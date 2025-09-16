@@ -1,0 +1,14 @@
+[project]
+name = "examinedlifejournal"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "gjdutils",
+    "openai-whisper",
+    "typer",
+]
+
+[tool.uv.sources]
+gjdutils = { path = "./gjdutils", editable = true }

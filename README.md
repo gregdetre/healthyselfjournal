@@ -1,1 +1,3 @@
 # examinedlifejournal
+
+see AGENTS.md
