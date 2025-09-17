@@ -19,5 +19,8 @@ dependencies = [
     "typer>=0.9.0",
 ]
 
+[project.scripts]
+examinedlifejournal = "examinedlifejournal.__main__:app"
+
 [tool.uv.sources]
 gjdutils = { path = "./gjdutils", editable = true }

@@ -9,7 +9,7 @@ Auto-start voice recording interface with visual feedback and keyboard controls.
 The journaling loop is started from the project root:
 
 ```bash
-uv run examinedlifejournal journal [--sessions-dir PATH] [--stream-llm/--no-stream-llm]
+uv run examinedlifejournal journal [--sessions-dir PATH] [--stream-llm/--no-stream-llm] [--voice-mode/--no-voice-mode] [--tts-model SPEC] [--tts-voice NAME] [--tts-format FORMAT]
 ```
 
 Files default to `./sessions/`; pass `--sessions-dir` to override for archival or testing.
@@ -25,7 +25,7 @@ Tip: during a session, you can say "give me a question" to instantly get a quest
 
 Environment variables:
 
-- `journal`: requires `ANTHROPIC_API_KEY` for dialogue/summaries. `OPENAI_API_KEY` is only required when `--stt-backend cloud-openai` is selected.
+- `journal`: requires `ANTHROPIC_API_KEY` for dialogue/summaries. `OPENAI_API_KEY` is required when `--stt-backend cloud-openai` or when `--voice-mode` is enabled (OpenAI TTS).
 - `reconcile`: requires `OPENAI_API_KEY` only when `--stt-backend cloud-openai` is selected. Local backends do not need API keys.
 
 ### Summaries Utilities
@@ -64,5 +64,26 @@ Recording started… [████████░░░░░░░░] Press an
 
 ## Display Mode
 
-- Default: Streaming next question word-by-word for conversational feel (`--stream-llm`).
-- Disable streaming with `--no-stream-llm` to show all-at-once.
+- **Streaming**: Default streams the next question word-by-word (`--stream-llm`).
+- **Speech**: Enable `--voice-mode` to speak the assistant's questions out loud using OpenAI TTS. When speech is enabled, streaming display is automatically disabled for clarity.
+- Disable streaming manually with `--no-stream-llm` to show all-at-once.
+
+### Speech options
+
+- `--voice-mode/--no-voice-mode`: convenience switch that enables speech with default settings.
+- `--tts-model`: TTS model (default `gpt-4o-mini-tts`).
+- `--tts-voice`: TTS voice (default `shimmer`).
+- `--tts-format`: audio format for playback (default `wav`).
+
+Examples:
+```bash
+# One-flag voice mode with defaults (shimmer, gpt-4o-mini-tts, wav)
+uv run examinedlifejournal journal --voice-mode
+
+# Explicit control
+uv run examinedlifejournal journal --speak-llm --tts-voice shimmer --tts-model gpt-4o-mini-tts --tts-format wav
+```
+
+Notes:
+- macOS uses `afplay` for local playback. If unavailable, `ffplay` is attempted.
+- Only assistant questions are spoken; summaries and status messages remain text-only.

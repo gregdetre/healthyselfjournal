@@ -8,6 +8,7 @@
 - Understanding the product? See: `docs/reference/PRODUCT_VISION_FEATURES.md`.
 - Data and files? See: `docs/reference/FILE_FORMATS_ORGANISATION.md`.
 - Voice recognition? See: `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md`.
+- Speech output (TTS)? See: `docs/reference/AUDIO_SPEECH_GENERATION.md`.
 
 ## By Category
 
@@ -17,6 +18,7 @@ Guides for getting your environment ready and understanding core tooling.
 - **SETUP** (⭐ START HERE): `docs/reference/SETUP.md` — Install tooling, use the preferred external venv, and run with `uv`.
 - THIRD-PARTY LIBRARIES: `docs/reference/THIRD_PARTY_LIBRARIES_NEEDED.md` — External deps and rationale.
 - AUDIO & WHISPER: `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md` — Speech-to-text setup, formats, and caveats.
+- SPEECH (TTS): `docs/reference/AUDIO_SPEECH_GENERATION.md` — Speech synthesis and playback options.
 - FILE FORMATS: `docs/reference/FILE_FORMATS_ORGANISATION.md` — Where files live and how they’re structured.
 
 ### Architecture & Design

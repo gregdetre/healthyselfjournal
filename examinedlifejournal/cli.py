@@ -17,6 +17,7 @@ from .session import SessionConfig, SessionManager
 from .events import init_event_logger, log_event, get_event_log_path
 from .history import load_recent_summaries
 from .llm import SummaryRequest, generate_summary
+from .tts import TTSOptions, speak_text
 from .transcription import (
     BackendNotAvailableError,
     apply_transcript_formatting,
@@ -52,7 +53,7 @@ def journal(
     llm_model: str = typer.Option(
         CONFIG.model_llm,
         "--llm-model",
-        help="LLM model spec (provider:model:version).",
+        help="LLM model string: provider:model:version[:thinking] (e.g., anthropic:claude-sonnet-4:20250514:thinking)",
     ),
     stt_backend: str = typer.Option(
         CONFIG.stt_backend,
@@ -102,6 +103,28 @@ def journal(
         "--stream-llm/--no-stream-llm",
         help="Stream the next question from the LLM for lower perceived latency.",
     ),
+    voice_mode: bool = typer.Option(
+        False,
+        "--voice-mode/--no-voice-mode",
+        help=(
+            "Convenience switch: enable speech with default TTS settings (shimmer, gpt-4o-mini-tts, wav)."
+        ),
+    ),
+    tts_model: str = typer.Option(
+        CONFIG.tts_model,
+        "--tts-model",
+        help="TTS model identifier (default: gpt-4o-mini-tts).",
+    ),
+    tts_voice: str = typer.Option(
+        CONFIG.tts_voice,
+        "--tts-voice",
+        help="TTS voice name (e.g., alloy).",
+    ),
+    tts_format: str = typer.Option(
+        CONFIG.tts_format,
+        "--tts-format",
+        help="TTS audio format for playback (wav recommended).",
+    ),
 ) -> None:
     """Run the interactive voice journaling session."""
 
@@ -132,8 +155,32 @@ def journal(
         for warning in selection.warnings:
             console.print(f"[yellow]STT warning:[/] {warning}")
 
+    # Propagate config flags for TTS
+    # Convenience: --voice-mode turns on TTS and sets sensible defaults
+    if voice_mode:
+        CONFIG.speak_llm = True
+        tts_model = tts_model or "gpt-4o-mini-tts"
+        tts_voice = tts_voice or "shimmer"
+        tts_format = tts_format or "wav"
+
+    # Allow explicit config override via env/CONFIG but not via removed flag
+    CONFIG.tts_model = str(tts_model)
+    CONFIG.tts_voice = str(tts_voice)
+    CONFIG.tts_format = str(tts_format)
+
+    # When speaking is enabled, disable LLM streaming for clearer UX
+    if CONFIG.speak_llm and stream_llm:
+        console.print(
+            "[yellow]Speech enabled; disabling streaming display for clarity.[/]"
+        )
+        stream_llm = False
+
     # Require OpenAI key only if using cloud STT
     if selection.backend_id == "cloud-openai":
+        _require_env("OPENAI_API_KEY")
+
+    # Also require OpenAI key when TTS is enabled (OpenAI backend)
+    if CONFIG.speak_llm:
         _require_env("OPENAI_API_KEY")
 
     # Initialize append-only metadata event logger
@@ -243,7 +290,31 @@ def journal(
 
     try:
         while True:
-            console.print(f"[bold magenta]AI:[/] {question}")
+            console.print(
+                Panel.fit(
+                    question,
+                    title="AI",
+                    border_style="cyan",
+                )
+            )
+            console.print()
+
+            # Speak the assistant's question before recording, if enabled
+            if CONFIG.speak_llm:
+                try:
+                    speak_text(
+                        question,
+                        TTSOptions(
+                            backend="openai",
+                            model=CONFIG.tts_model,
+                            voice=CONFIG.tts_voice,
+                            audio_format=CONFIG.tts_format,  # type: ignore[arg-type]
+                        ),
+                    )
+                except Exception as exc:  # pragma: no cover - runtime path
+                    console.print(
+                        f"[yellow]TTS failed; continuing without speech:[/] {exc}"
+                    )
 
             try:
                 exchange = manager.record_exchange(question, console)
@@ -294,6 +365,7 @@ def journal(
                     )
                 continue
 
+            console.print()
             console.print(
                 Panel.fit(exchange.transcript, title="You", border_style="green")
             )
@@ -329,7 +401,9 @@ def journal(
                         buffer.append(chunk)
 
                     # Render live as tokens stream in
-                    with Live(console=console, auto_refresh=True, transient=True) as live:
+                    with Live(
+                        console=console, auto_refresh=True, transient=True
+                    ) as live:
                         # Use a small spinner-like feedback until first token arrives
                         live.update(
                             Panel.fit(
@@ -344,7 +418,9 @@ def journal(
                         # Final render with the fully assembled text
                         streamed_text = "".join(buffer)
                         question_text = (
-                            next_question.question if next_question.question else streamed_text
+                            next_question.question
+                            if next_question.question
+                            else streamed_text
                         )
                         live.update(
                             Panel.fit(
@@ -379,7 +455,10 @@ def journal(
     except KeyboardInterrupt:
         console.print("[red]Session interrupted by user.[/]")
     finally:
+        # Surface progress while waiting for the final summary flush
+        console.print("[cyan]Finalizing summary before exit…[/]")
         manager.complete()
+        console.print("[green]Summary updated.[/]")
         log_event(
             "cli.end",
             {
@@ -587,7 +666,7 @@ def summaries_backfill(
     llm_model: str = typer.Option(
         CONFIG.model_llm,
         "--llm-model",
-        help="LLM model spec (provider:model:version).",
+        help="LLM model string: provider:model:version[:thinking] (e.g., anthropic:claude-sonnet-4:20250514:thinking)",
     ),
     missing_only: bool = typer.Option(
         True,
