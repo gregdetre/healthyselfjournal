@@ -10,7 +10,9 @@ DEFAULT_MAX_RECENT_SUMMARIES = 50
 DEFAULT_MAX_HISTORY_TOKENS = 5_000
 DEFAULT_SESSION_BREAK_MINUTES = 20
 DEFAULT_MODEL_LLM = "anthropic:claude-sonnet-4-20250514"
-DEFAULT_MODEL_STT = "gpt-4o-mini-transcribe"
+# more accurate, but slower & more expensive
+DEFAULT_MODEL_STT = "gpt-4o-transcribe"
+# DEFAULT_MODEL_STT = "gpt-4o-mini-transcribe"
 DEFAULT_PROMPT_BUDGET_TOKENS = 8_000
 DEFAULT_RETRY_MAX_ATTEMPTS = 3
 DEFAULT_RETRY_BACKOFF_BASE_MS = 1_500
@@ -38,6 +40,8 @@ class AppConfig:
     short_answer_duration_seconds: float = DEFAULT_SHORT_ANSWER_DURATION_SECONDS
     short_answer_voiced_seconds: float = DEFAULT_SHORT_ANSWER_VOICED_SECONDS
     voice_rms_dbfs_threshold: float = DEFAULT_VOICE_RMS_DBFS_THRESHOLD
+    # Optional: delete large WAV files once MP3 and STT JSON exist
+    delete_wav_when_safe: bool = True
 
 
 CONFIG = AppConfig()

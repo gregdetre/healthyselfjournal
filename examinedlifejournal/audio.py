@@ -56,6 +56,7 @@ def record_response(
     sample_rate: int = 16_000,
     meter_refresh_hz: float = 20.0,
     ffmpeg_path: str | None = None,
+    print_saved_message: bool = True,
 ) -> AudioCaptureResult:
     """Record audio until a keypress while updating a visual meter."""
 
@@ -73,7 +74,7 @@ def record_response(
 
     console.print(
         Text(
-            "Recording started. Press any key to stop (ESC cancels, Q quits after this response).",
+            "Recording started. SPACE pauses/resumes; any key stops (ESC cancels, Q quits after this response).",
             style="bold green",
         )
     )
@@ -84,6 +85,7 @@ def record_response(
     cancel_flag = threading.Event()
     quit_flag = threading.Event()
     interrupt_flag = threading.Event()
+    paused_event = threading.Event()
 
     voiced_seconds = 0.0
     frame_duration_sec = 0.0
@@ -93,30 +95,46 @@ def record_response(
     ):  # pragma: no cover - exercised at runtime
         if status:
             _LOGGER.warning("Audio status: %s", status)
-        frames_queue.put_nowait(indata.copy())
+        # Always compute level for the meter
         rms = float(np.sqrt(np.mean(np.square(indata), dtype=np.float64)))
         try:
             level_queue.put_nowait(rms)
         except queue.Full:
             pass
+        # Only enqueue frames for writing when not paused
+        if not paused_event.is_set():
+            frames_queue.put_nowait(indata.copy())
 
     def _wait_for_stop():  # pragma: no cover - blocking on user input
         try:
-            key = readchar.readkey()
+            while True:
+                key = readchar.readkey()
+                if key == readchar.key.CTRL_C:
+                    stop_event.set()
+                    interrupt_flag.set()
+                    return
+                if key == readchar.key.ESC:
+                    cancel_flag.set()
+                    stop_event.set()
+                    return
+                if key.lower() == "q":
+                    quit_flag.set()
+                    stop_event.set()
+                    return
+                # SPACE toggles pause/resume without stopping
+                if key == getattr(readchar.key, "SPACE", " ") or key == " ":
+                    if paused_event.is_set():
+                        paused_event.clear()
+                    else:
+                        paused_event.set()
+                    continue
+                # Any other key stops recording
+                stop_event.set()
+                return
         except KeyboardInterrupt:
             stop_event.set()
             interrupt_flag.set()
             return
-
-        if key == readchar.key.CTRL_C:
-            stop_event.set()
-            interrupt_flag.set()
-            return
-        if key == readchar.key.ESC:
-            cancel_flag.set()
-        elif key.lower() == "q":
-            quit_flag.set()
-        stop_event.set()
 
     listener_thread = threading.Thread(target=_wait_for_stop, daemon=True)
     listener_thread.start()
@@ -168,6 +186,12 @@ def record_response(
 
                         if time.monotonic() - last_render >= 1.0 / meter_refresh_hz:
                             level = _drain_latest_level(level_queue)
+                            # Update status text based on pause state
+                            status_text = (
+                                Text("Paused", style="bold yellow")
+                                if paused_event.is_set()
+                                else Text("Recording", style="bold green")
+                            )
                             message = _render_meter(level, status_text)
                             live.update(message, refresh=True)
                             last_render = time.monotonic()
@@ -200,7 +224,12 @@ def record_response(
 
     if cancel_flag.is_set():
         wav_path.unlink(missing_ok=True)
-        console.print(Text("Recording cancelled.", style="yellow"))
+        console.print(
+            Text(
+                "Cancelled. Take discarded. Press any key to stop; ESC cancels, Q ends after next take.",
+                style="yellow",
+            )
+        )
         log_event(
             "audio.record.cancelled",
             {
@@ -254,14 +283,7 @@ def record_response(
         ffmpeg_path=ffmpeg_path,
     )
 
-    if mp3_path:
-        console.print(
-            Text(
-                f"Saved WAV → {wav_path.name} ({_format_duration(duration_sec)}); MP3 conversion queued.",
-                style="green",
-            )
-        )
-    else:
+    if print_saved_message:
         console.print(
             Text(
                 f"Saved WAV → {wav_path.name} ({_format_duration(duration_sec)})",
@@ -311,7 +333,7 @@ def _render_meter(level_rms: float, status_text: Text) -> Text:
     text.append(status_text)
     text.append("  [")
     text.append(bar, style="cyan")
-    text.append("] Press any key to stop (ESC cancels, Q quits)")
+    text.append("] SPACE pause/resume; any key stops (ESC cancels, Q quits)")
     return text
 
 
@@ -388,6 +410,26 @@ def _maybe_start_mp3_conversion(
                     "mp3": mp3_path.name,
                 },
             )
+            # Optional cleanup: delete WAV once MP3 is present and STT JSON exists
+            try:
+                from .config import CONFIG as _CFG
+
+                if getattr(_CFG, "delete_wav_when_safe", False):
+                    stt_json = wav_path.with_suffix(".stt.json")
+                    if stt_json.exists() and wav_path.exists():
+                        try:
+                            wav_path.unlink(missing_ok=True)
+                            log_event(
+                                "audio.wav.deleted",
+                                {
+                                    "wav": wav_path.name,
+                                    "reason": "safe_delete_after_mp3_and_stt",
+                                },
+                            )
+                        except Exception:
+                            pass
+            except Exception:
+                pass
         except subprocess.CalledProcessError as exc:
             _LOGGER.warning("MP3 conversion failed: %s", exc)
             log_event(

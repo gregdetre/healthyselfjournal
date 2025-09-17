@@ -32,6 +32,7 @@ from .storage import (
 )
 from .transcription import TranscriptionResult, transcribe_wav
 from .events import log_event
+from rich.text import Text
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -64,6 +65,9 @@ class SessionState:
     response_index: int = 0
     recent_history: List[HistoricalSummary] = field(default_factory=list)
     resumed: bool = False
+    # UI feedback flags for last capture disposition
+    last_cancelled: bool = False
+    last_discarded_short: bool = False
 
 
 @dataclass
@@ -232,15 +236,21 @@ class SessionManager:
             console=console,
             sample_rate=16_000,
             ffmpeg_path=self.config.ffmpeg_path,
+            print_saved_message=False,
         )
 
         if capture.cancelled:
+            # Mark disposition for clearer UI messaging
+            self.state.last_cancelled = True
+            self.state.last_discarded_short = False
             self.state.response_index -= 1
             return None
 
         if capture.discarded_short_answer:
             # Treat as no exchange; do not transcribe, do not persist any body
             self.state.response_index -= 1
+            self.state.last_cancelled = False
+            self.state.last_discarded_short = True
             log_event(
                 "session.exchange.discarded_short",
                 {
@@ -253,6 +263,22 @@ class SessionManager:
             # If user pressed Q while discarding, mark quit flag on state and let caller handle
             self.state.quit_requested = capture.quit_after
             return None
+
+        # Print a combined saved message with segment and session total durations
+        try:
+            doc = load_transcript(self.state.markdown_path)
+            prior_total = float(doc.frontmatter.data.get("duration_seconds", 0.0))
+        except Exception:
+            prior_total = 0.0
+
+        seg_formatted = _format_duration(capture.duration_seconds)
+        total_formatted = _format_duration(prior_total + capture.duration_seconds)
+        console.print(
+            Text(
+                f"Saved WAV → {capture.wav_path.name} ({seg_formatted}; total {total_formatted})",
+                style="green",
+            )
+        )
 
         transcription = transcribe_wav(
             capture.wav_path,
@@ -281,6 +307,9 @@ class SessionManager:
         )
         self.state.exchanges.append(exchange)
         self.state.quit_requested = capture.quit_after
+        # Successful capture resets disposition flags
+        self.state.last_cancelled = False
+        self.state.last_discarded_short = False
 
         self._update_frontmatter_after_exchange()
         log_event(
@@ -500,3 +529,32 @@ def _persist_raw_transcription(wav_path: Path, payload: dict) -> None:
     output_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
     )
+    # Optional cleanup: delete WAV when safe (MP3 + STT present)
+    try:
+        from .config import CONFIG as _CFG
+
+        if getattr(_CFG, "delete_wav_when_safe", False):
+            mp3_path = wav_path.with_suffix(".mp3")
+            if mp3_path.exists() and wav_path.exists():
+                try:
+                    wav_path.unlink(missing_ok=True)
+                    log_event(
+                        "audio.wav.deleted",
+                        {
+                            "wav": wav_path.name,
+                            "reason": "safe_delete_after_mp3_and_stt",
+                        },
+                    )
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+def _format_duration(seconds: float) -> str:
+    total_seconds = int(round(max(0.0, float(seconds))))
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
