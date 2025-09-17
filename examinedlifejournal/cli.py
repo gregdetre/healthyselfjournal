@@ -49,6 +49,11 @@ def journal(
         "--language",
         help="Primary language for transcription and LLM guidance.",
     ),
+    resume: bool = typer.Option(
+        False,
+        "--resume",
+        help="Resume the most recent session in the sessions directory.",
+    ),
 ) -> None:
     """Run the interactive voice journaling session."""
 
@@ -66,6 +71,7 @@ def journal(
             "language": language,
             "events_log": str(get_event_log_path() or ""),
             "app_version": __version__,
+            "resume": resume,
         },
     )
 
@@ -78,17 +84,51 @@ def journal(
     )
     manager = SessionManager(session_cfg)
 
-    console.print(
-        Panel.fit(
-            "Voice journaling session starting. Recording starts immediately.\n"
-            "Press any key to stop. ESC cancels the current take; Q saves then ends after this entry.",
-            title="Examined Life Journal",
-            border_style="magenta",
+    # Determine whether to start new or resume recent session
+    if resume:
+        markdown_files = sorted((p for p in sessions_dir.glob("*.md")), reverse=True)
+        if not markdown_files:
+            console.print(
+                Panel.fit(
+                    "No prior sessions found. Starting a new session.",
+                    title="Examined Life Journal",
+                    border_style="magenta",
+                )
+            )
+            state = manager.start()
+            question = opening_question
+        else:
+            latest_md = markdown_files[0]
+            state = manager.resume(latest_md)
+            doc = load_transcript(state.markdown_path)
+            if doc.body.strip():
+                try:
+                    next_q = manager.generate_next_question(doc.body)
+                    question = next_q.question
+                except Exception as exc:
+                    console.print(f"[red]Question generation failed:[/] {exc}")
+                    question = opening_question
+            else:
+                question = opening_question
+            console.print(
+                Panel.fit(
+                    f"Resuming session {state.session_id}. Recording starts immediately.\n"
+                    "Press any key to stop. ESC cancels the current take; Q saves then ends after this entry.",
+                    title="Examined Life Journal",
+                    border_style="magenta",
+                )
+            )
+    else:
+        console.print(
+            Panel.fit(
+                "Voice journaling session starting. Recording starts immediately.\n"
+                "Press any key to stop. ESC cancels the current take; Q saves then ends after this entry.",
+                title="Examined Life Journal",
+                border_style="magenta",
+            )
         )
-    )
-
-    state = manager.start()
-    question = opening_question
+        state = manager.start()
+        question = opening_question
 
     try:
         while True:

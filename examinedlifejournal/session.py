@@ -63,6 +63,7 @@ class SessionState:
     quit_requested: bool = False
     response_index: int = 0
     recent_history: List[HistoricalSummary] = field(default_factory=list)
+    resumed: bool = False
 
 
 @dataclass
@@ -143,6 +144,77 @@ class SessionManager:
                 "stt_model": self.config.stt_model,
                 "language": self.config.language,
                 "recent_summaries_count": len(recent),
+            },
+        )
+        return self.state
+
+    def resume(self, markdown_path: Path) -> SessionState:
+        """Resume an existing session from a transcript markdown file.
+
+        - Preserves existing transcript and frontmatter
+        - Sets response index to next available segment number
+        - Loads recent summaries for LLM context
+        """
+        base_dir = self.config.base_dir
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        session_id = markdown_path.stem
+
+        recent = load_recent_summaries(
+            base_dir,
+            current_filename=markdown_path.name,
+            limit=self.config.recent_summaries_limit,
+            max_estimated_tokens=self.config.max_history_tokens,
+        )
+
+        self.state = SessionState(
+            session_id=session_id,
+            markdown_path=markdown_path,
+            audio_dir=base_dir / session_id,
+            recent_history=recent,
+            resumed=True,
+        )
+        self.state.audio_dir.mkdir(parents=True, exist_ok=True)
+
+        # Determine next response index from existing frontmatter or files
+        try:
+            doc = load_transcript(markdown_path)
+            audio_entries = doc.frontmatter.data.get("audio_file") or []
+            indices: list[int] = []
+            for entry in audio_entries:
+                try:
+                    wav_name = str(entry.get("wav", ""))
+                    # Expect pattern <session_id>_<NN>.wav
+                    stem = Path(wav_name).stem
+                    parts = stem.split("_")
+                    if len(parts) >= 2 and parts[-1].isdigit():
+                        indices.append(int(parts[-1]))
+                except Exception:
+                    continue
+            if not indices:
+                # Fallback: inspect filesystem for existing WAVs
+                for wav_path in sorted(
+                    self.state.audio_dir.glob(f"{session_id}_*.wav")
+                ):
+                    try:
+                        stem = wav_path.stem
+                        parts = stem.split("_")
+                        if len(parts) >= 2 and parts[-1].isdigit():
+                            indices.append(int(parts[-1]))
+                    except Exception:
+                        continue
+            self.state.response_index = max(indices) if indices else 0
+        except Exception:
+            # Defensive: on any error, continue from zero
+            self.state.response_index = 0
+
+        log_event(
+            "session.resume",
+            {
+                "session_id": session_id,
+                "transcript_file": markdown_path.name,
+                "audio_dir": self.state.audio_dir,
+                "existing_responses": self.state.response_index,
             },
         )
         return self.state
@@ -365,10 +437,9 @@ class SessionManager:
 
         with self._io_lock:
             doc = load_transcript(self.state.markdown_path)
-            total_duration = sum(
-                item.audio.duration_seconds for item in self.state.exchanges
-            )
-            audio_segments = [
+
+            # Build list of new segments from current process
+            new_segments = [
                 {
                     "wav": exchange.audio.wav_path.name,
                     "mp3": (
@@ -381,10 +452,37 @@ class SessionManager:
                 for exchange in self.state.exchanges
             ]
 
+            if self.state.resumed:
+                # Merge with existing without duplicating entries
+                existing_list = list(doc.frontmatter.data.get("audio_file") or [])
+                by_wav: dict[str, dict] = {
+                    str(item.get("wav")): item for item in existing_list
+                }
+                for seg in new_segments:
+                    by_wav[seg["wav"]] = seg
+                merged_list = [
+                    # Keep original order, append any truly new ones in order recorded
+                    *[item for item in existing_list if str(item.get("wav")) in by_wav],
+                    *[
+                        seg
+                        for seg in new_segments
+                        if seg["wav"] not in {str(i.get("wav")) for i in existing_list}
+                    ],
+                ]
+                total_duration = sum(
+                    float(item.get("duration_seconds", 0.0)) for item in merged_list
+                )
+                audio_file_value = merged_list
+            else:
+                total_duration = sum(
+                    item.audio.duration_seconds for item in self.state.exchanges
+                )
+                audio_file_value = new_segments
+
             doc.frontmatter.data.update(
                 {
                     "duration_seconds": round(total_duration, 2),
-                    "audio_file": audio_segments,
+                    "audio_file": audio_file_value,
                     "recent_summary_refs": [
                         item.filename for item in self.state.recent_history
                     ],
