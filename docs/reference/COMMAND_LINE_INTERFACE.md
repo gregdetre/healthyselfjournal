@@ -14,6 +14,20 @@ uv run examinedlifejournal journal [--sessions-dir PATH]
 
 Files default to `./sessions/`; pass `--sessions-dir` to override for archival or testing.
 
+Tip: during a session, you can say "give me a question" to instantly get a question from the built‑in question bank (bypasses the LLM for speed/robustness).
+
+#### Speech-to-text options
+
+- `--stt-backend`: choose between `cloud-openai`, `local-mlx`, `local-faster`, `local-whispercpp`, or `auto-private` (local-first probe).
+- `--stt-model`: preset (`default`, `accuracy`, `fast`) or explicit model id/path.
+- `--stt-compute`: optional precision override for local backends (e.g. `int8_float16`). Ignored when unsupported.
+- `--stt-formatting`: `sentences` (default heuristic splitter) or `raw` (unaltered backend output).
+
+Environment variables:
+
+- `journal`: requires `ANTHROPIC_API_KEY` for dialogue/summaries. `OPENAI_API_KEY` is only required when `--stt-backend cloud-openai` is selected.
+- `reconcile`: requires `OPENAI_API_KEY` only when `--stt-backend cloud-openai` is selected. Local backends do not need API keys.
+
 ### Summaries Utilities
 
 Minimal commands for working with summaries stored in session frontmatter:
