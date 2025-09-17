@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import Optional, TYPE_CHECKING
 
 import numpy as np
-import readchar
 import sounddevice as sd
 import soundfile as sf
 from rich.live import Live
@@ -75,7 +74,7 @@ def record_response(
 
     console.print(
         Text(
-            "Recording started. SPACE pauses/resumes; any key stops (ESC cancels, Q quits after this response).",
+            "Recording started. SPACE pauses/resumes; any key stops (Q quits after this response).",
             style="bold green",
         )
     )
@@ -112,20 +111,42 @@ def record_response(
             level_queue.put_nowait(rms)
         except queue.Full:
             pass
-        # Only enqueue frames for writing when not paused
-        if not paused_event.is_set():
+        # Do not enqueue frames after a stop/cancel has been requested,
+        # and only enqueue when not paused
+        if not stop_event.is_set() and not paused_event.is_set():
             frames_queue.put_nowait(indata.copy())
 
     def _wait_for_stop():  # pragma: no cover - blocking on user input
+        # Lazy import to avoid hard dependency during unit tests
+        try:
+            import readchar  # type: ignore
+        except Exception as _exc:  # noqa: N816 - local name matches import
+            _LOGGER.warning("readchar not available: %s", _exc)
+            # Fallback: stop on any input via input() (no pause/cancel support)
+            try:
+                input()
+            except Exception:
+                pass
+            stop_event.set()
+            return
         try:
             while True:
                 key = readchar.readkey()
+                # Normalize to string in case backend returns bytes
+                if isinstance(key, (bytes, bytearray)):
+                    try:
+                        key = key.decode("utf-8", "ignore")
+                    except Exception:
+                        key = str(key)
                 # Handle Ctrl-C robustly across readchar versions and terminals
                 if key == "\x03" or key == getattr(readchar.key, "CTRL_C", None):
                     stop_event.set()
                     interrupt_flag.set()
                     return
-                if key == readchar.key.ESC:
+                # Treat ESC and any ESC-prefixed sequence (e.g., ANSI) as cancel
+                if key == getattr(readchar.key, "ESC", "\x1b") or (
+                    isinstance(key, str) and key.startswith("\x1b")
+                ):
                     cancel_flag.set()
                     stop_event.set()
                     return
@@ -247,7 +268,7 @@ def record_response(
         wav_path.unlink(missing_ok=True)
         console.print(
             Text(
-                "Cancelled. Take discarded. Press any key to stop; ESC cancels, Q ends after next take.",
+                "Cancelled. Take discarded. Press any key to stop; Q ends after next take.",
                 style="yellow",
             )
         )
@@ -365,7 +386,7 @@ def _render_meter(level_rms: float, status_text: Text, paused: bool = False) -> 
         text.append("  [")
         text.append(bar, style="cyan")
         text.append("]")
-    text.append(" SPACE pause/resume; any key stops (ESC cancels, Q quits)")
+    text.append(" SPACE pause/resume; any key stops (Q quits)")
     return text
 
 

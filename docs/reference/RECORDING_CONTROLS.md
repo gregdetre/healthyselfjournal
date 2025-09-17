@@ -21,11 +21,14 @@ Keyboard controls for voice recording and session management.
 
 ## Session Controls
 
-- **ESC**: Cancel current recording (don't save or transcribe)
 - **SPACE**: Pause/resume the recording (paused audio is not saved; meter hidden while paused)
 - **Q**: Quit after this response
   - If pressed before any substantial speech: the take is auto‑discarded and the session ends cleanly
   - If pressed after a normal answer: the take is saved/transcribed, then the session ends
+
+### Known Issue
+
+- On some terminals, the ESC key may require a second press to cancel reliably and can be interpreted as a generic stop on the first press. As a result, the in-app hints omit the ESC instruction for now. Cancellation still works but may be inconsistent across environments. Tracking for a more robust fix.
 
 ## Error Prevention
 
