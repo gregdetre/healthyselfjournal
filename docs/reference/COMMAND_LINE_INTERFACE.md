@@ -2,7 +2,17 @@
 
 ## Overview
 
-Press-to-record voice interface with visual feedback and keyboard controls.
+Auto-start voice recording interface with visual feedback and keyboard controls.
+
+### Launching
+
+The journaling loop is started from the project root:
+
+```bash
+uv run examinedlifejournal journal [--sessions-dir PATH]
+```
+
+Files default to `./sessions/`; pass `--sessions-dir` to override for archival or testing.
 
 ## See also
 
@@ -14,7 +24,7 @@ Press-to-record voice interface with visual feedback and keyboard controls.
 
 Unicode block volume meter using Python `rich` library:
 ```
-Recording... [████████░░░░░░░░] Press any key to stop
+Recording started… [████████░░░░░░░░] Press any key to stop (ESC cancels, Q quits)
 ```
 
 ## Display Mode

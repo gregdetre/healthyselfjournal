@@ -29,6 +29,13 @@ Core requirements:
 - Include current session + recent summaries in context
 - Transparent mode switching based on emotional context
 
+## Progress Update (2025-02-16)
+
+- Core CLI, session manager, and audio/transcription/LLM pipelines wired end-to-end; recordings persist immediately with optional MP3 conversion.
+- YAML frontmatter now holds rolling summaries, audio metadata, and recent-session context; summary regeneration happens after every exchange.
+- README/TESTING docs refreshed and initial pytest coverage in place for storage/history helpers.
+- Still to do: broaden automated tests (audio/session flow, LLM integration), verify ffmpeg/device enumeration on target machines, document/example transcript, and run a full E2E session.
+
 ## Decisions and constraints (V1)
 
 - Audio capture: Use `sounddevice` for cross-platform input and `soundfile` to persist lossless WAV (mono, 16 kHz, 16-bit PCM) immediately after stop. Real-time volume meter computed via NumPy RMS over recent frames. Key handling via `readchar` for portable, non-blocking keypresses. Visuals via `rich`.
@@ -78,15 +85,15 @@ Decision (V1): Soft reminder at ~20 minutes based on research; no automated brea
 ## Stages & actions
 
 ### Stage: Environment setup and dependencies
-- [ ] Install core dependencies: `rich`, `anthropic`, `openai`, `jinja2`, `pyyaml`, `sounddevice`, `soundfile`, `numpy`, `readchar`
+- [x] Install core dependencies: `rich`, `anthropic`, `openai`, `jinja2`, `pyyaml`, `sounddevice`, `soundfile`, `numpy`, `readchar`
 - [ ] Ensure `ffmpeg` available on PATH (optional for MP3 conversion)
 - [ ] Verify audio device enumeration and default selection with `sounddevice`
-- [ ] Verify real-time volume monitoring capability (RMS computation)
-- [ ] Create basic project structure and .gitignore
+- [x] Verify real-time volume monitoring capability (RMS computation)
+- [x] Create basic project structure and .gitignore
 
 ### Stage: Configuration and model selection
 
-- [ ] Create `config.py` to centralize parameters:
+- [x] Create `config.py` to centralize parameters:
   - `MAX_RECENT_SUMMARIES` (default 50)
   - `MAX_HISTORY_TOKENS` (default 5000)
   - `SESSION_BREAK_MINUTES` (default 20)
@@ -99,54 +106,54 @@ Decision (V1): Soft reminder at ~20 minutes based on research; no automated brea
 
 ### Stage: Basic audio recording with visual feedback
 - [ ] Write test for audio recording functionality
-- [ ] Implement press-any-key to start recording
-- [ ] Create volume meter visualization using rich
+- [x] Implement press-any-key to start recording
+- [x] Create volume meter visualization using rich
   - Unicode blocks showing real-time audio levels
   - "Recording... [████████░░░░░░░░] Press any key to stop"
-- [ ] Implement press-any-key to stop recording
-- [ ] Save audio immediately to WAV with yyMMdd_HHmm timestamp; MP3 conversion in background when available
+- [x] Implement press-any-key to stop recording
+- [x] Save audio immediately to WAV with yyMMdd_HHmm timestamp; MP3 conversion in background when available
 - [ ] Test recording on different audio devices
   - Use `readchar` for non-blocking keypress handling
 
 ### Stage: Whisper transcription integration
 - [ ] Write test for transcription pipeline
-- [ ] Set up OpenAI API client with Whisper
-- [ ] Implement audio file upload to Whisper API
-- [ ] Handle transcription response and errors
-- [ ] Save initial transcript to markdown file
+- [x] Set up OpenAI API client with Whisper
+- [x] Implement audio file upload to Whisper API
+- [x] Handle transcription response and errors
+- [x] Save initial transcript to markdown file
 - [ ] Test with various audio qualities and accents
   - Persist raw STT response permanently; implement 3x retry with backoff
 
 ### Stage: Basic LLM dialogue with Claude
 - [ ] Write test for Claude API integration
-- [ ] Set up Anthropic Claude API client
-- [ ] Create basic Jinja2 prompt template
+- [x] Set up Anthropic Claude API client
+- [x] Create basic Jinja2 prompt template
   - Include current transcript
   - Add default opening question
   - Store prompt in `.prompt.md.jinja` next to caller; render via `gjdutils.strings.jinja_render`
-- [ ] Implement question generation after transcription
-- [ ] Display AI response as text output
-- [ ] Update markdown with Q&A format
+- [x] Implement question generation after transcription
+- [x] Display AI response as text output
+- [x] Update markdown with Q&A format
   - "## AI Q: " prefix for questions
   - User response as section content
   - Enforce prompt token budget; include recent summaries per context rules
 
 ### Stage: Session management and controls
 - [ ] Write tests for session control flow
-- [ ] Implement ESC key detection (cancel recording)
-- [ ] Implement Q key detection (transcribe and quit)
-- [ ] Add continuous dialogue loop
+- [x] Implement ESC key detection (cancel recording)
+- [x] Implement Q key detection (transcribe and quit)
+- [x] Add continuous dialogue loop
   - Record → Transcribe → Generate question → Display → Loop
-- [ ] Handle session termination gracefully
-- [ ] Ensure all files saved before exit
+- [x] Handle session termination gracefully
+- [x] Ensure all files saved before exit
 
 ### Stage: Summary generation and frontmatter
 - [ ] Write tests for summary generation
-- [ ] Create summary prompt template for Claude
+- [x] Create summary prompt template for Claude
   - Store template in `.prompt.md.jinja`; render via `gjdutils.strings.jinja_render`
-- [ ] Generate initial summary after first Q&A
-- [ ] Update summary after each subsequent Q&A
-- [ ] Implement frontmatter read/write with pyyaml
+- [x] Generate initial summary after first Q&A
+- [x] Update summary after each subsequent Q&A
+- [x] Implement frontmatter read/write with pyyaml
   - Parse existing frontmatter
   - Update summary field
   - Preserve other metadata if present
@@ -155,45 +162,45 @@ Decision (V1): Soft reminder at ~20 minutes based on research; no automated brea
 
 ### Stage: Context management with previous sessions
 - [ ] Write tests for context loading
-- [ ] Implement file discovery for recent sessions
+- [x] Implement file discovery for recent sessions
   - Sort by timestamp in filename
   - Load last N session files
-- [ ] Extract summaries from frontmatter
-- [ ] Update Jinja2 template to include context
+- [x] Extract summaries from frontmatter
+- [x] Update Jinja2 template to include context
   - Add recent_summaries variable
   - Format for LLM consumption
 - [ ] Test pattern detection across sessions
   - Enforce 50 summaries max and ~5000-token budget for history
 
 ### Stage: Question variety and adaptation
-- [ ] Create initial question bank
+- [x] Create initial question bank
   - Concrete/specific questions
   - Open/exploratory questions
   - Pattern-interrupting questions
-- [ ] Implement "Give me a question" detection
-- [ ] Add question selection logic to template
+- [x] Implement "Give me a question" detection
+- [x] Add question selection logic to template
 - [ ] Test question variety over multiple sessions
 - [ ] Document question categories for future expansion
 
 ### Stage: Error handling and resilience
-- [ ] Add try/catch for audio device errors
-- [ ] Implement Whisper API retry logic
-- [ ] Add Claude API rate limit handling
-- [ ] Create fallback for network failures
+- [x] Add try/catch for audio device errors
+- [x] Implement Whisper API retry logic
+- [x] Add Claude API rate limit handling
+- [x] Create fallback for network failures
   - Save audio/transcript locally
   - Queue for later processing
 - [ ] Test crash recovery scenarios
-- [ ] Add logging for debugging
+- [x] Add logging for debugging
   - Validate graceful behavior when `ffmpeg` is missing (keep WAV only)
 
 ### Stage: Integration testing and polish
 - [ ] Use subagent to run full end-to-end test session
 - [ ] Test multiple sessions in single day
-- [ ] Verify file naming and organization
+- [x] Verify file naming and organization
 - [ ] Test with various session lengths
 - [ ] Check memory/resource usage over time
 - [ ] Run linting and type checking
-- [ ] Update documentation with usage instructions
+- [x] Update documentation with usage instructions
   - Add `TESTING.md` with pytest guidance and minimal high-level tests approach
 
 ### Stage: Streaming LLM responses (late-stage)
@@ -205,9 +212,9 @@ Decision (V1): Soft reminder at ~20 minutes based on research; no automated brea
   - Simulate process kill mid-session to verify immediate persistence guarantees
 
 ### Stage: Finalize V1
-- [ ] Create simple CLI entry point script
-- [ ] Write README with setup instructions
-- [ ] Document API key configuration
+- [x] Create simple CLI entry point script
+- [x] Write README with setup instructions
+- [x] Document API key configuration
 - [ ] Update any other documents as needed
 - [ ] Add example session transcript
 - [ ] Final test of complete flow

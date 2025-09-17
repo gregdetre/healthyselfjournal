@@ -28,7 +28,7 @@ At a high level, the CLI in `examinedlifejournal.py`:
 Live mic capture in `examinedlifejournal.py`:
 - Records from the system mic with `ffmpeg` (until RETURN or for `--duration` seconds)
 - Transcribes using the selected backend: `mlx` (GPU) or `faster` (CPU)
-- Defaults: `--backend mlx`, `--model-name large-v2`, language auto‑detect (override with `--language en`)
+- Defaults: `--backend mlx`, `--model-name large-v2`, language `en` (override with `--language <code>`)
 
 ### Setup
 1) Ensure `ffmpeg` is installed (macOS/Homebrew):
@@ -44,8 +44,8 @@ uv sync --active
 ### Usage
 Live mic capture (GPU, MLX backend):
 ```bash
-python examinedlifejournal.py --duration 3                   # defaults to MLX + large-v2, language auto
-python examinedlifejournal.py --duration 3 --language en     # force English
+python examinedlifejournal.py --duration 3                   # defaults to MLX + large-v2, language en
+python examinedlifejournal.py --duration 3 --language fr     # force French
 ```
 
 CPU (faster-whisper) alternative:
