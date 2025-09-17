@@ -15,6 +15,7 @@ from gjdutils.strings import jinja_render
 
 _LOGGER = logging.getLogger(__name__)
 from .events import log_event
+from .config import CONFIG
 
 
 @dataclass
@@ -27,6 +28,7 @@ class QuestionRequest:
     opening_question: str
     question_bank: Sequence[str]
     language: str
+    conversation_duration: str
     max_tokens: int = 256
 
 
@@ -63,14 +65,17 @@ def generate_followup_question(request: QuestionRequest) -> QuestionResponse:
         raise ValueError(f"Unsupported provider '{provider}' for question generation")
 
     template = _load_prompt("question.prompt.md.jinja")
+    # Shuffle the question bank to vary ordering in the prompt
+    shuffled_question_bank = list(request.question_bank)
+    random.shuffle(shuffled_question_bank)
     rendered = jinja_render(
         template,
         {
             "recent_summaries": list(request.recent_summaries),
             "current_transcript": request.current_transcript,
-            "opening_question": request.opening_question,
-            "question_bank": list(request.question_bank),
+            "question_bank": shuffled_question_bank,
             "language": request.language,
+            "conversation_duration": request.conversation_duration,
         },
         filesystem_loader=PROMPTS_DIR,
     )
@@ -79,7 +84,9 @@ def generate_followup_question(request: QuestionRequest) -> QuestionResponse:
         model_name,
         rendered,
         max_tokens=request.max_tokens,
-        temperature=0.7,
+        temperature=CONFIG.llm_temperature_question,
+        top_p=CONFIG.llm_top_p,
+        top_k=CONFIG.llm_top_k,
     )
 
     question = text.strip()
@@ -117,7 +124,9 @@ def generate_summary(request: SummaryRequest) -> SummaryResponse:
         model_name,
         rendered,
         max_tokens=request.max_tokens,
-        temperature=0.4,
+        temperature=CONFIG.llm_temperature_summary,
+        top_p=CONFIG.llm_top_p,
+        top_k=CONFIG.llm_top_k,
     )
 
     response = SummaryResponse(summary_markdown=text.strip(), model=request.model)
@@ -156,6 +165,8 @@ def _call_anthropic(
     *,
     max_tokens: int,
     temperature: float,
+    top_p: float | None = None,
+    top_k: int | None = None,
     max_retries: int = 3,
     backoff_base_seconds: float = 1.5,
 ) -> str:
@@ -167,18 +178,24 @@ def _call_anthropic(
 
     for attempt in range(1, max_retries + 1):
         try:
-            response = _ANTHROPIC_CLIENT.messages.create(
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system="You are a thoughtful journaling companion.",
-                messages=[
+            create_kwargs = {
+                "model": model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "system": "You are a thoughtful journaling companion.",
+                "messages": [
                     {
                         "role": "user",
                         "content": prompt,
                     }
                 ],
-            )
+            }
+            if top_p is not None:
+                create_kwargs["top_p"] = top_p
+            if top_k is not None:
+                create_kwargs["top_k"] = top_k
+
+            response = _ANTHROPIC_CLIENT.messages.create(**create_kwargs)
             return "".join(
                 block.text for block in response.content if block.type == "text"
             ).strip()

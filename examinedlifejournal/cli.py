@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import json
 
 import typer
 from rich.console import Console
@@ -14,6 +15,12 @@ from .session import SessionConfig, SessionManager
 from .events import init_event_logger, log_event, get_event_log_path
 from .history import load_recent_summaries
 from .llm import SummaryRequest, generate_summary
+from .transcription import (
+    BackendNotAvailableError,
+    apply_transcript_formatting,
+    resolve_backend_selection,
+    create_transcription_backend,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -45,10 +52,28 @@ def journal(
         "--llm-model",
         help="LLM model spec (provider:model:version).",
     ),
+    stt_backend: str = typer.Option(
+        CONFIG.stt_backend,
+        "--stt-backend",
+        help=(
+            "Transcription backend: cloud-openai, local-mlx, local-faster, "
+            "local-whispercpp, or auto-private."
+        ),
+    ),
     stt_model: str = typer.Option(
         CONFIG.model_stt,
         "--stt-model",
-        help="Whisper/STT model identifier for OpenAI.",
+        help="Model preset or identifier for the selected backend.",
+    ),
+    stt_compute: str = typer.Option(
+        CONFIG.stt_compute or "auto",
+        "--stt-compute",
+        help="Optional compute precision override for local backends (e.g., int8_float16).",
+    ),
+    stt_formatting: str = typer.Option(
+        CONFIG.stt_formatting,
+        "--stt-formatting",
+        help="Transcript formatting mode: sentences (default) or raw.",
     ),
     opening_question: str = typer.Option(
         CONFIG.opening_question,
@@ -73,8 +98,36 @@ def journal(
 ) -> None:
     """Run the interactive voice journaling session."""
 
-    _require_env("OPENAI_API_KEY")
     _require_env("ANTHROPIC_API_KEY")
+
+    try:
+        apply_transcript_formatting("sample", stt_formatting)
+    except ValueError as exc:
+        console.print(f"[red]Invalid --stt-formatting:[/] {exc}")
+        raise typer.Exit(code=2)
+
+    try:
+        selection = resolve_backend_selection(stt_backend, stt_model, stt_compute)
+    except (ValueError, BackendNotAvailableError) as exc:
+        console.print(f"[red]STT configuration error:[/] {exc}")
+        raise typer.Exit(code=2)
+
+    CONFIG.model_stt = selection.model
+    CONFIG.stt_backend = selection.backend_id
+    CONFIG.stt_compute = selection.compute
+    CONFIG.stt_formatting = stt_formatting
+
+    if selection.reason:
+        console.print(
+            f"[cyan]auto-private[/] -> using [bold]{selection.backend_id}[/] ({selection.reason})"
+        )
+    if selection.warnings:
+        for warning in selection.warnings:
+            console.print(f"[yellow]STT warning:[/] {warning}")
+
+    # Require OpenAI key only if using cloud STT
+    if selection.backend_id == "cloud-openai":
+        _require_env("OPENAI_API_KEY")
 
     # Initialize append-only metadata event logger
     init_event_logger(sessions_dir)
@@ -83,25 +136,40 @@ def journal(
         {
             "sessions_dir": sessions_dir,
             "model_llm": llm_model,
-            "model_stt": stt_model,
+            "stt_backend": selection.backend_id,
+            "model_stt": selection.model,
+            "stt_compute": selection.compute,
+            "stt_requested_backend": stt_backend,
+            "stt_requested_model": stt_model,
+            "stt_requested_compute": stt_compute,
+            "stt_formatting": stt_formatting,
             "language": language,
             "events_log": str(get_event_log_path() or ""),
             "app_version": __version__,
             "resume": resume,
+            "stt_auto_reason": selection.reason,
+            "stt_warnings": selection.warnings,
         },
     )
 
     # Propagate config flag
-    from .config import CONFIG as _CFG
-
-    _CFG.delete_wav_when_safe = bool(delete_wav_when_safe)
+    CONFIG.delete_wav_when_safe = bool(delete_wav_when_safe)
 
     session_cfg = SessionConfig(
         base_dir=sessions_dir,
         llm_model=llm_model,
-        stt_model=stt_model,
+        stt_model=selection.model,
+        stt_backend=selection.backend_id,
+        stt_compute=selection.compute,
         opening_question=opening_question,
         language=language,
+        stt_formatting=stt_formatting,
+        stt_backend_requested=stt_backend,
+        stt_model_requested=stt_model,
+        stt_compute_requested=stt_compute,
+        stt_auto_private_reason=selection.reason,
+        stt_backend_selection=selection,
+        stt_warnings=selection.warnings,
     )
     manager = SessionManager(session_cfg)
 
@@ -134,22 +202,37 @@ def journal(
             console.print(
                 Panel.fit(
                     f"Resuming session {state.session_id}. Recording starts immediately.\n"
-                    "Press any key to stop. ESC cancels the current take; Q saves then ends after this entry.",
+                    "Press any key to stop. ESC cancels the current take; Q saves then ends after this entry.\n\n"
+                    "Tip: Say 'give me a question' to get a quick prompt from the question bank.",
                     title="Examined Life Journal",
                     border_style="magenta",
                 )
             )
+            # Surface pending transcription work, but don't auto-run.
+            pending = _count_missing_stt(sessions_dir)
+            if pending:
+                console.print(
+                    f"[yellow]{pending} recording(s) pending transcription.[/] "
+                    f"Run [cyan]examinedlifejournal reconcile --sessions-dir '{sessions_dir}'[/] to backfill."
+                )
     else:
         console.print(
             Panel.fit(
                 "Voice journaling session starting. Recording starts immediately.\n"
-                "Press any key to stop. ESC cancels the current take; Q saves then ends after this entry.",
+                "Press any key to stop. ESC cancels the current take; Q saves then ends after this entry.\n\n"
+                "Tip: Say 'give me a question' to get a quick prompt from the question bank.",
                 title="Examined Life Journal",
                 border_style="magenta",
             )
         )
         state = manager.start()
         question = opening_question
+        pending = _count_missing_stt(sessions_dir)
+        if pending:
+            console.print(
+                f"[yellow]{pending} recording(s) pending transcription.[/] "
+                f"Run [cyan]examinedlifejournal reconcile --sessions-dir '{sessions_dir}'[/] to backfill."
+            )
 
     try:
         while True:
@@ -158,16 +241,24 @@ def journal(
             try:
                 exchange = manager.record_exchange(question, console)
             except Exception as exc:  # pragma: no cover - runtime error surface
-                console.print(f"[red]Error during recording/transcription:[/] {exc}")
+                # Keep the session alive: audio is already saved on disk.
+                console.print(
+                    f"[red]Transcription failed:[/] {exc}\n"
+                    "[yellow]Your audio was saved.[/] You can backfill later with: "
+                    "[cyan]examinedlifejournal reconcile --sessions-dir '{sessions_dir}'[/]"
+                )
                 log_event(
                     "cli.error",
                     {
                         "where": "record_exchange",
                         "error_type": exc.__class__.__name__,
                         "error": str(exc),
+                        "action": "continue_without_transcript",
                     },
                 )
-                break
+                # Re-ask the same question so the user can continue.
+                # Skip transcript display and summary scheduling.
+                continue
 
             if exchange is None:
                 # Could be cancelled or discarded short answer; message accordingly
@@ -259,6 +350,13 @@ def journal(
                 border_style="magenta",
             )
         )
+        # Remind user if there is pending STT work.
+        pending = _count_missing_stt(sessions_dir)
+        if pending:
+            console.print(
+                f"[yellow]{pending} recording(s) still pending transcription.[/] "
+                f"Use [cyan]examinedlifejournal reconcile --sessions-dir '{sessions_dir}'[/] to process them."
+            )
 
 
 @app.command()
@@ -276,6 +374,125 @@ def _require_env(var_name: str) -> None:
     if not os.environ.get(var_name):
         console.print(f"[red]Environment variable {var_name} is required.[/]")
         raise typer.Exit(code=2)
+
+
+def _count_missing_stt(audio_root: Path) -> int:
+    """Return the number of .wav files without a sibling .stt.json under a root dir."""
+    if not audio_root.exists():
+        return 0
+    missing = 0
+    for wav in audio_root.rglob("*.wav"):
+        stt = wav.with_suffix(".stt.json")
+        if not stt.exists():
+            missing += 1
+    return missing
+
+
+def _write_json_atomic(output_path: Path, payload: dict) -> None:
+    tmp_path = output_path.with_name(output_path.name + ".partial")
+    tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    tmp_path.replace(output_path)
+
+
+@app.command()
+def reconcile(
+    sessions_dir: Path = typer.Option(
+        CONFIG.recordings_dir,
+        "--sessions-dir",
+        help="Directory where session markdown/audio files are stored.",
+    ),
+    stt_backend: str = typer.Option(
+        CONFIG.stt_backend,
+        "--stt-backend",
+        help=(
+            "Transcription backend: cloud-openai, local-mlx, local-faster, "
+            "local-whispercpp, or auto-private."
+        ),
+    ),
+    stt_model: str = typer.Option(
+        CONFIG.model_stt,
+        "--stt-model",
+        help="Model preset or identifier for the selected backend.",
+    ),
+    stt_compute: str = typer.Option(
+        CONFIG.stt_compute or "auto",
+        "--stt-compute",
+        help="Optional compute precision override for local backends (e.g., int8_float16).",
+    ),
+    language: str = typer.Option(
+        "en",
+        "--language",
+        help="Primary language for transcription.",
+    ),
+    limit: int = typer.Option(
+        0,
+        "--limit",
+        help="Maximum number of recordings to reconcile (0 = no limit).",
+    ),
+):
+    """Backfill missing transcriptions for saved WAV files."""
+
+    try:
+        selection = resolve_backend_selection(stt_backend, stt_model, stt_compute)
+    except (ValueError, BackendNotAvailableError) as exc:
+        console.print(f"[red]STT configuration error:[/] {exc}")
+        raise typer.Exit(code=2)
+
+    # Require OpenAI key only if using cloud STT
+    if selection.backend_id == "cloud-openai":
+        _require_env("OPENAI_API_KEY")
+
+    backend = create_transcription_backend(selection)
+    console.print(
+        f"Scanning '{sessions_dir}' for recordings needing transcription using "
+        f"[bold]{selection.backend_id}[/] ({selection.model})."
+    )
+
+    processed = 0
+    skipped = 0
+    errors = 0
+
+    wav_files = sorted(sessions_dir.rglob("*.wav"))
+    if not wav_files:
+        console.print("[yellow]No WAV files found.[/]")
+        return
+
+    for wav in wav_files:
+        stt_json = wav.with_suffix(".stt.json")
+        if stt_json.exists():
+            skipped += 1
+            continue
+        try:
+            result = backend.transcribe(wav, language=language)
+            _write_json_atomic(stt_json, result.raw_response)
+            # Optional cleanup: delete WAV when safe (MP3 + STT present)
+            try:
+                if getattr(CONFIG, "delete_wav_when_safe", False):
+                    mp3_path = wav.with_suffix(".mp3")
+                    if mp3_path.exists() and wav.exists():
+                        wav.unlink(missing_ok=True)
+                        log_event(
+                            "audio.wav.deleted",
+                            {
+                                "wav": wav.name,
+                                "reason": "safe_delete_after_mp3_and_stt",
+                            },
+                        )
+            except Exception:
+                pass
+
+            console.print(f"[green]Transcribed:[/] {wav.name}")
+            processed += 1
+            if limit and processed >= limit:
+                break
+        except Exception as exc:  # pragma: no cover - defensive surface
+            errors += 1
+            log_event("reconcile.error", {"wav": wav.name, "error": str(exc)})
+            console.print(f"[red]Failed to transcribe {wav.name}:[/] {exc}")
+
+    console.print(
+        f"Completed. Processed {processed}; skipped {skipped} existing; errors {errors}."
+    )
 
 
 @summaries_app.command("list")

@@ -30,7 +30,15 @@ from .storage import (
     load_transcript,
     write_transcript,
 )
-from .transcription import TranscriptionResult, transcribe_wav
+from .transcription import (
+    BackendNotAvailableError,
+    BackendSelection,
+    TranscriptionBackend,
+    TranscriptionResult,
+    apply_transcript_formatting,
+    create_transcription_backend,
+    format_transcript_sentences,
+)
 from .events import log_event
 from rich.text import Text
 
@@ -75,7 +83,9 @@ class SessionConfig:
     base_dir: Path
     llm_model: str
     stt_model: str
-    opening_question: str
+    opening_question: str = CONFIG.opening_question
+    stt_backend: str = CONFIG.stt_backend
+    stt_compute: str | None = CONFIG.stt_compute
     max_history_tokens: int = CONFIG.max_history_tokens
     recent_summaries_limit: int = CONFIG.max_recent_summaries
     app_version: str = __version__
@@ -83,6 +93,13 @@ class SessionConfig:
     retry_backoff_base_ms: int = CONFIG.retry_backoff_base_ms
     ffmpeg_path: str | None = CONFIG.ffmpeg_path
     language: str = "en"
+    stt_formatting: str = CONFIG.stt_formatting
+    stt_backend_requested: str | None = None
+    stt_model_requested: str | None = None
+    stt_compute_requested: str | None = None
+    stt_auto_private_reason: str | None = None
+    stt_backend_selection: BackendSelection | None = None
+    stt_warnings: List[str] = field(default_factory=list)
 
 
 class SessionManager:
@@ -91,6 +108,26 @@ class SessionManager:
     def __init__(self, config: SessionConfig) -> None:
         self.config = config
         self.state: SessionState | None = None
+        if config.stt_backend_selection is not None:
+            self._backend_selection = config.stt_backend_selection
+        else:
+            self._backend_selection = BackendSelection(
+                backend_id=config.stt_backend,
+                model=config.stt_model,
+                compute=config.stt_compute,
+                requested_backend=config.stt_backend_requested,
+                requested_model=config.stt_model_requested,
+                requested_compute=config.stt_compute_requested,
+                reason=config.stt_auto_private_reason,
+                warnings=list(config.stt_warnings or []),
+            )
+        # Normalise resolved values back onto config for downstream consumers.
+        self.config.stt_backend = self._backend_selection.backend_id
+        self.config.stt_model = self._backend_selection.model
+        self.config.stt_compute = self._backend_selection.compute
+        self.config.stt_backend_selection = self._backend_selection
+        self.config.stt_warnings = list(self._backend_selection.warnings)
+        self._transcription_backend: TranscriptionBackend | None = None
         # Serialize all transcript writes (frontmatter/body/summary) within process
         self._io_lock = threading.Lock()
         # Single worker to run summary generation tasks in background
@@ -118,7 +155,15 @@ class SessionManager:
             "transcript_file": markdown_path.name,
             "recent_summary_refs": [item.filename for item in recent],
             "model_llm": self.config.llm_model,
-            "model_stt": self.config.stt_model,
+            "model_stt": self._backend_selection.model,
+            "stt_backend": self._backend_selection.backend_id,
+            "stt_compute": self._backend_selection.compute,
+            "stt_formatting": self.config.stt_formatting,
+            "stt_requested_backend": self.config.stt_backend_requested,
+            "stt_requested_model": self.config.stt_model_requested,
+            "stt_requested_compute": self.config.stt_compute_requested,
+            "stt_auto_private_reason": self.config.stt_auto_private_reason,
+            "stt_warnings": list(self._backend_selection.warnings),
             "app_version": self.config.app_version,
             "duration_seconds": 0.0,
             "audio_file": [],
@@ -145,12 +190,33 @@ class SessionManager:
                 "transcript_file": markdown_path.name,
                 "audio_dir": self.state.audio_dir,
                 "llm_model": self.config.llm_model,
-                "stt_model": self.config.stt_model,
+                "stt_backend": self._backend_selection.backend_id,
+                "stt_model": self._backend_selection.model,
+                "stt_compute": self._backend_selection.compute,
+                "stt_formatting": self.config.stt_formatting,
+                "stt_auto_reason": self.config.stt_auto_private_reason,
                 "language": self.config.language,
                 "recent_summaries_count": len(recent),
+                "stt_warnings": self._backend_selection.warnings,
             },
         )
+        for warning in self._backend_selection.warnings:
+            _LOGGER.warning("STT backend warning: %s", warning)
         return self.state
+
+    def _get_transcription_backend(self) -> TranscriptionBackend:
+        if self._transcription_backend is None:
+            try:
+                self._transcription_backend = create_transcription_backend(
+                    self._backend_selection,
+                    max_retries=self.config.retry_max_attempts,
+                    backoff_base_seconds=self.config.retry_backoff_base_ms / 1000,
+                )
+            except BackendNotAvailableError as exc:
+                raise RuntimeError(
+                    f"Unable to initialise transcription backend '{self._backend_selection.backend_id}': {exc}"
+                ) from exc
+        return self._transcription_backend
 
     def resume(self, markdown_path: Path) -> SessionState:
         """Resume an existing session from a transcript markdown file.
@@ -280,27 +346,36 @@ class SessionManager:
             )
         )
 
-        transcription = transcribe_wav(
+        backend = self._get_transcription_backend()
+        transcription = backend.transcribe(
             capture.wav_path,
-            model=self.config.stt_model,
             language=self.config.language,
-            max_retries=self.config.retry_max_attempts,
-            backoff_base_seconds=self.config.retry_backoff_base_ms / 1000,
         )
 
         _persist_raw_transcription(capture.wav_path, transcription.raw_response)
+
+        try:
+            formatted_text = apply_transcript_formatting(
+                transcription.text, self.config.stt_formatting
+            )
+        except ValueError:
+            _LOGGER.warning(
+                "Unsupported formatting mode '%s'; falling back to sentence splits",
+                self.config.stt_formatting,
+            )
+            formatted_text = format_transcript_sentences(transcription.text)
 
         # Serialize body append to avoid racing with background summary writes
         with self._io_lock:
             append_exchange_body(
                 self.state.markdown_path,
                 question,
-                transcription.text,
+                formatted_text,
             )
 
         exchange = Exchange(
             question=question,
-            transcript=transcription.text,
+            transcript=formatted_text,
             audio=capture,
             transcription=transcription,
             discarded_short_answer=False,
@@ -323,6 +398,7 @@ class SessionManager:
                 ),
                 "duration_seconds": round(exchange.audio.duration_seconds, 2),
                 "stt_model": exchange.transcription.model,
+                "stt_backend": exchange.transcription.backend,
                 "quit_after": exchange.audio.quit_after,
                 "cancelled": exchange.audio.cancelled,
             },
@@ -334,6 +410,13 @@ class SessionManager:
             raise RuntimeError("Session has not been started")
 
         history_text = [item.summary for item in self.state.recent_history]
+        # Compute total conversation duration so far in minutes:seconds
+        try:
+            doc = load_transcript(self.state.markdown_path)
+            total_seconds = float(doc.frontmatter.data.get("duration_seconds", 0.0))
+        except Exception:
+            total_seconds = sum(e.audio.duration_seconds for e in self.state.exchanges)
+        duration_mm_ss = _format_minutes_seconds(total_seconds)
         lowered = transcript.lower()
         if "give me a question" in lowered:
             import random
@@ -351,6 +434,8 @@ class SessionManager:
             opening_question=self.config.opening_question,
             question_bank=QUESTION_BANK,
             language=self.config.language,
+            conversation_duration=duration_mm_ss,
+            max_tokens=CONFIG.llm_max_tokens_question,
         )
         response = generate_followup_question(request)
         if self.state.exchanges:
@@ -378,6 +463,7 @@ class SessionManager:
                 transcript_markdown=snapshot_body,
                 recent_summaries=history_text,
                 model=self.config.llm_model,
+                max_tokens=CONFIG.llm_max_tokens_summary,
             )
         )
         # Write latest summary, reloading to merge with any concurrent updates
@@ -413,6 +499,7 @@ class SessionManager:
                         transcript_markdown=snapshot_body,
                         recent_summaries=history_text,
                         model=self.config.llm_model,
+                        max_tokens=CONFIG.llm_max_tokens_summary,
                     )
                 )
                 with self._io_lock:
@@ -516,7 +603,10 @@ class SessionManager:
                         item.filename for item in self.state.recent_history
                     ],
                     "model_llm": self.config.llm_model,
-                    "model_stt": self.config.stt_model,
+                    "model_stt": self._backend_selection.model,
+                    "stt_backend": self._backend_selection.backend_id,
+                    "stt_compute": self._backend_selection.compute,
+                    "stt_formatting": self.config.stt_formatting,
                     "app_version": self.config.app_version,
                     "transcript_file": self.state.markdown_path.name,
                 }
@@ -557,4 +647,10 @@ def _format_duration(seconds: float) -> str:
     minutes, secs = divmod(remainder, 60)
     if hours:
         return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
+
+
+def _format_minutes_seconds(seconds: float) -> str:
+    total_seconds = int(round(max(0.0, float(seconds))))
+    minutes, secs = divmod(total_seconds, 60)
     return f"{minutes}:{secs:02d}"

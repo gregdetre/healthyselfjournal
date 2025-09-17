@@ -43,13 +43,13 @@ def test_short_answer_discard_sets_quit_and_skips_transcription(tmp_path, monkey
         "examinedlifejournal.session.record_response", lambda *a, **k: fake_capture
     )
 
-    # Monkeypatch transcribe_wav to raise if called (it should not be called)
-    def _fail(*args, **kwargs):  # pragma: no cover - explicit guard
+    # Backend should never be requested for discarded short answers
+    def _fail_backend(self):  # pragma: no cover - explicit guard
         raise AssertionError(
-            "transcribe_wav should not be called for discarded short answer"
+            "transcription backend should not be requested for discarded short answer"
         )
 
-    monkeypatch.setattr("examinedlifejournal.session.transcribe_wav", _fail)
+    monkeypatch.setattr(SessionManager, "_get_transcription_backend", _fail_backend)
 
     exchange = manager.record_exchange("Test Q", None)  # console is unused in this path
 
@@ -95,6 +95,8 @@ def test_session_start_carries_recent_history(tmp_path):
     ]
     assert doc.frontmatter.data["model_llm"] == "anthropic:test-v1"
     assert doc.frontmatter.data["model_stt"] == "whisper-test"
+    assert doc.frontmatter.data["stt_backend"] == manager.config.stt_backend
+    assert doc.frontmatter.data["stt_formatting"] == manager.config.stt_formatting
     assert doc.frontmatter.data["transcript_file"] == created_path.name
 
 
@@ -144,6 +146,7 @@ def test_session_complete_updates_frontmatter(tmp_path):
                     text="It felt slow but intentional.",
                     raw_response={},
                     model="whisper-test",
+                    backend="cloud-openai",
                 ),
             ),
             Exchange(
@@ -161,6 +164,7 @@ def test_session_complete_updates_frontmatter(tmp_path):
                     text="A walk cleared my head.",
                     raw_response={},
                     model="whisper-test",
+                    backend="cloud-openai",
                 ),
             ),
         ]
@@ -212,6 +216,7 @@ def test_generate_next_question_uses_question_bank(tmp_path, monkeypatch):
                 text="I talked about my day.",
                 raw_response={},
                 model="whisper-test",
+                backend="cloud-openai",
             ),
         )
     )
