@@ -35,6 +35,10 @@ The following topics have been researched and documented:
 - ✅ Progress tracking → `PROGRESS_TRACKING_STREAK_DESIGN.md`
 - ✅ Socratic questioning → `SOCRATIC_QUESTIONING_TECHNIQUES.md`
 
+### Contemplative Practices (Completed)
+- ✅ Mindful reflection (Plum Village tradition) → `MINDFUL_REFLECTION_PLUM_VILLAGE.md`
+- ✅ Beginning Anew practice → `BEGINNING_ANEW_PRACTICE.md`
+
 ## Prioritization Criteria
 - **Effect size**: Clinical significance (d>0.3 high, 0.2-0.3 medium, <0.2 small)
 - **Implementation ease**: Natural fit for voice-based CLI interface
@@ -159,7 +163,7 @@ The following topics have been researched and documented:
     - Style matching and pacing
     - Personality-informed approaches
 
-22. **Mindfulness integration**
+22. **Mindfulness integration** → `MINDFUL_REFLECTION_PLUM_VILLAGE.md` ✅
     - Present-moment awareness prompts
     - Body scan check-ins
     - Breath-based transitions
@@ -205,6 +209,14 @@ The following topics have been researched and documented:
     - Adolescent vs adult approaches
     - Developmental considerations
     - Parental involvement guidelines
+
+## Tier 7: Miscellaneous Suggestions
+
+31. **Clean Language techniques** → `CLEAN_LANGUAGE_TECHNIQUES.md` ✅
+    - Non-directive questioning using client's exact words
+    - Metaphor exploration and preservation
+    - David Grove's 12 basic questions framework
+    - Avoiding therapist contamination of client's experience
 
 ## Research Methodology Notes
 

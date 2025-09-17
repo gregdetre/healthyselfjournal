@@ -2,7 +2,7 @@
 
 ## Overview
 
-LLM-generated summaries stored in frontmatter, regenerated after each Q&A within a session for crash resilience.
+LLM-generated summaries stored in frontmatter. For resilience, summaries are refreshed throughout the session; to reduce latency, regeneration now runs in the background.
 
 ## See also
 
@@ -12,15 +12,22 @@ LLM-generated summaries stored in frontmatter, regenerated after each Q&A within
 
 ## Summary Generation
 
-- Generated/regenerated after each question-answer exchange
+- Scheduled after each question-answer exchange, executed in a background worker
 - Stored in `summary` frontmatter field
 - Captures conversation arc and key themes
+- May briefly lag behind the most recent exchange while the background task runs
 
 ## Context Usage
 
 - Recent summaries included in LLM prompts
 - Enables pattern detection across sessions
 - Creates "knows you" feeling
+
+## Concurrency & Safety
+
+- All transcript writes (frontmatter/body/summary) are serialized with an in-process lock
+- Background worker snapshots the transcript body for the LLM call and reloads before write to avoid clobbering concurrent updates
+- On session completion, the worker is shut down gracefully to flush pending writes
 
 ## Backfill Process
 

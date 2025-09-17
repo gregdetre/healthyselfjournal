@@ -2,6 +2,9 @@
 
 Voice-first journaling CLI combining live audio capture, Whisper transcription, and Claude-powered follow-up questions.
 
+see: `AGENTS.md`
+
+
 ## Prerequisites
 
 - Python 3.12+

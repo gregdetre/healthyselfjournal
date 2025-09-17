@@ -2,10 +2,54 @@
 
 Short guidelines for agents/tools working in this repo.
 
-- For full setup and usage instructions (uv, external venv, editable deps), see:
-  - `docs/reference/SETUP.md`
+## Setup
 
-Quick pointers:
-- Preferred venv: `/Users/greg/.venvs/experim__examinedlifejournal` (source it before running commands)
-- By default, `uv` prefers a project `.venv`, so make sure to pass `--active` to target the active external venv
-- Local editable dep: `./gjdutils` tracked via `[tool.uv.sources]`
+- See `docs/reference/SETUP.md` for uv + external venv workflow
+- Preferred venv: `/Users/greg/.venvs/experim__examinedlifejournal` (source it first)
+- `gjdutils` is a local editable dep via `[tool.uv.sources]`
+- `ffmpeg` on PATH enables background MP3 conversion (optional)
+
+## Run
+
+- Activate venv, then:
+  - `uv sync --active`
+  - `uv run --active examinedlifejournal journal [--sessions-dir PATH]`
+
+## Tests
+
+- Minimal, offline: `pytest tests/test_storage.py`
+- Full suite requires API keys in env
+- Tests live in `tests/`
+
+## Logs & saved files
+
+- Event log: `sessions/events.log` (metadata-only; see `examinedlifejournal/events.py`)
+- Session outputs under `./sessions/` (markdown + per-session audio dir)
+- Details: `docs/reference/FILE_FORMATS_ORGANISATION.md`
+
+## Key modules
+
+- Core: `session.py`, `audio.py`, `transcription.py`, `llm.py`
+- Persistence & context: `storage.py`, `history.py`, `events.py`
+- CLI & prompts: `cli.py`, `prompts/*.jinja`, `question_bank.py`, `config.py`
+
+## Key reference docs
+
+- CLI usage: `docs/reference/COMMAND_LINE_INTERFACE.md`
+- Recording controls: `docs/reference/RECORDING_CONTROLS.md`
+- Dialogue flow: `docs/reference/DIALOGUE_FLOW.md`
+- Prompt templates: `docs/reference/LLM_PROMPT_TEMPLATES.md`
+- File formats: `docs/reference/FILE_FORMATS_ORGANISATION.md`
+- Whisper/STT: `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md`
+- see others in `docs/reference/`
+
+## Planning & research
+
+- Implementation plan: `docs/planning/250917a_voice_journaling_app_v1.md`
+- Decisions & context: `docs/conversations/`
+- Evidence base: `docs/research/`
+
+## Tips
+
+- When using the external venv, pass `--active` to uv project commands
+- Use `--sessions-dir` to target a temp/test directory during development

@@ -6,6 +6,8 @@ Effective therapeutic journaling requires optimal integration of cognitive and e
 
 - `SELF_DISTANCING_TECHNIQUES.md` - specific techniques for perspective-taking in cognitive-emotional integration
 - `STRUCTURED_REFLECTION_VS_RUMINATION.md` - safety guidelines for preventing harmful rumination during integration
+- `MINDFUL_REFLECTION_PLUM_VILLAGE.md` - contemplative practices from Thich Nhat Hanh for balanced emotional processing
+- `BEGINNING_ANEW_PRACTICE.md` - structured approach to emotional expression with cognitive integration
 - `OPTIMAL_SESSION_TIMING.md` - timing considerations that support effective cognitive-emotional processing
 - `../reference/OPENING_QUESTIONS.md` - practical implementation of integration principles in prompt design
 - `../reference/DIALOGUE_FLOW.md` - conversation structures that facilitate balanced processing

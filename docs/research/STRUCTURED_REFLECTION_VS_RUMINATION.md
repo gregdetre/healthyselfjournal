@@ -5,6 +5,9 @@ Distinguishing adaptive reflection from destructive rumination is critical for s
 ## See also
 
 - `POTENTIAL_RESEARCH_TOPICS.md` - identifies this as Tier 1 priority research for core safety features
+- `MINDFUL_REFLECTION_PLUM_VILLAGE.md` - contemplative practices that promote healthy reflection over rumination
+- `BEGINNING_ANEW_PRACTICE.md` - structured practice for processing difficult emotions without rumination
+- `COGNITIVE_EMOTIONAL_INTEGRATION.md` - frameworks for balanced processing that avoids rumination traps
 - `deep_research_overview/JOURNALLING_SCIENTIFIC_EVIDENCE_RESEARCH.md` - broader context on journaling effectiveness and risks
 - Watkins, E. R. (2008). Constructive and unconstructive repetitive thought. *Psychological Bulletin*, 134, 163–206 - foundational theoretical framework
 - Bushman, B. J. (2002). Does venting anger feed or extinguish the flame? *Personality and Social Psychology Bulletin*, 28, 724-731 - evidence against cathartic venting
