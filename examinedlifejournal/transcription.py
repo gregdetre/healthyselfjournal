@@ -8,11 +8,17 @@ import random
 import time
 from pathlib import Path
 from typing import Any
+from functools import lru_cache
 
 from openai import APIConnectionError, APIStatusError, OpenAI, OpenAIError
 
 _LOGGER = logging.getLogger(__name__)
 from .events import log_event
+
+
+@lru_cache(maxsize=1)
+def _get_openai_client() -> OpenAI:
+    return OpenAI()
 
 
 @dataclass
@@ -33,7 +39,7 @@ def transcribe_wav(
 ) -> TranscriptionResult:
     """Call the Whisper API for the given WAV file with retry/backoff."""
 
-    client = OpenAI()
+    client = _get_openai_client()
     last_error: Exception | None = None
 
     log_event(

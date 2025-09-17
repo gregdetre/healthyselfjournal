@@ -125,13 +125,14 @@ def journal(
             )
 
             try:
-                manager.regenerate_summary()
+                # Background scheduling to reduce latency
+                manager.schedule_summary_regeneration()
             except Exception as exc:
-                console.print(f"[red]Summary generation failed:[/] {exc}")
+                console.print(f"[red]Summary scheduling failed:[/] {exc}")
                 log_event(
                     "cli.error",
                     {
-                        "where": "regenerate_summary",
+                        "where": "schedule_summary_regeneration",
                         "error_type": exc.__class__.__name__,
                         "error": str(exc),
                     },

@@ -158,7 +158,12 @@ def record_response(
                             frame_duration_sec = len(chunk) / sample_rate
                             # Convert RMS to dBFS-like scale: db = 20*log10(rms)
                             # Use configured threshold (e.g., -40 dBFS) to count as voiced
-                            if _rms_above_threshold(rms, CONFIG.voice_rms_dbfs_threshold):
+                            rms_value = float(
+                                np.sqrt(np.mean(np.square(chunk), dtype=np.float64))
+                            )
+                            if _rms_above_threshold(
+                                rms_value, CONFIG.voice_rms_dbfs_threshold
+                            ):
                                 voiced_seconds += frame_duration_sec
 
                         if time.monotonic() - last_render >= 1.0 / meter_refresh_hz:
@@ -216,7 +221,10 @@ def record_response(
 
     # Short-answer auto-discard gating: skip saving/transcribing if likely accidental
     discarded_short = False
-    if duration_sec <= CONFIG.short_answer_duration_seconds and voiced_seconds <= CONFIG.short_answer_voiced_seconds:
+    if (
+        duration_sec <= CONFIG.short_answer_duration_seconds
+        and voiced_seconds <= CONFIG.short_answer_voiced_seconds
+    ):
         # Treat as noise/accidental: delete wav and do not convert to mp3
         wav_path.unlink(missing_ok=True)
         discarded_short = True

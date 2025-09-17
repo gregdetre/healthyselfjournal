@@ -6,8 +6,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import json
 import logging
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Sequence
+from concurrent.futures import ThreadPoolExecutor
 
 from . import __version__
 from .audio import AudioCaptureResult, record_response
@@ -84,6 +86,13 @@ class SessionManager:
     def __init__(self, config: SessionConfig) -> None:
         self.config = config
         self.state: SessionState | None = None
+        # Serialize all transcript writes (frontmatter/body/summary) within process
+        self._io_lock = threading.Lock()
+        # Single worker to run summary generation tasks in background
+        self._summary_executor = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="summary"
+        )
+        self._summary_shutdown = False
 
     def start(self) -> SessionState:
         base_dir = self.config.base_dir
@@ -183,11 +192,13 @@ class SessionManager:
 
         _persist_raw_transcription(capture.wav_path, transcription.raw_response)
 
-        append_exchange_body(
-            self.state.markdown_path,
-            question,
-            transcription.text,
-        )
+        # Serialize body append to avoid racing with background summary writes
+        with self._io_lock:
+            append_exchange_body(
+                self.state.markdown_path,
+                question,
+                transcription.text,
+            )
 
         exchange = Exchange(
             question=question,
@@ -256,17 +267,23 @@ class SessionManager:
         if self.state is None:
             raise RuntimeError("Session has not been started")
 
-        doc = load_transcript(self.state.markdown_path)
+        # Snapshot transcript body under lock to avoid partial reads during writes
+        with self._io_lock:
+            doc = load_transcript(self.state.markdown_path)
+            snapshot_body = doc.body
         history_text = [item.summary for item in self.state.recent_history]
         response = generate_summary(
             SummaryRequest(
-                transcript_markdown=doc.body,
+                transcript_markdown=snapshot_body,
                 recent_summaries=history_text,
                 model=self.config.llm_model,
             )
         )
-        doc.frontmatter.data["summary"] = response.summary_markdown
-        write_transcript(self.state.markdown_path, doc)
+        # Write latest summary, reloading to merge with any concurrent updates
+        with self._io_lock:
+            latest = load_transcript(self.state.markdown_path)
+            latest.frontmatter.data["summary"] = response.summary_markdown
+            write_transcript(self.state.markdown_path, latest)
         log_event(
             "session.summary.updated",
             {
@@ -275,10 +292,61 @@ class SessionManager:
             },
         )
 
+    def schedule_summary_regeneration(self) -> None:
+        """Schedule background summary generation for current transcript.
+
+        Safe to call after each exchange; coexists with other writers via _io_lock.
+        """
+        if self.state is None:
+            return
+        # Snapshot body under lock to avoid reading while writing
+        with self._io_lock:
+            doc = load_transcript(self.state.markdown_path)
+            snapshot_body = doc.body
+        history_text = [item.summary for item in self.state.recent_history]
+
+        def _task() -> None:
+            try:
+                response = generate_summary(
+                    SummaryRequest(
+                        transcript_markdown=snapshot_body,
+                        recent_summaries=history_text,
+                        model=self.config.llm_model,
+                    )
+                )
+                with self._io_lock:
+                    latest = load_transcript(self.state.markdown_path)
+                    latest.frontmatter.data["summary"] = response.summary_markdown
+                    write_transcript(self.state.markdown_path, latest)
+                log_event(
+                    "session.summary.updated",
+                    {
+                        "session_id": self.state.session_id,
+                        "model": response.model,
+                    },
+                )
+            except (
+                Exception
+            ):  # pragma: no cover - defensive logging in background thread
+                _LOGGER.exception("Background summary generation failed")
+
+        try:
+            # May raise RuntimeError if executor has been shut down
+            self._summary_executor.submit(_task)
+        except Exception:  # pragma: no cover - defensive logging
+            _LOGGER.exception("Failed to submit background summary task")
+
     def complete(self) -> None:
         if self.state is None:
             return
         self._update_frontmatter_after_exchange()
+        # Flush background summary tasks before exiting
+        try:
+            if not self._summary_shutdown:
+                self._summary_executor.shutdown(wait=True)
+                self._summary_shutdown = True
+        except Exception:  # pragma: no cover - defensive
+            _LOGGER.exception("Failed to shutdown summary executor")
         log_event(
             "session.complete",
             {
@@ -295,35 +363,38 @@ class SessionManager:
         if self.state is None:
             return
 
-        doc = load_transcript(self.state.markdown_path)
-        total_duration = sum(
-            item.audio.duration_seconds for item in self.state.exchanges
-        )
-        audio_segments = [
-            {
-                "wav": exchange.audio.wav_path.name,
-                "mp3": (
-                    exchange.audio.mp3_path.name if exchange.audio.mp3_path else None
-                ),
-                "duration_seconds": round(exchange.audio.duration_seconds, 2),
-            }
-            for exchange in self.state.exchanges
-        ]
+        with self._io_lock:
+            doc = load_transcript(self.state.markdown_path)
+            total_duration = sum(
+                item.audio.duration_seconds for item in self.state.exchanges
+            )
+            audio_segments = [
+                {
+                    "wav": exchange.audio.wav_path.name,
+                    "mp3": (
+                        exchange.audio.mp3_path.name
+                        if exchange.audio.mp3_path
+                        else None
+                    ),
+                    "duration_seconds": round(exchange.audio.duration_seconds, 2),
+                }
+                for exchange in self.state.exchanges
+            ]
 
-        doc.frontmatter.data.update(
-            {
-                "duration_seconds": round(total_duration, 2),
-                "audio_file": audio_segments,
-                "recent_summary_refs": [
-                    item.filename for item in self.state.recent_history
-                ],
-                "model_llm": self.config.llm_model,
-                "model_stt": self.config.stt_model,
-                "app_version": self.config.app_version,
-                "transcript_file": self.state.markdown_path.name,
-            }
-        )
-        write_transcript(self.state.markdown_path, doc)
+            doc.frontmatter.data.update(
+                {
+                    "duration_seconds": round(total_duration, 2),
+                    "audio_file": audio_segments,
+                    "recent_summary_refs": [
+                        item.filename for item in self.state.recent_history
+                    ],
+                    "model_llm": self.config.llm_model,
+                    "model_stt": self.config.stt_model,
+                    "app_version": self.config.app_version,
+                    "transcript_file": self.state.markdown_path.name,
+                }
+            )
+            write_transcript(self.state.markdown_path, doc)
 
 
 def _persist_raw_transcription(wav_path: Path, payload: dict) -> None:

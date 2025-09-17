@@ -45,7 +45,9 @@ def test_short_answer_discard_sets_quit_and_skips_transcription(tmp_path, monkey
 
     # Monkeypatch transcribe_wav to raise if called (it should not be called)
     def _fail(*args, **kwargs):  # pragma: no cover - explicit guard
-        raise AssertionError("transcribe_wav should not be called for discarded short answer")
+        raise AssertionError(
+            "transcribe_wav should not be called for discarded short answer"
+        )
 
     monkeypatch.setattr("examinedlifejournal.session.transcribe_wav", _fail)
 
