@@ -1,34 +1,50 @@
 # Conversation Summaries
 
-## Overview
-
-LLM-generated summaries stored in frontmatter. For resilience, summaries are refreshed throughout the session; to reduce latency, regeneration now runs in the background.
+Short LLM-generated summaries are stored in markdown frontmatter for each session. They are refreshed during a session (background worker) and used to provide context for future prompts.
 
 ## See also
 
-- `FILE_FORMATS_ORGANISATION.md` - Where summaries are stored
-- `LLM_PROMPT_TEMPLATES.md` - How summaries provide context
-- `../conversations/250916a_journaling_app_dialogue_design.md` - Continuity rationale
+- `FILE_FORMATS_ORGANISATION.md` – Where summaries are stored and related keys.
+- `LLM_PROMPT_TEMPLATES.md` – Summary prompt template and variables.
+- `COMMAND_LINE_INTERFACE.md` – CLI commands for listing/backfilling summaries.
+- `../conversations/250916a_journaling_app_dialogue_design.md` – Why continuity and summaries matter.
 
-## Summary Generation
+## Summary generation (current state)
 
-- Scheduled after each question-answer exchange, executed in a background worker
-- Stored in `summary` frontmatter field
-- Captures conversation arc and key themes
-- May briefly lag behind the most recent exchange while the background task runs
+- Triggered after each exchange via a background worker to reduce latency.
+- Persisted under `summary` in frontmatter (single-line normalized on write).
+- Captures arc, themes, and suggested next steps.
+- May briefly lag behind the latest exchange while the background task runs.
 
-## Context Usage
+## Context usage
 
-- Recent summaries included in LLM prompts
-- Enables pattern detection across sessions
-- Creates "knows you" feeling
+- Recent summaries feed into future prompts for continuity.
+- Enables pattern detection across sessions; improves personalization.
 
-## Concurrency & Safety
+## Concurrency and safety
 
-- All transcript writes (frontmatter/body/summary) are serialized with an in-process lock
-- Background worker snapshots the transcript body for the LLM call and reloads before write to avoid clobbering concurrent updates
-- On session completion, the worker is shut down gracefully to flush pending writes
+- All writes (frontmatter/body/summary) serialized via in-process lock.
+- Background worker snapshots body for LLM call; reloads before write to merge.
+- Graceful shutdown flushes pending tasks on session completion.
 
-## Backfill Process
+## Backfill
 
-Planned utility to generate missing summaries from existing transcripts.
+Use the CLI to list and (re)generate summaries for existing session markdown files:
+
+```bash
+# Show sessions missing summaries (default)
+uv run examinedlifejournal summaries list --sessions-dir ./sessions
+
+# Show all sessions with status
+uv run examinedlifejournal summaries list --sessions-dir ./sessions --all
+
+# Backfill only missing summaries (default)
+uv run examinedlifejournal summaries backfill --sessions-dir ./sessions
+
+# Regenerate all summaries (overwrite existing)
+uv run examinedlifejournal summaries backfill --sessions-dir ./sessions --all
+```
+
+Notes:
+- Uses the same prompt and recent-history context as the live flow.
+- Requires `ANTHROPIC_API_KEY`.
