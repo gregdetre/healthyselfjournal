@@ -12,7 +12,7 @@ Session transcripts remain flat, with per-session assets stored in a sibling sub
 
 ## Directory Structure
 
-Base directory (default `./sessions/`) contains:
+Base directory (default `./sessions/`) contains (minute-level session IDs; no seconds):
 - `yyMMdd_HHmm.md` — Transcript and dialogue for the session
 - `yyMMdd_HHmm/` — Folder containing all session assets:
   - `yyMMdd_HHmm_XX.wav` — Audio segment for response `XX`
