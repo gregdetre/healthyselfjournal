@@ -16,10 +16,12 @@ Base directory (default `./sessions/`) contains:
 - `yyMMdd_HHmm.md` — Transcript and dialogue for the session
 - `yyMMdd_HHmm/` — Folder containing all session assets:
   - `yyMMdd_HHmm_XX.wav` — Audio segment for response `XX`
-  - `yyMMdd_HHmm_XX.mp3` — Optional MP3 sibling when `ffmpeg` is available
+- `yyMMdd_HHmm_XX.mp3` — Optional MP3 sibling when `ffmpeg` is available
   - `yyMMdd_HHmm_XX.stt.json` — Raw Whisper transcription payload for that segment
 
 Note: Extremely short, low‑voiced takes may be auto‑discarded. In those cases no `.wav`, `.mp3`, or `.stt.json` is kept.
+
+By default, large `.wav` files are automatically deleted once both the `.mp3` and `.stt.json` exist. This saves disk space while retaining a compressed audio copy and the raw transcription payload. To keep WAVs, pass `--keep-wav` on the CLI or set `CONFIG.delete_wav_when_safe=False`.
 
 ## Markdown Format
 

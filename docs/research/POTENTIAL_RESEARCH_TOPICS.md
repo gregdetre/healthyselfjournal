@@ -39,6 +39,33 @@ The following topics have been researched and documented:
 - ✅ Mindful reflection (Plum Village tradition) → `MINDFUL_REFLECTION_PLUM_VILLAGE.md`
 - ✅ Beginning Anew practice → `BEGINNING_ANEW_PRACTICE.md`
 
+### Cognitive Frameworks (Completed)
+- ✅ Explanatory style and Three P's (Seligman) → `EXPLANATORY_STYLE_THREE_PS.md`
+
+### Coaching Questions (Completed)
+
+#### Research-Backed (Strong Evidence)
+- ✅ Coaching frameworks and evidence → `COACHING_FRAMEWORKS_EVIDENCE.md`
+  - ICF competencies research, Socratic questioning RCTs, GROW model studies
+  - Solution-Focused Brief Therapy evidence, motivational interviewing data
+
+#### Expert-Endorsed (Moderate Evidence)
+- ✅ Daily reflection questions → `DAILY_REFLECTION_QUESTIONS.md`
+  - Neil Pasricha framework, Rangan Chatterjee protocol, morning/evening routines
+  - Some research backing, widely used in practice
+- ✅ Values and self-discovery → `VALUES_SELF_DISCOVERY_QUESTIONS.md`
+  - Business Model You framework, identity exploration, strengths assessment
+  - Based on positive psychology research, needs more RCT validation
+
+#### Popular/Practical (Variable Evidence)
+- ✅ Famous coach questions → `FAMOUS_COACH_QUESTIONS.md`
+  - Tim Ferriss (17 questions, fear-setting), Tony Robbins, Marshall Goldsmith
+  - Martha Beck, Arthur Brooks failure journal, Jeff Bezos framework
+  - Expert credibility but limited controlled studies
+- ✅ Annual and quarterly reviews → `ANNUAL_QUARTERLY_REVIEW_QUESTIONS.md`
+  - Debbie Millman 5-year vision, career planning, life design questions
+  - Anecdotal success stories, needs systematic research
+
 ## Prioritization Criteria
 - **Effect size**: Clinical significance (d>0.3 high, 0.2-0.3 medium, <0.2 small)
 - **Implementation ease**: Natural fit for voice-based CLI interface

@@ -65,6 +65,7 @@ When initiating new research:
 4. **Launch parallel agents** for efficiency
 5. **Update tracking** in POTENTIAL_RESEARCH_TOPICS.md upon completion
 6. **Cross-reference** new docs with existing research
+7. **Probably** store the new doc in `docs/research/`, unless instructed otherwise, and if it makes sense to do so.
 
 ## Common research patterns
 

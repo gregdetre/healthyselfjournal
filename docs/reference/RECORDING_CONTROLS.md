@@ -14,7 +14,7 @@ Keyboard controls for voice recording and session management.
 
 1. Recording starts immediately on command launch
 2. Visual volume meter shows recording active
-3. Press any key to stop recording
+3. Press SPACE to pause/resume; press any other key to stop recording
 4. If the captured answer is extremely short and low‑voiced, it is discarded automatically (no files saved, no transcription)
 5. Otherwise, Whisper transcribes to text
 6. LLM generates response question
@@ -22,6 +22,7 @@ Keyboard controls for voice recording and session management.
 ## Session Controls
 
 - **ESC**: Cancel current recording (don't save or transcribe)
+- **SPACE**: Pause/resume the recording (paused audio is not saved)
 - **Q**: Quit after this response
   - If pressed before any substantial speech: the take is auto‑discarded and the session ends cleanly
   - If pressed after a normal answer: the take is saved/transcribed, then the session ends
