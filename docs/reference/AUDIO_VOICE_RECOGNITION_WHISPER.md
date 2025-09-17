@@ -6,7 +6,6 @@ This document describes how we run OpenAI Whisper locally for audio transcriptio
 ### See also
 - `../reference/SETUP.md` — project setup, venv, and `uv` usage.
 - `../../AGENTS.md` — quick pointers for agents/tools (preferred venv, `uv --active`).
-- `../../main.py` — simple CLI entrypoint that loads Whisper `large-v2` and transcribes a file.
  - `../../examinedlifejournal.py` — live mic capture CLI with MLX (GPU) or faster‑whisper (CPU) backends.
 - External:
   - OpenAI Whisper: https://github.com/openai/whisper — reference implementation and docs.
@@ -21,10 +20,10 @@ This document describes how we run OpenAI Whisper locally for audio transcriptio
 - Use system `ffmpeg` for audio handling.
 
 ### Overview
-At a high level, the CLI in `main.py`:
-- Detects device: `cpu` by default (or `mps` when explicitly requested).
-- Loads `large-v2` via `whisper.load_model(...)` (from cache at `~/.cache/whisper` or auto‑downloads on first use).
-- Transcribes the input audio/video file and prints plain text to stdout.
+At a high level, the CLI in `examinedlifejournal.py`:
+- Records from the system mic or transcribes a provided file (`--input`).
+- Defaults to MLX (GPU) with `large-v2` and auto language detection.
+- CPU path available via `--backend faster`.
 
 Live mic capture in `examinedlifejournal.py`:
 - Records from the system mic with `ffmpeg` (until RETURN or for `--duration` seconds)
@@ -54,13 +53,13 @@ CPU (faster-whisper) alternative:
 python examinedlifejournal.py --duration 3 --backend faster --model-name large-v2 --compute-type int8_float16
 ```
 
-Basic transcription (CPU, safest):
+Basic transcription from file (default MLX):
 ```bash
-python main.py --device cpu /path/to/audio.m4a
+python examinedlifejournal.py --input /path/to/audio.m4a
 ```
-Try Apple Metal (may be faster, can be flaky depending on torch):
+CPU alternative:
 ```bash
-python main.py --device mps /path/to/audio.m4a
+python examinedlifejournal.py --input /path/to/audio.m4a --backend faster
 ```
 Notes:
 - Supported formats include `.m4a`, `.mp3`, `.wav`, etc. `ffmpeg` handles conversion internally.
@@ -71,7 +70,7 @@ Create a quick test file on macOS and transcribe:
 ```bash
 say -v Samantha "This is a short Whisper test." -o test.aiff
 ffmpeg -y -i test.aiff -ar 16000 -ac 1 test.wav
-python main.py --device cpu test.wav
+python examinedlifejournal.py --input test.wav
 ```
 
 ### Gotchas

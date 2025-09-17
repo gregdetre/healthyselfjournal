@@ -20,7 +20,7 @@ This document explains how to set up and work on this project using uv, with a f
 ```
 examinedlifejournal/
   ├─ gjdutils/               # local clone (editable)
-  ├─ main.py
+  ├─ examinedlifejournal.py
   ├─ pyproject.toml
   └─ docs/reference/SETUP.md
 ```
@@ -50,7 +50,7 @@ uv sync --active
 
 5) Run commands using the active venv
 ```bash
-uv run --active python main.py
+uv run --active python examinedlifejournal.py --duration 3
 uv run --active ipython
 ```
 
@@ -64,7 +64,7 @@ If you prefer a project-local environment:
 ```bash
 uv venv .venv
 uv sync              # no --active needed when using the project env
-uv run python main.py
+uv run python examinedlifejournal.py --duration 3
 ```
 Note: If both an active external venv and a project `.venv` exist, uv prefers the project `.venv` unless you pass `--active`.
 
