@@ -7,7 +7,7 @@ This document describes how we run OpenAI Whisper locally for audio transcriptio
 - `../reference/SETUP.md` — project setup, venv, and `uv` usage.
 - `../../AGENTS.md` — quick pointers for agents/tools (preferred venv, `uv --active`).
 - `../../main.py` — simple CLI entrypoint that loads Whisper `large-v2` and transcribes a file.
- - `../../whisper_record.py` — live mic capture CLI with MLX (GPU) or faster‑whisper (CPU) backends.
+ - `../../examinedlifejournal.py` — live mic capture CLI with MLX (GPU) or faster‑whisper (CPU) backends.
 - External:
   - OpenAI Whisper: https://github.com/openai/whisper — reference implementation and docs.
   - PyTorch MPS notes: https://pytorch.org/docs/stable/notes/mps.html — Apple Metal backend details.
@@ -26,7 +26,7 @@ At a high level, the CLI in `main.py`:
 - Loads `large-v2` via `whisper.load_model(...)` (from cache at `~/.cache/whisper` or auto‑downloads on first use).
 - Transcribes the input audio/video file and prints plain text to stdout.
 
-Live mic capture in `whisper_record.py`:
+Live mic capture in `examinedlifejournal.py`:
 - Records from the system mic with `ffmpeg` (until RETURN or for `--duration` seconds)
 - Transcribes using the selected backend: `mlx` (GPU) or `faster` (CPU)
 - Defaults: `--backend mlx`, `--model-name large-v2`, language auto‑detect (override with `--language en`)
@@ -45,13 +45,13 @@ uv sync --active
 ### Usage
 Live mic capture (GPU, MLX backend):
 ```bash
-python whisper_record.py --duration 3                   # defaults to MLX + large-v2, language auto
-python whisper_record.py --duration 3 --language en     # force English
+python examinedlifejournal.py --duration 3                   # defaults to MLX + large-v2, language auto
+python examinedlifejournal.py --duration 3 --language en     # force English
 ```
 
 CPU (faster-whisper) alternative:
 ```bash
-python whisper_record.py --duration 3 --backend faster --model-name large-v2 --compute-type int8_float16
+python examinedlifejournal.py --duration 3 --backend faster --model-name large-v2 --compute-type int8_float16
 ```
 
 Basic transcription (CPU, safest):
@@ -78,7 +78,7 @@ python main.py --device cpu test.wav
 - PyTorch MPS op gaps: Some torch versions on macOS fail with missing MPS sparse ops (e.g., sparse COO). Prefer MLX (GPU) or faster‑whisper (CPU) instead of MPS.
 - FP16 on CPU is unsupported; we keep FP16 disabled on MPS too for stability.
 - First run may download models; ensure adequate disk space and network access or pre‑seed the cache.
-- MLX first run: models are fetched from `mlx-community/whisper-<model>` and compiled; this can take minutes. Subsequent runs are much faster. The `whisper_record.py` CLI streams progress.
+- MLX first run: models are fetched from `mlx-community/whisper-<model>` and compiled; this can take minutes. Subsequent runs are much faster. The `examinedlifejournal.py` CLI streams progress.
 
 ### Troubleshooting
 - "whisper not found": ensure the venv is active and `uv sync --active` has completed.
@@ -88,7 +88,7 @@ python main.py --device cpu test.wav
 
 ### Planned improvements
 - Optional `faster-whisper` path for speed with near‑parity accuracy on CPU.
-- Streaming mic capture command (e.g., `whisper_record.py`) for quick dictation workflows.
+- Streaming mic capture command (e.g., `examinedlifejournal.py`) for quick dictation workflows.
 - Automated local benchmark script comparing CPU vs MPS on short samples.
 
 
