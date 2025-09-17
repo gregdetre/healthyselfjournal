@@ -8,7 +8,7 @@ import random
 import time
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterable, Sequence, Callable
+from typing import Iterable, Sequence, Callable, Any
 
 from anthropic import (
     APIStatusError,
@@ -154,19 +154,21 @@ def stream_followup_question(
                 "max_tokens": request.max_tokens,
             },
         )
-        with _ANTHROPIC_CLIENT.messages.stream(
-            model=model_name,
-            max_tokens=request.max_tokens,
-            temperature=0.7,
-            system="You are a thoughtful journaling companion.",
-            thinking={"type": "enabled"} if thinking_enabled else None,
-            messages=[
+        stream_kwargs: dict[str, Any] = {
+            "model": model_name,
+            "max_tokens": request.max_tokens,
+            "temperature": 0.7,
+            "system": "You are a thoughtful journaling companion.",
+            "messages": [
                 {
                     "role": "user",
                     "content": rendered,
                 }
             ],
-        ) as stream:
+        }
+        if thinking_enabled:
+            stream_kwargs["thinking"] = {"type": "enabled"}
+        with _ANTHROPIC_CLIENT.messages.stream(**stream_kwargs) as stream:
             for text in stream.text_stream:
                 try:
                     on_delta(text)
@@ -243,39 +245,74 @@ def generate_summary(request: SummaryRequest) -> SummaryResponse:
 
 
 def _split_model_spec(spec: str) -> tuple[str, str, bool]:
-    parts = spec.split(":", 1)
-    if len(parts) == 1:
-        provider, model_name = "anthropic", parts[0]
-    else:
-        provider, model_name = parts[0], parts[1]
+    """Parse provider:model[:version][:thinking] → (provider, provider_model_id, thinking).
 
-    # Normalize Anthropic model aliases and optional ":thinking" suffix
-    if provider == "anthropic":
-        model_name, thinking_enabled = _normalize_anthropic_model(model_name)
-    else:
-        thinking_enabled = False
-    return provider, model_name, thinking_enabled
-
-
-def _normalize_anthropic_model(model_name: str) -> tuple[str, bool]:
-    """Return canonical Anthropic model id and if thinking is requested.
-
-    Supports alias inputs and an optional trailing ":thinking" tag, which we
-    turn into the Anthropic API "thinking" parameter rather than a model id.
+    Provider-specific normalization:
+    - Anthropic: model id is "<model>-<version>" when version is provided.
+      If version omitted, accept existing hyphenated ids, or use a sensible default
+      for known aliases (e.g., claude-sonnet-4 → claude-sonnet-4-20250514).
+      Thinking maps to the API "thinking" parameter, not the model id.
     """
-    want_thinking = False
-    if model_name.endswith(":thinking"):
-        want_thinking = True
-        model_name = model_name[: -len(":thinking")]
+    if ":" not in spec:
+        provider = "anthropic"
+        rest = spec
+    else:
+        provider, rest = spec.split(":", 1)
 
-    # Map aliases → canonical IDs (do NOT downgrade Sonnet 4 to 3.7)
-    legacy_map: dict[str, str] = {
-        "claude-sonnet-4": "claude-sonnet-4-20250514",
-        "sonnet-4": "claude-sonnet-4-20250514",
-        "claude-sonnet": "claude-sonnet-4-20250514",
+    # Split remaining segments: model[:version][:thinking]
+    rest_parts = rest.split(":") if rest else []
+    if not rest_parts:
+        raise ValueError("Invalid model spec: missing model segment")
+
+    base_model = rest_parts[0]
+    version: str | None = None
+    thinking_enabled = False
+
+    if len(rest_parts) >= 2:
+        # If the last segment is 'thinking', mark it and pop
+        if rest_parts[-1] == "thinking":
+            thinking_enabled = True
+            rest_parts = rest_parts[:-1]
+        # After removing thinking, a second segment is the version
+        if len(rest_parts) >= 2:
+            version = rest_parts[1]
+
+    # Provider-specific normalization
+    if provider == "anthropic":
+        model_id = _normalize_anthropic_model(base_model, version)
+    else:
+        # For unknown providers, pass through the model name (and ignore version)
+        model_id = base_model if version is None else f"{base_model}:{version}"
+
+    return provider, model_id, thinking_enabled
+
+
+def _normalize_anthropic_model(model_name: str, version: str | None) -> str:
+    """Return canonical Anthropic model id for messages API.
+
+    Accepts either plain ids like 'claude-3-7-sonnet-20250219' or tuple
+    (model_name='claude-sonnet-4', version='20250514') and returns
+    'claude-sonnet-4-20250514'. If version is None and model_name already
+    includes a hyphenated date suffix, it's returned as-is. For known aliases
+    without version, default to the stable version.
+    """
+    # If already looks like a full model id with date suffix, keep as-is
+    if any(token.isdigit() and len(token) == 8 for token in model_name.split("-")):
+        return model_name
+
+    if version:
+        return f"{model_name}-{version}"
+
+    # No explicit version: map known aliases to a default stable version
+    default_versions: dict[str, str] = {
+        "claude-sonnet-4": "20250514",
+        "sonnet-4": "20250514",
+        "claude-sonnet": "20250514",
     }
-    normalized = legacy_map.get(model_name, model_name)
-    return normalized, want_thinking
+    if model_name in default_versions:
+        return f"{model_name}-{default_versions[model_name]}"
+    # Otherwise pass through unchanged
+    return model_name
 
 
 def _strip_thinking_variant(model_name: str) -> str:

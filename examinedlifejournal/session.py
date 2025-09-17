@@ -20,9 +20,9 @@ from .llm import (
     QuestionResponse,
     SummaryRequest,
     generate_followup_question,
-    stream_followup_question,
     generate_summary,
 )
+from . import llm as llm_module
 from .question_bank import QUESTION_BANK
 from .storage import (
     Frontmatter,
@@ -141,7 +141,7 @@ class SessionManager:
         base_dir = self.config.base_dir
         base_dir.mkdir(parents=True, exist_ok=True)
 
-        session_id = datetime.now().strftime("%y%m%d_%H%M%S")
+        session_id = datetime.now().strftime("%y%m%d_%H%M")
         markdown_path = base_dir / f"{session_id}.md"
 
         recent = load_recent_summaries(
@@ -489,7 +489,7 @@ class SessionManager:
             conversation_duration=duration_mm_ss,
             max_tokens=CONFIG.llm_max_tokens_question,
         )
-        response = stream_followup_question(request, on_delta)
+        response = llm_module.stream_followup_question(request, on_delta)
         if self.state.exchanges:
             self.state.exchanges[-1].followup_question = response
         log_event(
