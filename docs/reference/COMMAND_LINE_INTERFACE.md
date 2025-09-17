@@ -9,7 +9,7 @@ Auto-start voice recording interface with visual feedback and keyboard controls.
 The journaling loop is started from the project root:
 
 ```bash
-uv run examinedlifejournal journal [--sessions-dir PATH]
+uv run examinedlifejournal journal [--sessions-dir PATH] [--stream-llm/--no-stream-llm]
 ```
 
 Files default to `./sessions/`; pass `--sessions-dir` to override for archival or testing.
@@ -64,5 +64,5 @@ Recording started… [████████░░░░░░░░] Press an
 
 ## Display Mode
 
-- V1: All-at-once response display
-- Future: Streaming word-by-word for conversational feel
+- Default: Streaming next question word-by-word for conversational feel (`--stream-llm`).
+- Disable streaming with `--no-stream-llm` to show all-at-once.

@@ -13,6 +13,7 @@ import math
 import queue
 import shutil
 import subprocess
+import signal
 import threading
 import time
 from pathlib import Path
@@ -87,6 +88,16 @@ def record_response(
     interrupt_flag = threading.Event()
     paused_event = threading.Event()
 
+    # Install a temporary SIGINT handler so Ctrl-C always stops recording,
+    # even if readchar doesn't surface it as a key while paused.
+    previous_sigint_handler = signal.getsignal(signal.SIGINT)
+
+    def _sigint_handler(signum, frame):  # pragma: no cover - signal path
+        stop_event.set()
+        interrupt_flag.set()
+
+    signal.signal(signal.SIGINT, _sigint_handler)
+
     voiced_seconds = 0.0
     frame_duration_sec = 0.0
 
@@ -109,7 +120,8 @@ def record_response(
         try:
             while True:
                 key = readchar.readkey()
-                if key == readchar.key.CTRL_C:
+                # Handle Ctrl-C robustly across readchar versions and terminals
+                if key == "\x03" or key == getattr(readchar.key, "CTRL_C", None):
                     stop_event.set()
                     interrupt_flag.set()
                     return
@@ -185,14 +197,18 @@ def record_response(
                                 voiced_seconds += frame_duration_sec
 
                         if time.monotonic() - last_render >= 1.0 / meter_refresh_hz:
+                            # Drain the latest level regardless to keep queues fresh
                             level = _drain_latest_level(level_queue)
+                            is_paused = paused_event.is_set()
                             # Update status text based on pause state
                             status_text = (
                                 Text("Paused", style="bold yellow")
-                                if paused_event.is_set()
+                                if is_paused
                                 else Text("Recording", style="bold green")
                             )
-                            message = _render_meter(level, status_text)
+                            message = _render_meter(
+                                level, status_text, paused=is_paused
+                            )
                             live.update(message, refresh=True)
                             last_render = time.monotonic()
 
@@ -214,6 +230,11 @@ def record_response(
         raise
 
     finally:
+        # Restore previous SIGINT handler
+        try:
+            signal.signal(signal.SIGINT, previous_sigint_handler)
+        except Exception:
+            pass
         stop_event.set()
         listener_thread.join(timeout=0.1)
 
@@ -278,6 +299,15 @@ def record_response(
             discarded_short_answer=True,
         )
 
+    # Lightweight post-processing: trim leading/trailing silence and attenuate peaks
+    try:
+        new_duration = _postprocess_wav_simple(wav_path, sample_rate)
+        if new_duration is not None:
+            duration_sec = new_duration
+    except Exception:
+        # Fail-safe: never block the flow due to post-processing issues
+        _LOGGER.debug("Post-processing skipped due to error", exc_info=True)
+
     mp3_path = _maybe_start_mp3_conversion(
         wav_path,
         ffmpeg_path=ffmpeg_path,
@@ -323,17 +353,19 @@ def _drain_latest_level(level_queue: queue.Queue[float]) -> float:
     return level
 
 
-def _render_meter(level_rms: float, status_text: Text) -> Text:
-    normalized = _normalize_rms(level_rms)
-    blocks = 16
-    filled = int(round(normalized * blocks))
-    filled = max(0, min(filled, blocks))
-    bar = "█" * filled + "░" * (blocks - filled)
+def _render_meter(level_rms: float, status_text: Text, paused: bool = False) -> Text:
     text = Text()
     text.append(status_text)
-    text.append("  [")
-    text.append(bar, style="cyan")
-    text.append("] SPACE pause/resume; any key stops (ESC cancels, Q quits)")
+    if not paused:
+        normalized = _normalize_rms(level_rms)
+        blocks = 16
+        filled = int(round(normalized * blocks))
+        filled = max(0, min(filled, blocks))
+        bar = "█" * filled + "░" * (blocks - filled)
+        text.append("  [")
+        text.append(bar, style="cyan")
+        text.append("]")
+    text.append(" SPACE pause/resume; any key stops (ESC cancels, Q quits)")
     return text
 
 
@@ -453,3 +485,102 @@ def _maybe_start_mp3_conversion(
 
     threading.Thread(target=_convert, daemon=True).start()
     return mp3_path
+
+
+def _postprocess_wav_simple(wav_path: Path, input_sample_rate: int) -> Optional[float]:
+    """Trim leading/trailing silence and attenuate peaks to avoid clipping.
+
+    Returns the new duration in seconds if changes were written; otherwise None.
+
+    This intentionally avoids heavy dependencies and complex DSP. It uses a
+    simple absolute-amplitude threshold derived from the configured dBFS
+    threshold and adds small pre/post padding to avoid cutting transients.
+    """
+    try:
+        audio, sr = sf.read(wav_path, dtype="float32", always_2d=False)
+    except Exception as exc:  # pragma: no cover - defensive
+        _LOGGER.debug("Failed to read WAV for post-processing: %s", exc)
+        log_event(
+            "audio.wav.postprocess.error",
+            {
+                "wav": wav_path.name,
+                "error_type": exc.__class__.__name__,
+                "error": str(exc),
+                "stage": "read",
+            },
+        )
+        return None
+
+    # Downmix defensively if multi-channel (should be mono already)
+    if getattr(audio, "ndim", 1) == 2:
+        try:
+            audio = audio.mean(axis=1)
+        except Exception:
+            # If shape unexpected, bail out safely
+            return None
+
+    if audio.size == 0:
+        return None
+
+    # Compute simple amplitude threshold from dBFS setting
+    threshold_dbfs = CONFIG.voice_rms_dbfs_threshold
+    amplitude_threshold = float(10.0 ** (threshold_dbfs / 20.0))
+    amplitude_threshold = max(1e-5, min(amplitude_threshold, 0.5))
+
+    abs_audio = np.abs(audio)
+    above = np.nonzero(abs_audio > amplitude_threshold)[0]
+
+    trimmed = audio
+    trimmed_any = False
+    if above.size > 0:
+        pad_samples = int(0.05 * sr)
+        start = max(int(above[0]) - pad_samples, 0)
+        end = min(int(above[-1]) + pad_samples + 1, audio.shape[0])
+        if end - start > 0 and (start > 0 or end < audio.shape[0]):
+            candidate = audio[start:end]
+            # Avoid pathological over-trimming: require at least 0.2s remain or skip
+            if candidate.shape[0] >= int(0.2 * sr) or audio.shape[0] < int(0.25 * sr):
+                trimmed = candidate
+                trimmed_any = True
+
+    max_abs = float(np.max(np.abs(trimmed))) if trimmed.size else 0.0
+    attenuated = False
+    # Only attenuate if dangerously close to full-scale
+    desired_peak = 0.98
+    if max_abs > desired_peak and max_abs > 0:
+        scale = desired_peak / max_abs
+        trimmed = (trimmed * scale).astype(np.float32, copy=False)
+        attenuated = True
+
+    # If nothing changed materially, skip rewrite
+    if not trimmed_any and not attenuated:
+        return None
+
+    try:
+        sf.write(wav_path, trimmed.astype(np.float32, copy=False), sr, subtype="PCM_16")
+    except Exception as exc:  # pragma: no cover - defensive
+        _LOGGER.debug("Failed to write post-processed WAV: %s", exc)
+        log_event(
+            "audio.wav.postprocess.error",
+            {
+                "wav": wav_path.name,
+                "error_type": exc.__class__.__name__,
+                "error": str(exc),
+                "stage": "write",
+            },
+        )
+        return None
+
+    try:
+        details: dict[str, object] = {
+            "wav": wav_path.name,
+            "sr": sr,
+            "trimmed": trimmed_any,
+            "attenuated": attenuated,
+            "duration_seconds": round(len(trimmed) / float(sr), 3),
+        }
+        log_event("audio.wav.postprocess", details)
+    except Exception:
+        pass
+
+    return len(trimmed) / float(sr)

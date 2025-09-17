@@ -228,3 +228,63 @@ def test_generate_next_question_uses_question_bank(tmp_path, monkeypatch):
     assert response.question == QUESTION_BANK[0]
     assert response.model == "question-bank"
     assert state.exchanges[-1].followup_question == response
+
+
+def test_generate_next_question_streams_with_callback(tmp_path, monkeypatch):
+    base_dir = tmp_path / "session"
+    config = SessionConfig(
+        base_dir=base_dir,
+        llm_model="anthropic:test",
+        stt_model="whisper-test",
+        opening_question="What would you like to explore?",
+        app_version="test-app",
+    )
+    manager = SessionManager(config)
+    state = manager.start()
+
+    audio_dir = base_dir / state.session_id
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    wav = audio_dir / f"{state.session_id}_01.wav"
+    wav.write_bytes(b"fake-wav")
+
+    state.exchanges.append(
+        Exchange(
+            question="Opening question",
+            transcript="I talked about streaming.",
+            audio=AudioCaptureResult(
+                wav_path=wav,
+                mp3_path=None,
+                duration_seconds=1.0,
+                voiced_seconds=0.8,
+                cancelled=False,
+                quit_after=False,
+            ),
+            transcription=TranscriptionResult(
+                text="I talked about streaming.",
+                raw_response={},
+                model="whisper-test",
+                backend="cloud-openai",
+            ),
+        )
+    )
+
+    # Monkeypatch the underlying streaming call to emit two chunks and return a final question
+    from examinedlifejournal import llm as llm_module
+
+    def fake_stream_followup_question(request, on_delta):
+        on_delta("What ")
+        on_delta("now?")
+        return llm_module.QuestionResponse(question="What now?", model=request.model)
+
+    monkeypatch.setattr(llm_module, "stream_followup_question", fake_stream_followup_question)
+
+    chunks: list[str] = []
+
+    def on_delta(chunk: str) -> None:
+        chunks.append(chunk)
+
+    response = manager.generate_next_question_streaming("Body text", on_delta)
+
+    assert response.question.endswith("?")
+    assert "".join(chunks) == "What now?"
+    assert state.exchanges[-1].followup_question == response

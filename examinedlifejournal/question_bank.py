@@ -11,4 +11,7 @@ QUESTION_BANK: list[str] = [
     "What is one belief that felt challenged today?",
     "How did you take care of yourself in the past 24 hours?",
     "What emotion surprised you lately, and what triggered it?",
+    "What is one small step you could take in the next 24 hours?",
+    "What strengths did you use today?",
+    "What are you grateful for today?",
 ]

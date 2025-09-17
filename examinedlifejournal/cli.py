@@ -7,6 +7,8 @@ import json
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.live import Live
+from rich.text import Text
 
 from . import __version__
 from .config import CONFIG
@@ -94,6 +96,11 @@ def journal(
         True,
         "--delete-wav-when-safe/--keep-wav",
         help="Delete WAV after MP3+STT exist (saves disk).",
+    ),
+    stream_llm: bool = typer.Option(
+        True,
+        "--stream-llm/--no-stream-llm",
+        help="Stream the next question from the LLM for lower perceived latency.",
     ),
 ) -> None:
     """Run the interactive voice journaling session."""
@@ -314,7 +321,47 @@ def journal(
                 break
 
             try:
-                next_question = manager.generate_next_question(transcript_doc.body)
+                if stream_llm:
+                    buffer: list[str] = []
+
+                    def on_delta(chunk: str) -> None:
+                        # Accumulate and re-render live panel
+                        buffer.append(chunk)
+
+                    # Render live as tokens stream in
+                    with Live(console=console, auto_refresh=True, transient=True) as live:
+                        # Use a small spinner-like feedback until first token arrives
+                        live.update(
+                            Panel.fit(
+                                Text("Thinking…", style="italic cyan"),
+                                title="Next Question",
+                                border_style="cyan",
+                            )
+                        )
+                        next_question = manager.generate_next_question_streaming(
+                            transcript_doc.body, on_delta
+                        )
+                        # Final render with the fully assembled text
+                        streamed_text = "".join(buffer)
+                        question_text = (
+                            next_question.question if next_question.question else streamed_text
+                        )
+                        live.update(
+                            Panel.fit(
+                                question_text,
+                                title="Next Question",
+                                border_style="cyan",
+                            )
+                        )
+                else:
+                    next_question = manager.generate_next_question(transcript_doc.body)
+                    console.print(
+                        Panel.fit(
+                            next_question.question,
+                            title="Next Question",
+                            border_style="cyan",
+                        )
+                    )
             except Exception as exc:
                 console.print(f"[red]Question generation failed:[/] {exc}")
                 log_event(
@@ -328,9 +375,6 @@ def journal(
                 break
 
             question = next_question.question
-            console.print(
-                Panel.fit(question, title="Next Question", border_style="cyan")
-            )
 
     except KeyboardInterrupt:
         console.print("[red]Session interrupted by user.[/]")

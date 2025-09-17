@@ -20,6 +20,7 @@ from .llm import (
     QuestionResponse,
     SummaryRequest,
     generate_followup_question,
+    stream_followup_question,
     generate_summary,
 )
 from .question_bank import QUESTION_BANK
@@ -438,6 +439,57 @@ class SessionManager:
             max_tokens=CONFIG.llm_max_tokens_question,
         )
         response = generate_followup_question(request)
+        if self.state.exchanges:
+            self.state.exchanges[-1].followup_question = response
+        log_event(
+            "session.next_question.generated",
+            {
+                "session_id": self.state.session_id if self.state else None,
+                "model": response.model,
+            },
+        )
+        return response
+
+    def generate_next_question_streaming(
+        self, transcript: str, on_delta: callable
+    ) -> QuestionResponse:
+        if self.state is None:
+            raise RuntimeError("Session has not been started")
+
+        history_text = [item.summary for item in self.state.recent_history]
+        # Compute total conversation duration so far in minutes:seconds
+        try:
+            doc = load_transcript(self.state.markdown_path)
+            total_seconds = float(doc.frontmatter.data.get("duration_seconds", 0.0))
+        except Exception:
+            total_seconds = sum(e.audio.duration_seconds for e in self.state.exchanges)
+        duration_mm_ss = _format_minutes_seconds(total_seconds)
+        lowered = transcript.lower()
+        if "give me a question" in lowered:
+            import random
+
+            chosen = random.choice(QUESTION_BANK)
+            # Emit the full question via callback for consistency with streaming UX
+            try:
+                on_delta(chosen)
+            except Exception:  # pragma: no cover - defensive callback
+                pass
+            response = QuestionResponse(question=chosen, model="question-bank")
+            if self.state.exchanges:
+                self.state.exchanges[-1].followup_question = response
+            return response
+
+        request = QuestionRequest(
+            model=self.config.llm_model,
+            current_transcript=transcript,
+            recent_summaries=history_text,
+            opening_question=self.config.opening_question,
+            question_bank=QUESTION_BANK,
+            language=self.config.language,
+            conversation_duration=duration_mm_ss,
+            max_tokens=CONFIG.llm_max_tokens_question,
+        )
+        response = stream_followup_question(request, on_delta)
         if self.state.exchanges:
             self.state.exchanges[-1].followup_question = response
         log_event(

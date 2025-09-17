@@ -16,8 +16,8 @@ Continuous Q&A loop with LLM-generated follow-up questions after each response.
 1. Start with default opener or custom question
 2. User records voice response
 3. Transcribe and save
-4. LLM generates contextual follow-up question
-5. Display question as text
+4. LLM generates contextual follow-up question (streamed by default for lower perceived latency)
+5. Display question as text (progressively when streaming is enabled)
 6. Loop until user presses Q to quit
 
 ## Question Generation
