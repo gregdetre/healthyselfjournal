@@ -142,38 +142,15 @@ def stream_followup_question(
                     "max_tokens": request.max_tokens,
                 },
             )
-            # Ensure thinking temperature and budget obey API constraints
-            effective_temperature = 1.0 if thinking_enabled else 0.7
-            # Enforce Anthropic minimum budget requirement (>= 1024) when thinking is enabled
-            # and keep it strictly below max_tokens to avoid exhausting the output quota.
-            # Also clamp by configured prompt budget.
-            if thinking_enabled:
-                # Reserve at least 1 token for output; budget must be >= 1024
-                reserved_for_output = 1
-                max_allowed_by_output = max(request.max_tokens - reserved_for_output, 0)
-                effective_budget_tokens = max(
-                    1024, min(CONFIG.prompt_budget_tokens, max_allowed_by_output)
-                )
-            else:
-                effective_budget_tokens = None
-
-            stream_kwargs: dict[str, Any] = {
-                "model": model_name,
-                "max_tokens": request.max_tokens,
-                "temperature": effective_temperature,
-                "system": SYSTEM_PROMPT,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": rendered,
-                    }
-                ],
-            }
-            if thinking_enabled:
-                stream_kwargs["thinking"] = {
-                    "type": "enabled",
-                    "budget_tokens": effective_budget_tokens,
-                }
+            stream_kwargs = _build_anthropic_kwargs(
+                model=model_name,
+                prompt=rendered,
+                max_tokens=request.max_tokens,
+                temperature=CONFIG.llm_temperature_question,
+                top_p=CONFIG.llm_top_p,
+                top_k=CONFIG.llm_top_k,
+                thinking_enabled=thinking_enabled,
+            )
             with _ANTHROPIC_CLIENT.messages.stream(**stream_kwargs) as stream:
                 for text in stream.text_stream:
                     try:
@@ -307,15 +284,11 @@ def get_model_provider(spec: str) -> str:
 
 def _render_question_prompt(request: QuestionRequest) -> str:
     template = _load_prompt("question.prompt.md.jinja")
-    # Shuffle the question bank to vary ordering in the prompt
-    shuffled_question_bank = list(request.question_bank)
-    random.shuffle(shuffled_question_bank)
     return jinja_render(
         template,
         {
             "recent_summaries": list(request.recent_summaries),
             "current_transcript": request.current_transcript,
-            "question_bank": shuffled_question_bank,
             "language": request.language,
             "conversation_duration": request.conversation_duration,
             "llm_questions_debug": request.llm_questions_debug,
@@ -530,38 +503,15 @@ def _call_anthropic(
 
     for attempt in range(1, max_retries + 1):
         try:
-            effective_temperature = 1.0 if thinking_enabled else temperature
-            # Enforce Anthropic minimum budget requirement (>= 1024) when thinking is enabled
-            if thinking_enabled:
-                reserved_for_output = 1
-                max_allowed_by_output = max(max_tokens - reserved_for_output, 0)
-                effective_budget_tokens = max(
-                    1024, min(CONFIG.prompt_budget_tokens, max_allowed_by_output)
-                )
-            else:
-                effective_budget_tokens = None
-            create_kwargs = {
-                "model": model,
-                "max_tokens": max_tokens,
-                "temperature": effective_temperature,
-                "system": SYSTEM_PROMPT,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    }
-                ],
-            }
-            if thinking_enabled:
-                create_kwargs["thinking"] = {
-                    "type": "enabled",
-                    "budget_tokens": effective_budget_tokens,
-                }
-            if top_p is not None:
-                create_kwargs["top_p"] = top_p
-            if top_k is not None:
-                create_kwargs["top_k"] = top_k
-
+            create_kwargs = _build_anthropic_kwargs(
+                model=model,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                thinking_enabled=thinking_enabled,
+            )
             response = _ANTHROPIC_CLIENT.messages.create(**create_kwargs)
             return "".join(
                 block.text for block in response.content if block.type == "text"
@@ -628,3 +578,56 @@ def _call_anthropic(
         },
     )
     raise last_error
+
+
+def _build_anthropic_kwargs(
+    *,
+    model: str,
+    prompt: str,
+    max_tokens: int,
+    temperature: float,
+    top_p: float | None,
+    top_k: int | None,
+    thinking_enabled: bool,
+) -> dict[str, Any]:
+    """Construct kwargs for Anthropic messages API with consistent thinking behavior.
+
+    - Applies system prompt
+    - Normalizes temperature when thinking is enabled
+    - Enforces Anthropic thinking budget constraints (>=1024 and < max_tokens)
+    - Passes through top_p/top_k when provided
+    """
+    effective_temperature = 1.0 if thinking_enabled else temperature
+    # Enforce Anthropic minimum budget requirement (>= 1024) when thinking is enabled
+    if thinking_enabled:
+        reserved_for_output = 1
+        max_allowed_by_output = max(max_tokens - reserved_for_output, 0)
+        effective_budget_tokens = max(
+            1024, min(CONFIG.prompt_budget_tokens, max_allowed_by_output)
+        )
+    else:
+        effective_budget_tokens = None
+
+    create_kwargs: dict[str, Any] = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "temperature": effective_temperature,
+        "system": SYSTEM_PROMPT,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        ],
+    }
+    if thinking_enabled:
+        create_kwargs["thinking"] = {
+            "type": "enabled",
+            "budget_tokens": effective_budget_tokens,
+        }
+    if top_p is not None:
+        create_kwargs["top_p"] = top_p
+    if top_k is not None:
+        create_kwargs["top_k"] = top_k
+
+    return create_kwargs

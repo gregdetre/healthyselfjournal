@@ -23,7 +23,6 @@ from .llm import (
     generate_summary,
 )
 from . import llm as llm_module
-from .question_bank import QUESTION_BANK
 from .storage import (
     Frontmatter,
     TranscriptDocument,
@@ -41,6 +40,8 @@ from .transcription import (
     format_transcript_sentences,
 )
 from .events import log_event
+from .utils.audio_utils import maybe_delete_wav_when_safe
+from .utils.time_utils import format_hh_mm_ss, format_mm_ss
 from rich.text import Text
 
 if TYPE_CHECKING:
@@ -339,8 +340,8 @@ class SessionManager:
         except Exception:
             prior_total = 0.0
 
-        seg_formatted = _format_duration(capture.duration_seconds)
-        total_formatted = _format_duration(prior_total + capture.duration_seconds)
+        seg_formatted = format_hh_mm_ss(capture.duration_seconds)
+        total_formatted = format_hh_mm_ss(prior_total + capture.duration_seconds)
         console.print(
             Text(
                 f"Saved WAV → {capture.wav_path.name} ({seg_formatted}; total {total_formatted})",
@@ -418,23 +419,17 @@ class SessionManager:
             total_seconds = float(doc.frontmatter.data.get("duration_seconds", 0.0))
         except Exception:
             total_seconds = sum(e.audio.duration_seconds for e in self.state.exchanges)
-        duration_mm_ss = _format_minutes_seconds(total_seconds)
+        duration_mm_ss = format_mm_ss(total_seconds)
         lowered = transcript.lower()
-        if "give me a question" in lowered:
-            import random
-
-            chosen = random.choice(QUESTION_BANK)
-            response = QuestionResponse(question=chosen, model="question-bank")
-            if self.state.exchanges:
-                self.state.exchanges[-1].followup_question = response
-            return response
+        # If user asks explicitly for a question, rely on prompt instruction to select from default bank
+        # (No local random fallback; LLM will choose based on embedded list.)
 
         request = QuestionRequest(
             model=self.config.llm_model,
             current_transcript=transcript,
             recent_summaries=history_text,
             opening_question=self.config.opening_question,
-            question_bank=QUESTION_BANK,
+            question_bank=[],
             language=self.config.language,
             conversation_duration=duration_mm_ss,
             max_tokens=CONFIG.llm_max_tokens_question,
@@ -465,28 +460,17 @@ class SessionManager:
             total_seconds = float(doc.frontmatter.data.get("duration_seconds", 0.0))
         except Exception:
             total_seconds = sum(e.audio.duration_seconds for e in self.state.exchanges)
-        duration_mm_ss = _format_minutes_seconds(total_seconds)
+        duration_mm_ss = format_mm_ss(total_seconds)
         lowered = transcript.lower()
-        if "give me a question" in lowered:
-            import random
-
-            chosen = random.choice(QUESTION_BANK)
-            # Emit the full question via callback for consistency with streaming UX
-            try:
-                on_delta(chosen)
-            except Exception:  # pragma: no cover - defensive callback
-                pass
-            response = QuestionResponse(question=chosen, model="question-bank")
-            if self.state.exchanges:
-                self.state.exchanges[-1].followup_question = response
-            return response
+        # If user asks explicitly for a question, rely on prompt instruction to select from default bank
+        # (No local random fallback; LLM will choose and stream normally.)
 
         request = QuestionRequest(
             model=self.config.llm_model,
             current_transcript=transcript,
             recent_summaries=history_text,
             opening_question=self.config.opening_question,
-            question_bank=QUESTION_BANK,
+            question_bank=[],
             language=self.config.language,
             conversation_duration=duration_mm_ss,
             max_tokens=CONFIG.llm_max_tokens_question,
@@ -679,33 +663,16 @@ def _persist_raw_transcription(wav_path: Path, payload: dict) -> None:
         from .config import CONFIG as _CFG
 
         if getattr(_CFG, "delete_wav_when_safe", False):
-            mp3_path = wav_path.with_suffix(".mp3")
-            if mp3_path.exists() and wav_path.exists():
-                try:
-                    wav_path.unlink(missing_ok=True)
-                    log_event(
-                        "audio.wav.deleted",
-                        {
-                            "wav": wav_path.name,
-                            "reason": "safe_delete_after_mp3_and_stt",
-                        },
-                    )
-                except Exception:
-                    pass
+            maybe_delete_wav_when_safe(wav_path)
     except Exception:
         pass
 
 
-def _format_duration(seconds: float) -> str:
-    total_seconds = int(round(max(0.0, float(seconds))))
-    hours, remainder = divmod(total_seconds, 3600)
-    minutes, secs = divmod(remainder, 60)
-    if hours:
-        return f"{hours}:{minutes:02d}:{secs:02d}"
-    return f"{minutes}:{secs:02d}"
+def _format_duration(seconds: float) -> str:  # pragma: no cover - deprecated shim
+    return format_hh_mm_ss(seconds)
 
 
-def _format_minutes_seconds(seconds: float) -> str:
-    total_seconds = int(round(max(0.0, float(seconds))))
-    minutes, secs = divmod(total_seconds, 60)
-    return f"{minutes}:{secs:02d}"
+def _format_minutes_seconds(
+    seconds: float,
+) -> str:  # pragma: no cover - deprecated shim
+    return format_mm_ss(seconds)

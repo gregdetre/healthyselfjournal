@@ -673,7 +673,13 @@ def _run_mic_check(selection, *, language: str, stt_formatting: str) -> None:
                 style="cyan",
             )
         )
-        if readchar is None:
+        # Use shared key normalization utility
+        try:
+            from .utils.keys import read_one_key_normalized
+        except Exception:
+            read_one_key_normalized = None  # type: ignore
+
+        if readchar is None or read_one_key_normalized is None:
             # Fallback: on raw input, treat non-empty as retry, 'q' to quit
             try:
                 response = input()
@@ -683,25 +689,16 @@ def _run_mic_check(selection, *, language: str, stt_formatting: str) -> None:
                 console.print("[cyan]Quit requested. Exiting before session starts.[/]")
                 raise typer.Exit(code=0)
             if response.strip():
-                # Any text entered counts as retry
                 continue
             return
         else:
             try:
-                key = readchar.readkey()
-                # Normalise
-                if isinstance(key, (bytes, bytearray)):
-                    try:
-                        key = key.decode("utf-8", "ignore")
-                    except Exception:
-                        key = str(key)
-                if key in ("\r", "\n", getattr(readchar.key, "ENTER", "\n")):
+                key_name = read_one_key_normalized()
+                if key_name == "ENTER":
                     return
-                if key == getattr(readchar.key, "ESC", "\x1b") or (
-                    isinstance(key, str) and key.startswith("\x1b")
-                ):
+                if key_name == "ESC":
                     continue
-                if str(key).lower() == "q":
+                if key_name == "Q":
                     console.print(
                         "[cyan]Quit requested. Exiting before session starts.[/]"
                     )

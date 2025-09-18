@@ -90,7 +90,18 @@ def write_transcript(markdown_path: Path, document: TranscriptDocument) -> None:
         lines.append("")
 
     markdown_path.parent.mkdir(parents=True, exist_ok=True)
-    markdown_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # Atomic write: write to a temp file then replace
+    tmp_path = markdown_path.with_name("." + markdown_path.name + ".tmp")
+    tmp_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    try:
+        tmp_path.replace(markdown_path)
+    except Exception:
+        # Fallback to direct write if replace fails (e.g., cross-filesystem)
+        markdown_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 def append_exchange_body(

@@ -33,6 +33,8 @@ if TYPE_CHECKING:  # pragma: no cover - imported for typing only
 
 _LOGGER = logging.getLogger(__name__)
 from .events import log_event
+from .utils.time_utils import format_hh_mm_ss
+from .utils.audio_utils import maybe_delete_wav_when_safe
 
 
 @dataclass
@@ -120,53 +122,33 @@ def record_response(
             frames_queue.put_nowait(indata.copy())
 
     def _wait_for_stop():  # pragma: no cover - blocking on user input
-        # Lazy import to avoid hard dependency during unit tests
+        # Use shared key normalization; fall back handled inside the util
         try:
-            import readchar  # type: ignore
-        except Exception as _exc:  # noqa: N816 - local name matches import
-            _LOGGER.warning("readchar not available: %s", _exc)
-            # Fallback: stop on any input via input() (no pause/cancel support)
-            try:
-                input()
-            except Exception:
-                pass
-            stop_event.set()
-            return
+            from .utils.keys import read_one_key_normalized
+        except Exception:
+            read_one_key_normalized = None  # type: ignore
         try:
             while True:
-                key = readchar.readkey()
-                # Normalize to string in case backend returns bytes
-                if isinstance(key, (bytes, bytearray)):
-                    try:
-                        key = key.decode("utf-8", "ignore")
-                    except Exception:
-                        key = str(key)
-                # Handle Ctrl-C robustly across readchar versions and terminals
-                if key == "\x03" or key == getattr(readchar.key, "CTRL_C", None):
-                    stop_event.set()
-                    interrupt_flag.set()
-                    return
-                # Treat ESC and any ESC-prefixed sequence (e.g., ANSI) as cancel
-                if key == getattr(readchar.key, "ESC", "\x1b") or (
-                    isinstance(key, str) and key.startswith("\x1b")
-                ):
+                key_name = (
+                    read_one_key_normalized() if read_one_key_normalized else "OTHER"
+                )
+                if key_name == "ESC":
                     cancel_flag.set()
                     stop_event.set()
                     return
-                if key.lower() == "q":
+                if key_name == "Q":
                     quit_flag.set()
                     stop_event.set()
                     return
-                # SPACE toggles pause/resume without stopping
-                if key == getattr(readchar.key, "SPACE", " ") or key == " ":
+                if key_name == "SPACE":
                     if paused_event.is_set():
                         paused_event.clear()
                     else:
                         paused_event.set()
                     continue
-                # Any other key stops recording
-                stop_event.set()
-                return
+                if key_name == "ENTER" or key_name == "OTHER":
+                    stop_event.set()
+                    return
         except KeyboardInterrupt:
             stop_event.set()
             interrupt_flag.set()
@@ -352,7 +334,7 @@ def record_response(
     if print_saved_message:
         console.print(
             Text(
-                f"Saved WAV → {wav_path.name} ({_format_duration(duration_sec)})",
+                f"Saved WAV → {wav_path.name} ({format_hh_mm_ss(duration_sec)})",
                 style="green",
             )
         )
@@ -377,6 +359,8 @@ def _next_available_path(path: Path) -> Path:
         candidate = path.with_name(f"{stem}_{idx}{suffix}")
         if not candidate.exists():
             return candidate
+    # Fallback to original path (should be unreachable)
+    return path
 
 
 def _drain_latest_level(level_queue: queue.Queue[float]) -> float:
@@ -424,15 +408,6 @@ def _rms_above_threshold(rms: float, threshold_dbfs: float) -> bool:
         return False
     db = 20.0 * math.log10(rms + 1e-10)
     return db >= threshold_dbfs
-
-
-def _format_duration(seconds: float) -> str:
-    total_seconds = int(round(max(0.0, seconds)))
-    hours, remainder = divmod(total_seconds, 3600)
-    minutes, secs = divmod(remainder, 60)
-    if hours:
-        return f"{hours}:{minutes:02d}:{secs:02d}"
-    return f"{minutes}:{secs:02d}"
 
 
 def _maybe_start_mp3_conversion(
@@ -483,19 +458,7 @@ def _maybe_start_mp3_conversion(
                 from .config import CONFIG as _CFG
 
                 if getattr(_CFG, "delete_wav_when_safe", False):
-                    stt_json = wav_path.with_suffix(".stt.json")
-                    if stt_json.exists() and wav_path.exists():
-                        try:
-                            wav_path.unlink(missing_ok=True)
-                            log_event(
-                                "audio.wav.deleted",
-                                {
-                                    "wav": wav_path.name,
-                                    "reason": "safe_delete_after_mp3_and_stt",
-                                },
-                            )
-                        except Exception:
-                            pass
+                    maybe_delete_wav_when_safe(wav_path)
             except Exception:
                 pass
         except subprocess.CalledProcessError as exc:
