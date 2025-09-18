@@ -9,13 +9,15 @@ from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
 from rich.text import Text
+import tempfile
+import shutil
 
 from . import __version__
 from .cli_init import needs_init, run_init_wizard
 from .config import CONFIG
 from .events import get_event_log_path, init_event_logger, log_event
 from .history import load_recent_summaries
-from .llm import SummaryRequest, generate_summary
+from .llm import SummaryRequest, generate_summary, get_model_provider
 from .session import SessionConfig, SessionManager
 from .storage import load_transcript, write_transcript
 from .transcription import (
@@ -31,6 +33,7 @@ console = Console()
 
 
 def journal(
+    ctx: typer.Context,
     sessions_dir: Path = typer.Option(
         CONFIG.recordings_dir,
         "--sessions-dir",
@@ -111,8 +114,22 @@ def journal(
         "--tts-format",
         help="TTS audio format for playback (wav recommended).",
     ),
+    llm_questions_debug: bool = typer.Option(
+        False,
+        "--llm-questions-debug/--no-llm-questions-debug",
+        help="Append a debug postscript to LLM questions about techniques used.",
+    ),
+    mic_check: bool = typer.Option(
+        True,
+        "--mic-check/--no-mic-check",
+        help="Run a 3s mic check on startup (ENTER continue, ESC retry, q quit).",
+    ),
 ) -> None:
     """Run the interactive voice journaling session."""
+
+    # If a subcommand is invoked under the journal app, do nothing here
+    if getattr(ctx, "invoked_subcommand", None):
+        return
 
     # Auto-run init wizard if critical prerequisites are missing and we are in a TTY.
     # This respects any values loaded from .env/.env.local in __init__ at import time.
@@ -140,7 +157,9 @@ def journal(
             )
             raise typer.Exit(code=2)
 
-    _require_env("ANTHROPIC_API_KEY")
+    provider = get_model_provider(llm_model)
+    if provider == "anthropic":
+        _require_env("ANTHROPIC_API_KEY")
 
     try:
         apply_transcript_formatting("sample", stt_formatting)
@@ -215,6 +234,7 @@ def journal(
             "resume": resume,
             "stt_auto_reason": selection.reason,
             "stt_warnings": selection.warnings,
+            "mic_check": mic_check,
         },
     )
 
@@ -236,8 +256,18 @@ def journal(
         stt_auto_private_reason=selection.reason,
         stt_backend_selection=selection,
         stt_warnings=selection.warnings,
+        llm_questions_debug=llm_questions_debug,
     )
     manager = SessionManager(session_cfg)
+
+    # Optional mic check before starting or resuming a session
+    if mic_check:
+        try:
+            _run_mic_check(selection, language=language, stt_formatting=stt_formatting)
+        except typer.Exit:
+            raise
+        except Exception as exc:
+            console.print(f"[yellow]Mic check failed; continuing:[/] {exc}")
 
     # Determine whether to start new or resume recent session
     if resume:
@@ -466,31 +496,78 @@ def journal(
     except KeyboardInterrupt:
         console.print("[red]Session interrupted by user.[/]")
     finally:
-        # Surface progress while waiting for the final summary flush
-        console.print("[cyan]Finalizing summary before exit…[/]")
-        manager.complete()
-        console.print("[green]Summary updated.[/]")
-        log_event(
-            "cli.end",
-            {
-                "transcript_file": state.markdown_path.name,
-                "session_id": state.session_id,
-            },
-        )
-        console.print(
-            Panel.fit(
-                f"Session saved to {state.markdown_path.name}",
-                title="Session Complete",
-                border_style="magenta",
+        # If nothing was recorded and this wasn't a resume, don't keep an empty session file
+        is_empty_session = False
+        try:
+            if manager.state is not None and not manager.state.resumed:
+                has_exchanges = len(manager.state.exchanges) > 0
+                has_audio_artifacts = (
+                    any(manager.state.audio_dir.glob("*.wav"))
+                    or any(manager.state.audio_dir.glob("*.mp3"))
+                    or any(manager.state.audio_dir.glob("*.stt.json"))
+                )
+                doc = load_transcript(state.markdown_path)
+                body_empty = not bool(doc.body.strip())
+                is_empty_session = (
+                    (not has_exchanges) and (not has_audio_artifacts) and body_empty
+                )
+        except Exception:
+            # Defensive: if anything goes wrong here, fall back to normal finalize
+            is_empty_session = False
+
+        if is_empty_session:
+            # Best-effort shutdown of background executor without writing anything
+            try:
+                if getattr(manager, "_summary_executor", None) is not None:
+                    manager._summary_executor.shutdown(wait=False)
+            except Exception:
+                pass
+
+            # Remove the empty markdown and per-session audio dir (if still empty)
+            try:
+                state.markdown_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            try:
+                if state.audio_dir.exists() and not any(state.audio_dir.iterdir()):
+                    state.audio_dir.rmdir()
+            except Exception:
+                pass
+
+            log_event(
+                "cli.cancelled",
+                {
+                    "session_id": state.session_id,
+                    "reason": "no_recordings",
+                },
             )
-        )
-        # Remind user if there is pending STT work.
-        pending = _count_missing_stt(sessions_dir)
-        if pending:
+            console.print("[yellow]Session cancelled; nothing saved.[/]")
+        else:
+            # Surface progress while waiting for the final summary flush
+            console.print("[cyan]Finalizing summary before exit…[/]")
+            manager.complete()
+            console.print("[green]Summary updated.[/]")
+            log_event(
+                "cli.end",
+                {
+                    "transcript_file": state.markdown_path.name,
+                    "session_id": state.session_id,
+                },
+            )
             console.print(
-                f"[yellow]{pending} recording(s) still pending transcription.[/] "
-                f"Use [cyan]examinedlifejournal reconcile --sessions-dir '{sessions_dir}'[/] to process them."
+                Panel.fit(
+                    f"Session saved to {state.markdown_path.name}",
+                    title="Session Complete",
+                    border_style="magenta",
+                )
             )
+            # Remind user if there is pending STT work.
+            pending = _count_missing_stt(sessions_dir)
+            if pending:
+                console.print(
+                    f"[yellow]{pending} recording(s) still pending transcription.[/] "
+                    f"Use [cyan]examinedlifejournal reconcile --sessions-dir '{sessions_dir}'[/] to process them."
+                )
 
 
 def _require_env(var_name: str) -> None:
@@ -509,3 +586,194 @@ def _count_missing_stt(audio_root: Path) -> int:
         if not stt.exists():
             missing += 1
     return missing
+
+
+def _run_mic_check(selection, *, language: str, stt_formatting: str) -> None:
+    """Run a 3-second mic check loop until user accepts or quits.
+
+    - Records to a temporary directory
+    - Disables MP3 conversion and short-answer discard
+    - Deletes all artifacts after display
+    - ENTER continues; ESC retries; q quits the app
+    """
+    # Lazy imports to keep test deps light
+    try:
+        import readchar  # type: ignore
+    except Exception:
+        readchar = None  # type: ignore
+
+    # Construct a transcription backend matching current selection
+    backend = create_transcription_backend(selection)
+
+    while True:
+        console.print(
+            Panel.fit(
+                "Mic check: speak a few words. We'll record for 3 seconds and show the transcript.\n"
+                "Press ENTER to continue, ESC to try again, or q to quit.",
+                title="Mic Check",
+                border_style="magenta",
+            )
+        )
+
+        tmp_dir = Path(tempfile.mkdtemp(prefix="elj_miccheck_"))
+        try:
+            # Reuse audio capture with fixed duration and no persistence side-effects
+            from .audio import record_response
+
+            capture = record_response(
+                tmp_dir,
+                base_filename="miccheck",
+                console=console,
+                sample_rate=16_000,
+                ffmpeg_path=None,
+                print_saved_message=False,
+                convert_to_mp3=False,
+                max_seconds=3.0,
+                enforce_short_answer_guard=False,
+            )
+
+            if capture.cancelled:
+                # If user pressed ESC during capture, just retry automatically
+                continue
+
+            # Transcribe and show formatted transcript without persisting
+            transcription = backend.transcribe(capture.wav_path, language=language)
+            try:
+                formatted = apply_transcript_formatting(
+                    transcription.text, stt_formatting
+                )
+            except Exception:
+                formatted = transcription.text.strip()
+
+            console.print()
+            console.print(
+                Panel.fit(
+                    formatted or "(no speech detected)",
+                    title="Mic Check Transcript",
+                    border_style="green",
+                )
+            )
+            console.print(
+                Text(
+                    f"Backend: {selection.backend_id}  Model: {selection.model}",
+                    style="dim",
+                )
+            )
+        finally:
+            # Remove artifacts regardless of outcome
+            try:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            except Exception:
+                pass
+
+        # Await user decision
+        console.print(
+            Text(
+                "Press ENTER to continue, ESC to try again, or q to quit…",
+                style="cyan",
+            )
+        )
+        if readchar is None:
+            # Fallback: on raw input, treat non-empty as retry, 'q' to quit
+            try:
+                response = input()
+            except KeyboardInterrupt:
+                raise typer.Exit(code=0)
+            if response.strip().lower() == "q":
+                console.print("[cyan]Quit requested. Exiting before session starts.[/]")
+                raise typer.Exit(code=0)
+            if response.strip():
+                # Any text entered counts as retry
+                continue
+            return
+        else:
+            try:
+                key = readchar.readkey()
+                # Normalise
+                if isinstance(key, (bytes, bytearray)):
+                    try:
+                        key = key.decode("utf-8", "ignore")
+                    except Exception:
+                        key = str(key)
+                if key in ("\r", "\n", getattr(readchar.key, "ENTER", "\n")):
+                    return
+                if key == getattr(readchar.key, "ESC", "\x1b") or (
+                    isinstance(key, str) and key.startswith("\x1b")
+                ):
+                    continue
+                if str(key).lower() == "q":
+                    console.print(
+                        "[cyan]Quit requested. Exiting before session starts.[/]"
+                    )
+                    raise typer.Exit(code=0)
+                # Any other key: accept and proceed
+                return
+            except KeyboardInterrupt:
+                raise typer.Exit(code=0)
+
+
+def build_app() -> typer.Typer:
+    """Build the Typer sub-app for `journal` with subcommands.
+
+    Invoking `examinedlifejournal journal` with no subcommand runs the interactive
+    journaling loop (default). `examinedlifejournal journal list` lists sessions.
+    """
+
+    app = typer.Typer(
+        add_completion=False,
+        no_args_is_help=False,
+        context_settings={"help_option_names": ["-h", "--help"]},
+        help="Voice journaling and related utilities.",
+    )
+
+    # Default behavior: when no subcommand is provided, run the journaling loop
+    app.callback(invoke_without_command=True)(journal)
+
+    @app.command("list")
+    def list_sessions(
+        sessions_dir: Path = typer.Option(
+            CONFIG.recordings_dir,
+            "--sessions-dir",
+            help="Directory where session markdown/audio files are stored.",
+        ),
+        nchars: int | None = typer.Option(
+            None,
+            "--nchars",
+            help="Limit summary snippet to N characters (None = full summary).",
+        ),
+    ) -> None:
+        """List sessions by filename stem with the first 200 chars of the summary."""
+
+        markdown_files = sorted((p for p in sessions_dir.glob("*.md")))
+        if not markdown_files:
+            console.print("[yellow]No session markdown files found.[/]")
+            return
+
+        for path in markdown_files:
+            try:
+                doc = load_transcript(path)
+                summary_raw = doc.frontmatter.data.get("summary")
+                summary_text = summary_raw if isinstance(summary_raw, str) else ""
+                normalized = " ".join(summary_text.split())
+                if nchars is not None and nchars > 0:
+                    snippet = normalized[:nchars]
+                else:
+                    snippet = normalized
+                body = Text(snippet) if snippet else Text("(no summary)", style="dim")
+                console.print(
+                    Panel.fit(
+                        body,
+                        title=path.stem,
+                        border_style="cyan",
+                    )
+                )
+            except Exception as exc:  # pragma: no cover - defensive surface
+                console.print(
+                    Panel.fit(
+                        Text(f"error reading - {exc}", style="red"),
+                        title=path.name,
+                        border_style="red",
+                    )
+                )
+
+    return app

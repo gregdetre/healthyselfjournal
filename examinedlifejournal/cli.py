@@ -9,7 +9,7 @@ from rich.console import Console
 from .cli_init import init as init_cmd
 from .cli_reconcile import reconcile as reconcile_cmd
 from .cli_summaries import build_app as build_summaries_app
-from .cli_journal import journal as journal_cmd
+from .cli_journal import build_app as build_journal_app
 from .cli_merge import merge as merge_cmd
 
 app = typer.Typer(
@@ -25,6 +25,15 @@ console = Console()
 def _verify_runtime_deps_for_command(command_name: str) -> None:
     # Only enforce for commands that require interactive audio capture
     if command_name == "journal":
+        # Skip heavy runtime deps for non-interactive subcommands like `journal list`
+        argv = sys.argv[1:]
+        if "journal" in argv:
+            try:
+                idx = argv.index("journal")
+                if idx + 1 < len(argv) and argv[idx + 1] == "list":
+                    return
+            except Exception:
+                pass
         required = [
             ("readchar", "Keyboard input for pause/quit controls"),
             ("sounddevice", "Microphone capture"),
@@ -68,12 +77,13 @@ def _main_callback(ctx: typer.Context) -> None:
         _verify_runtime_deps_for_command(sub)
 
 
-# Sub-app for summaries utilities
+# Sub-apps
 summaries_app = build_summaries_app()
+journal_app = build_journal_app()
 app.add_typer(summaries_app, name="summaries")
+app.add_typer(journal_app, name="journal")
 
 # Top-level commands
-app.command()(journal_cmd)
 app.command()(reconcile_cmd)
 app.command()(init_cmd)
 app.command()(merge_cmd)

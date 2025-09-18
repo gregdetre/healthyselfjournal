@@ -9,12 +9,38 @@ Auto-start voice recording interface with visual feedback and keyboard controls.
 The journaling loop is started from the project root:
 
 ```bash
-uv run examinedlifejournal journal [--sessions-dir PATH] [--stream-llm/--no-stream-llm] [--voice-mode/--no-voice-mode] [--tts-model SPEC] [--tts-voice NAME] [--tts-format FORMAT]
+uv run examinedlifejournal journal \
+  [--sessions-dir PATH] \
+  [--llm-model SPEC] \
+  [--stt-backend BACKEND] [--stt-model MODEL] [--stt-compute COMPUTE] [--stt-formatting MODE] \
+  [--opening-question TEXT] [--language LANG] [--resume] \
+  [--delete-wav-when-safe/--keep-wav] \
+  [--stream-llm/--no-stream-llm] \
+  [--voice-mode/--no-voice-mode] [--tts-model SPEC] [--tts-voice NAME] [--tts-format FORMAT] \
+  [--llm-questions-debug/--no-llm-questions-debug] \
+  [--mic-check/--no-mic-check]
+
+# List existing sessions with summary snippets
+uv run examinedlifejournal journal list [--sessions-dir PATH] [--nchars N]
 ```
 
 Files default to `./sessions/`; pass `--sessions-dir` to override for archival or testing.
 
 Tip: during a session, you can say "give me a question" to instantly get a question from the built‑in question bank (bypasses the LLM for speed/robustness).
+#### Listing sessions
+
+Show each session by `.md` filename stem with a summary snippet from frontmatter. Use `--nchars` to limit characters (full summary when omitted):
+
+```bash
+uv run examinedlifejournal journal list --sessions-dir ./sessions --nchars 200
+```
+
+
+LLM selection:
+
+- `--llm-model` accepts `provider:model[:version][:thinking]`.
+  - Cloud default: `anthropic:claude-opus-4-1:20250805:thinking` (the `:thinking` suffix is optional and available on Anthropic models only).
+  - Private/local: `ollama:gemma3:27b-instruct-q4_K_M` (requires the Ollama daemon running on your machine; set `OLLAMA_BASE_URL` to override the host if needed).
 
 Getting started:
 
@@ -33,10 +59,37 @@ Getting started:
 - `--stt-compute`: optional precision override for local backends (e.g. `int8_float16`). Ignored when unsupported.
 - `--stt-formatting`: `sentences` (default heuristic splitter) or `raw` (unaltered backend output).
 
+Other useful options:
+
+- `--opening-question`: override the initial question shown at session start.
+- `--language`: primary language for transcription and LLM guidance (default `en`).
+- `--resume`: resume the most recent session in the sessions directory.
+- `--delete-wav-when-safe/--keep-wav`: delete WAV files once MP3 and STT JSON exist (default delete).
+- `--llm-questions-debug/--no-llm-questions-debug`: append a brief techniques postscript to LLM questions (off by default).
+
+#### Mic check
+
+- `--mic-check/--no-mic-check`: enabled by default. On startup (including when `--resume` is used), records a fixed 3 second sample so you can verify your mic level and transcription quality. The temporary recording is transcribed and shown, then discarded. Press ENTER to continue, ESC to try again, or `q` to quit.
+
 Environment variables:
 
-- `journal`: requires `ANTHROPIC_API_KEY` for dialogue/summaries. `OPENAI_API_KEY` is required when `--stt-backend cloud-openai` or when `--voice-mode` is enabled (OpenAI TTS).
+- `journal`: supply `ANTHROPIC_API_KEY` when using `anthropic:*` models for dialogue/summaries. Switching to `ollama:*` models keeps the loop fully local—no cloud keys required—just ensure the Ollama service is running (override the host via `OLLAMA_BASE_URL` if it is not on the default `http://localhost:11434`). `OPENAI_API_KEY` remains necessary whenever `--stt-backend cloud-openai` is selected or `--voice-mode` enables OpenAI TTS.
 - `reconcile`: requires `OPENAI_API_KEY` only when `--stt-backend cloud-openai` is selected. Local backends do not need API keys.
+
+### Reconcile recordings
+
+Backfill missing transcriptions for saved WAV files in `--sessions-dir`.
+
+```bash
+uv run examinedlifejournal reconcile \
+  [--sessions-dir PATH] \
+  [--stt-backend BACKEND] [--stt-model MODEL] [--stt-compute COMPUTE] \
+  [--language LANG] [--limit N]
+```
+
+Notes:
+- Uses the same STT backends as `journal`. Provide `OPENAI_API_KEY` only when using `--stt-backend cloud-openai`.
+- Honors `--delete-wav-when-safe`: WAVs are deleted after MP3 + STT exist when enabled.
 
 ### Summaries Utilities
 
@@ -54,7 +107,7 @@ uv run examinedlifejournal summaries regenerate [--sessions-dir PATH] [--llm-mod
 ```
 
 - `--missing-only/--all` defaults to missing-only for both commands.
-- Backfill requires `ANTHROPIC_API_KEY`.
+- Summary generation honours the same `--llm-model` provider syntax. Provide `ANTHROPIC_API_KEY` only when targeting `anthropic:*` models; local `ollama:*` runs stay offline (ensure the Ollama daemon is available).
 
 ### Merge sessions
 
@@ -67,7 +120,7 @@ uv run examinedlifejournal merge [--sessions-dir PATH] [--llm-model SPEC] [--reg
 Notes:
 - Asset filename collisions are avoided by suffixing with `_N` when needed.
 - The later session folder is removed if empty after moving.
-- Summary regeneration requires `ANTHROPIC_API_KEY`.
+- Summary regeneration requires `ANTHROPIC_API_KEY` only when the chosen `--llm-model` uses the Anthropic provider. Local `ollama:*` options avoid cloud calls.
  - After a successful merge, the later `.md` file is deleted.
  - Frontmatter `audio_file` becomes MP3-centric (e.g., `{wav: null, mp3: <file>, duration_seconds: <float>}`).
  - If the later assets folder is missing, run again with `--ignore-missing` to proceed.
@@ -81,6 +134,7 @@ See also (details and rationale):
 
 - `RECORDING_CONTROLS.md` – Detailed key mappings and recording flow for capture.
 - `PRODUCT_VISION_FEATURES.md` – How the CLI supports the broader product vision.
+- `PRIVACY.md` – Privacy modes, offline configuration, and what leaves your machine.
 - `../conversations/250917a_journaling_app_ui_technical_decisions.md` – Rationale behind CLI/UI choices and trade-offs.
 - `CONVERSATION_SUMMARIES.md` – Summary lifecycle and backfill rationale.
 
@@ -110,7 +164,7 @@ Examples:
 uv run examinedlifejournal journal --voice-mode
 
 # Explicit control
-uv run examinedlifejournal journal --speak-llm --tts-voice shimmer --tts-model gpt-4o-mini-tts --tts-format wav
+uv run examinedlifejournal journal --voice-mode --tts-voice shimmer --tts-model gpt-4o-mini-tts --tts-format wav
 ```
 
 Notes:
