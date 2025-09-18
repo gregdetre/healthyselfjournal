@@ -74,6 +74,25 @@ uv sync --active
 
 ## Usage
 
+### Getting started (PyPI users)
+
+Use either pip or uvx:
+
+```bash
+# pip
+pip install examinedlifejournal
+examinedlifejournal init
+examinedlifejournal journal
+
+# or uvx (no install needed)
+uvx examinedlifejournal -- init
+uvx examinedlifejournal -- journal
+```
+
+Notes:
+- The init wizard helps you add keys and pick Cloud vs Privacy mode.
+- Default sessions directory is `./sessions` in your current folder.
+
 1. Activate the project virtualenv:
    ```bash
    source /Users/greg/.venvs/experim__examinedlifejournal/bin/activate

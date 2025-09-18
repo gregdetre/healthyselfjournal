@@ -16,6 +16,16 @@ Files default to `./sessions/`; pass `--sessions-dir` to override for archival o
 
 Tip: during a session, you can say "give me a question" to instantly get a question from the built‑in question bank (bypasses the LLM for speed/robustness).
 
+Getting started:
+
+- First-time users should run the setup wizard:
+  ```bash
+  examinedlifejournal init
+  # or
+  uvx examinedlifejournal -- init
+  ```
+- See `INIT_FLOW.md` for the init wizard flow and configuration details.
+
 #### Speech-to-text options
 
 - `--stt-backend`: choose between `cloud-openai`, `local-mlx`, `local-faster`, `local-whispercpp`, or `auto-private` (local-first probe).
@@ -38,10 +48,29 @@ uv run examinedlifejournal summaries list [--sessions-dir PATH] [--missing-only/
 
 # Backfill (default only missing; use --all to regenerate all)
 uv run examinedlifejournal summaries backfill [--sessions-dir PATH] [--llm-model SPEC] [--missing-only/--all] [--limit N]
+
+# Regenerate a single file's summary
+uv run examinedlifejournal summaries regenerate [--sessions-dir PATH] [--llm-model SPEC] yyMMdd_HHmm[.md]
 ```
 
 - `--missing-only/--all` defaults to missing-only for both commands.
 - Backfill requires `ANTHROPIC_API_KEY`.
+
+### Merge sessions
+
+Merge two sessions, keeping the earlier one. Moves assets, appends later Q&A to earlier, updates frontmatter, and regenerates the summary by default.
+
+```bash
+uv run examinedlifejournal merge [--sessions-dir PATH] [--llm-model SPEC] [--regenerate/--no-regenerate] [--dry-run] [--ignore-missing] yyMMdd_HHmm[.md] yyMMdd_HHmm[.md]
+```
+
+Notes:
+- Asset filename collisions are avoided by suffixing with `_N` when needed.
+- The later session folder is removed if empty after moving.
+- Summary regeneration requires `ANTHROPIC_API_KEY`.
+ - After a successful merge, the later `.md` file is deleted.
+ - Frontmatter `audio_file` becomes MP3-centric (e.g., `{wav: null, mp3: <file>, duration_seconds: <float>}`).
+ - If the later assets folder is missing, run again with `--ignore-missing` to proceed.
 
 See also (details and rationale):
 - `CONVERSATION_SUMMARIES.md` – Why summaries exist, how they’re generated, and safety considerations.
@@ -87,3 +116,4 @@ uv run examinedlifejournal journal --speak-llm --tts-voice shimmer --tts-model g
 Notes:
 - macOS uses `afplay` for local playback. If unavailable, `ffplay` is attempted.
 - Only assistant questions are spoken; summaries and status messages remain text-only.
+ - While a question is being spoken, press ENTER to skip the voice playback immediately.
