@@ -8,7 +8,7 @@ import json
 import logging
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Sequence
+from typing import TYPE_CHECKING, Any, List, Sequence
 from concurrent.futures import ThreadPoolExecutor
 
 from . import __version__
@@ -349,6 +349,51 @@ class SessionManager:
             )
         )
 
+        return self._transcribe_and_store(
+            question,
+            capture,
+            source="cli",
+            extra_log_fields={"ui": "cli"},
+        )
+
+    def process_uploaded_exchange(
+        self,
+        question: str,
+        capture: AudioCaptureResult,
+        *,
+        segment_label: str | None = None,
+    ) -> Exchange:
+        """Persist an exchange sourced from an uploaded audio clip.
+
+        The ``capture`` argument should reference audio already written to disk
+        within the active session's media directory.
+        """
+
+        if self.state is None:
+            raise RuntimeError("Session has not been started")
+
+        self.state.response_index += 1
+        extra: dict[str, Any] | None = None
+        if segment_label:
+            extra = {"segment_label": segment_label}
+        return self._transcribe_and_store(
+            question,
+            capture,
+            source="web",
+            extra_log_fields=extra,
+        )
+
+    def _transcribe_and_store(
+        self,
+        question: str,
+        capture: AudioCaptureResult,
+        *,
+        source: str,
+        extra_log_fields: dict[str, Any] | None = None,
+    ) -> Exchange:
+        if self.state is None:
+            raise RuntimeError("Session has not been started")
+
         backend = self._get_transcription_backend()
         transcription = backend.transcribe(
             capture.wav_path,
@@ -390,51 +435,29 @@ class SessionManager:
         self.state.last_discarded_short = False
 
         self._update_frontmatter_after_exchange()
-        log_event(
-            "session.exchange.recorded",
-            {
-                "session_id": self.state.session_id,
-                "response_index": self.state.response_index,
-                "wav": exchange.audio.wav_path.name,
-                "mp3": (
-                    exchange.audio.mp3_path.name if exchange.audio.mp3_path else None
-                ),
-                "duration_seconds": round(exchange.audio.duration_seconds, 2),
-                "stt_model": exchange.transcription.model,
-                "stt_backend": exchange.transcription.backend,
-                "quit_after": exchange.audio.quit_after,
-                "cancelled": exchange.audio.cancelled,
-            },
-        )
+
+        log_payload = {
+            "session_id": self.state.session_id,
+            "response_index": self.state.response_index,
+            "wav": exchange.audio.wav_path.name,
+            "mp3": (exchange.audio.mp3_path.name if exchange.audio.mp3_path else None),
+            "duration_seconds": round(exchange.audio.duration_seconds, 2),
+            "stt_model": exchange.transcription.model,
+            "stt_backend": exchange.transcription.backend,
+            "quit_after": exchange.audio.quit_after,
+            "cancelled": exchange.audio.cancelled,
+            "source": source,
+        }
+        if extra_log_fields:
+            log_payload.update(extra_log_fields)
+
+        log_event("session.exchange.recorded", log_payload)
         return exchange
 
     def generate_next_question(self, transcript: str) -> QuestionResponse:
         if self.state is None:
             raise RuntimeError("Session has not been started")
-
-        history_text = [item.summary for item in self.state.recent_history]
-        # Compute total conversation duration so far in minutes:seconds
-        try:
-            doc = load_transcript(self.state.markdown_path)
-            total_seconds = float(doc.frontmatter.data.get("duration_seconds", 0.0))
-        except Exception:
-            total_seconds = sum(e.audio.duration_seconds for e in self.state.exchanges)
-        duration_mm_ss = format_mm_ss(total_seconds)
-        lowered = transcript.lower()
-        # If user asks explicitly for a question, rely on prompt instruction to select from default bank
-        # (No local random fallback; LLM will choose based on embedded list.)
-
-        request = QuestionRequest(
-            model=self.config.llm_model,
-            current_transcript=transcript,
-            recent_summaries=history_text,
-            opening_question=self.config.opening_question,
-            question_bank=[],
-            language=self.config.language,
-            conversation_duration=duration_mm_ss,
-            max_tokens=CONFIG.llm_max_tokens_question,
-            llm_questions_debug=self.config.llm_questions_debug,
-        )
+        request = self._build_question_request(transcript)
         response = generate_followup_question(request)
         if self.state.exchanges:
             self.state.exchanges[-1].followup_question = response
@@ -452,30 +475,7 @@ class SessionManager:
     ) -> QuestionResponse:
         if self.state is None:
             raise RuntimeError("Session has not been started")
-
-        history_text = [item.summary for item in self.state.recent_history]
-        # Compute total conversation duration so far in minutes:seconds
-        try:
-            doc = load_transcript(self.state.markdown_path)
-            total_seconds = float(doc.frontmatter.data.get("duration_seconds", 0.0))
-        except Exception:
-            total_seconds = sum(e.audio.duration_seconds for e in self.state.exchanges)
-        duration_mm_ss = format_mm_ss(total_seconds)
-        lowered = transcript.lower()
-        # If user asks explicitly for a question, rely on prompt instruction to select from default bank
-        # (No local random fallback; LLM will choose and stream normally.)
-
-        request = QuestionRequest(
-            model=self.config.llm_model,
-            current_transcript=transcript,
-            recent_summaries=history_text,
-            opening_question=self.config.opening_question,
-            question_bank=[],
-            language=self.config.language,
-            conversation_duration=duration_mm_ss,
-            max_tokens=CONFIG.llm_max_tokens_question,
-            llm_questions_debug=self.config.llm_questions_debug,
-        )
+        request = self._build_question_request(transcript)
         response = llm_module.stream_followup_question(request, on_delta)
         if self.state.exchanges:
             self.state.exchanges[-1].followup_question = response
@@ -487,6 +487,34 @@ class SessionManager:
             },
         )
         return response
+
+    def _build_question_request(self, transcript: str) -> QuestionRequest:
+        """Build a QuestionRequest with shared logic across generation modes.
+
+        - Computes recent summaries text list
+        - Derives total conversation duration so far as mm:ss
+        - Uses configured LLM model and language
+        """
+        assert self.state is not None
+        history_text = [item.summary for item in self.state.recent_history]
+        try:
+            doc = load_transcript(self.state.markdown_path)
+            total_seconds = float(doc.frontmatter.data.get("duration_seconds", 0.0))
+        except Exception:
+            total_seconds = sum(e.audio.duration_seconds for e in self.state.exchanges)
+        duration_mm_ss = format_mm_ss(total_seconds)
+
+        return QuestionRequest(
+            model=self.config.llm_model,
+            current_transcript=transcript,
+            recent_summaries=history_text,
+            opening_question=self.config.opening_question,
+            question_bank=[],
+            language=self.config.language,
+            conversation_duration=duration_mm_ss,
+            max_tokens=CONFIG.llm_max_tokens_question,
+            llm_questions_debug=self.config.llm_questions_debug,
+        )
 
     def regenerate_summary(self) -> None:
         if self.state is None:
