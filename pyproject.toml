@@ -11,6 +11,7 @@ dependencies = [
     "numpy>=1.26",
     "openai>=1.44.0",
     "python-dotenv>=1.0.1",
+    "questionary>=2.0.1",
     "pyyaml>=6.0.1",
     "readchar>=4.0.6",
     "rich>=13.7.0",
@@ -22,5 +23,18 @@ dependencies = [
 [project.scripts]
 examinedlifejournal = "examinedlifejournal.__main__:app"
 
+[tool.uv]
+package = true
+dev-dependencies = [
+    "pytest>=8.3.2",
+]
+
 [tool.uv.sources]
 gjdutils = { path = "./gjdutils", editable = true }
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["examinedlifejournal*"]
