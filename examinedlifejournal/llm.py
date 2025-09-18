@@ -17,11 +17,14 @@ from anthropic import (
     AnthropicError,
     NotFoundError,
 )
+import httpx
 from gjdutils.strings import jinja_render
 
 _LOGGER = logging.getLogger(__name__)
 from .events import log_event
 from .config import CONFIG
+
+SYSTEM_PROMPT = "You are a thoughtful journaling companion."
 
 
 @dataclass
@@ -36,11 +39,12 @@ class QuestionRequest:
     language: str
     conversation_duration: str
     max_tokens: int = 256
+    llm_questions_debug: bool = False
 
 
 @dataclass
 class QuestionResponse:
-    """Structured Anthropic response."""
+    """Structured LLM response."""
 
     question: str
     model: str
@@ -67,34 +71,31 @@ PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 def generate_followup_question(request: QuestionRequest) -> QuestionResponse:
     provider, model_name, thinking_enabled = _split_model_spec(request.model)
-    if provider != "anthropic":
+    if thinking_enabled and provider != "anthropic":
+        raise ValueError(f"Thinking mode is not supported for provider '{provider}'")
+    rendered = _render_question_prompt(request)
+
+    if provider == "anthropic":
+        text = _call_anthropic(
+            model_name,
+            rendered,
+            max_tokens=request.max_tokens,
+            temperature=CONFIG.llm_temperature_question,
+            top_p=CONFIG.llm_top_p,
+            top_k=CONFIG.llm_top_k,
+            thinking_enabled=thinking_enabled,
+        )
+    elif provider == "ollama":
+        text = _call_ollama(
+            model_name,
+            rendered,
+            max_tokens=request.max_tokens,
+            temperature=CONFIG.llm_temperature_question,
+            top_p=CONFIG.llm_top_p,
+            top_k=CONFIG.llm_top_k,
+        )
+    else:
         raise ValueError(f"Unsupported provider '{provider}' for question generation")
-
-    template = _load_prompt("question.prompt.md.jinja")
-    # Shuffle the question bank to vary ordering in the prompt
-    shuffled_question_bank = list(request.question_bank)
-    random.shuffle(shuffled_question_bank)
-    rendered = jinja_render(
-        template,
-        {
-            "recent_summaries": list(request.recent_summaries),
-            "current_transcript": request.current_transcript,
-            "question_bank": shuffled_question_bank,
-            "language": request.language,
-            "conversation_duration": request.conversation_duration,
-        },
-        filesystem_loader=PROMPTS_DIR,
-    )
-
-    text = _call_anthropic(
-        model_name,
-        rendered,
-        max_tokens=request.max_tokens,
-        temperature=CONFIG.llm_temperature_question,
-        top_p=CONFIG.llm_top_p,
-        top_k=CONFIG.llm_top_k,
-        thinking_enabled=thinking_enabled,
-    )
 
     question = text.strip()
     if not question.endswith("?"):
@@ -121,31 +122,83 @@ def stream_followup_question(
     non-streaming call on errors and emits the full text via on_delta once.
     """
     provider, model_name, thinking_enabled = _split_model_spec(request.model)
-    if provider != "anthropic":
-        raise ValueError(f"Unsupported provider '{provider}' for question generation")
+    if thinking_enabled and provider != "anthropic":
+        raise ValueError(f"Thinking mode is not supported for provider '{provider}'")
 
-    template = _load_prompt("question.prompt.md.jinja")
-    # Shuffle the question bank to vary ordering in the prompt
-    shuffled_question_bank = list(request.question_bank)
-    random.shuffle(shuffled_question_bank)
-    rendered = jinja_render(
-        template,
-        {
-            "recent_summaries": list(request.recent_summaries),
-            "current_transcript": request.current_transcript,
-            "question_bank": shuffled_question_bank,
-            "language": request.language,
-            "conversation_duration": request.conversation_duration,
-        },
-        filesystem_loader=PROMPTS_DIR,
-    )
+    rendered = _render_question_prompt(request)
 
     global _ANTHROPIC_CLIENT
     if _ANTHROPIC_CLIENT is None:
         _ANTHROPIC_CLIENT = Anthropic()
 
-    # Stream; fail fast with helpful error messages on failure
-    try:
+    if provider == "anthropic":
+        # Stream; fail fast with helpful error messages on failure
+        try:
+            log_event(
+                "llm.question.streaming.started",
+                {
+                    "provider": provider,
+                    "model": model_name,
+                    "max_tokens": request.max_tokens,
+                },
+            )
+            # Ensure thinking temperature and budget obey API constraints
+            effective_temperature = 1.0 if thinking_enabled else 0.7
+            # Enforce Anthropic minimum budget requirement (>= 1024) when thinking is enabled
+            # and keep it strictly below max_tokens to avoid exhausting the output quota.
+            # Also clamp by configured prompt budget.
+            if thinking_enabled:
+                # Reserve at least 1 token for output; budget must be >= 1024
+                reserved_for_output = 1
+                max_allowed_by_output = max(request.max_tokens - reserved_for_output, 0)
+                effective_budget_tokens = max(
+                    1024, min(CONFIG.prompt_budget_tokens, max_allowed_by_output)
+                )
+            else:
+                effective_budget_tokens = None
+
+            stream_kwargs: dict[str, Any] = {
+                "model": model_name,
+                "max_tokens": request.max_tokens,
+                "temperature": effective_temperature,
+                "system": SYSTEM_PROMPT,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": rendered,
+                    }
+                ],
+            }
+            if thinking_enabled:
+                stream_kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": effective_budget_tokens,
+                }
+            with _ANTHROPIC_CLIENT.messages.stream(**stream_kwargs) as stream:
+                for text in stream.text_stream:
+                    try:
+                        on_delta(text)
+                    except Exception:  # pragma: no cover - defensive in callback
+                        pass
+                final_message = stream.get_final_message()
+                text = "".join(
+                    block.text
+                    for block in final_message.content
+                    if block.type == "text"
+                ).strip()
+        except Exception as exc:
+            _LOGGER.warning("Streaming failed: %s", exc)
+            log_event(
+                "llm.question.streaming.failed",
+                {
+                    "provider": provider,
+                    "model": model_name,
+                    "error_type": exc.__class__.__name__,
+                },
+            )
+            # Re-raise to surface a user-visible error
+            raise
+    elif provider == "ollama":
         log_event(
             "llm.question.streaming.started",
             {
@@ -154,60 +207,31 @@ def stream_followup_question(
                 "max_tokens": request.max_tokens,
             },
         )
-        # Ensure thinking temperature and budget obey API constraints
-        effective_temperature = 1.0 if thinking_enabled else 0.7
-        # Enforce Anthropic minimum budget requirement (>= 1024) when thinking is enabled
-        # and keep it strictly below max_tokens to avoid exhausting the output quota.
-        # Also clamp by configured prompt budget.
-        if thinking_enabled:
-            # Reserve at least 1 token for output; budget must be >= 1024
-            reserved_for_output = 1
-            max_allowed_by_output = max(request.max_tokens - reserved_for_output, 0)
-            effective_budget_tokens = max(
-                1024, min(CONFIG.prompt_budget_tokens, max_allowed_by_output)
+        try:
+            text = _call_ollama(
+                model_name,
+                rendered,
+                max_tokens=request.max_tokens,
+                temperature=CONFIG.llm_temperature_question,
+                top_p=CONFIG.llm_top_p,
+                top_k=CONFIG.llm_top_k,
             )
-        else:
-            effective_budget_tokens = None
-
-        stream_kwargs: dict[str, Any] = {
-            "model": model_name,
-            "max_tokens": request.max_tokens,
-            "temperature": effective_temperature,
-            "system": "You are a thoughtful journaling companion.",
-            "messages": [
+        except Exception as exc:
+            log_event(
+                "llm.question.streaming.failed",
                 {
-                    "role": "user",
-                    "content": rendered,
-                }
-            ],
-        }
-        if thinking_enabled:
-            stream_kwargs["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": effective_budget_tokens,
-            }
-        with _ANTHROPIC_CLIENT.messages.stream(**stream_kwargs) as stream:
-            for text in stream.text_stream:
-                try:
-                    on_delta(text)
-                except Exception:  # pragma: no cover - defensive in callback
-                    pass
-            final_message = stream.get_final_message()
-            text = "".join(
-                block.text for block in final_message.content if block.type == "text"
-            ).strip()
-    except Exception as exc:
-        _LOGGER.warning("Streaming failed: %s", exc)
-        log_event(
-            "llm.question.streaming.failed",
-            {
-                "provider": provider,
-                "model": model_name,
-                "error_type": exc.__class__.__name__,
-            },
-        )
-        # Re-raise to surface a user-visible error
-        raise
+                    "provider": provider,
+                    "model": model_name,
+                    "error_type": exc.__class__.__name__,
+                },
+            )
+            raise
+        try:
+            on_delta(text)
+        except Exception:  # pragma: no cover - defensive callback
+            pass
+    else:
+        raise ValueError(f"Unsupported provider '{provider}' for question generation")
 
     question = text.strip()
     if not question.endswith("?"):
@@ -227,8 +251,8 @@ def stream_followup_question(
 
 def generate_summary(request: SummaryRequest) -> SummaryResponse:
     provider, model_name, thinking_enabled = _split_model_spec(request.model)
-    if provider != "anthropic":
-        raise ValueError(f"Unsupported provider '{provider}' for summaries")
+    if thinking_enabled and provider != "anthropic":
+        raise ValueError(f"Thinking mode is not supported for provider '{provider}'")
 
     template = _load_prompt("summary.prompt.md.jinja")
     rendered = jinja_render(
@@ -240,15 +264,27 @@ def generate_summary(request: SummaryRequest) -> SummaryResponse:
         filesystem_loader=PROMPTS_DIR,
     )
 
-    text = _call_anthropic(
-        model_name,
-        rendered,
-        max_tokens=request.max_tokens,
-        temperature=CONFIG.llm_temperature_summary,
-        top_p=CONFIG.llm_top_p,
-        top_k=CONFIG.llm_top_k,
-        thinking_enabled=thinking_enabled,
-    )
+    if provider == "anthropic":
+        text = _call_anthropic(
+            model_name,
+            rendered,
+            max_tokens=request.max_tokens,
+            temperature=CONFIG.llm_temperature_summary,
+            top_p=CONFIG.llm_top_p,
+            top_k=CONFIG.llm_top_k,
+            thinking_enabled=thinking_enabled,
+        )
+    elif provider == "ollama":
+        text = _call_ollama(
+            model_name,
+            rendered,
+            max_tokens=request.max_tokens,
+            temperature=CONFIG.llm_temperature_summary,
+            top_p=CONFIG.llm_top_p,
+            top_k=CONFIG.llm_top_k,
+        )
+    else:
+        raise ValueError(f"Unsupported provider '{provider}' for summaries")
 
     response = SummaryResponse(summary_markdown=text.strip(), model=request.model)
     log_event(
@@ -260,6 +296,32 @@ def generate_summary(request: SummaryRequest) -> SummaryResponse:
         },
     )
     return response
+
+
+def get_model_provider(spec: str) -> str:
+    """Return the provider segment from a model spec string."""
+
+    provider, _, _ = _split_model_spec(spec)
+    return provider
+
+
+def _render_question_prompt(request: QuestionRequest) -> str:
+    template = _load_prompt("question.prompt.md.jinja")
+    # Shuffle the question bank to vary ordering in the prompt
+    shuffled_question_bank = list(request.question_bank)
+    random.shuffle(shuffled_question_bank)
+    return jinja_render(
+        template,
+        {
+            "recent_summaries": list(request.recent_summaries),
+            "current_transcript": request.current_transcript,
+            "question_bank": shuffled_question_bank,
+            "language": request.language,
+            "conversation_duration": request.conversation_duration,
+            "llm_questions_debug": request.llm_questions_debug,
+        },
+        filesystem_loader=PROMPTS_DIR,
+    )
 
 
 def _split_model_spec(spec: str) -> tuple[str, str, bool]:
@@ -354,6 +416,100 @@ def _load_prompt(filename: str) -> str:
 _ANTHROPIC_CLIENT: Anthropic | None = None
 
 
+def _call_ollama(
+    model: str,
+    prompt: str,
+    *,
+    max_tokens: int,
+    temperature: float,
+    top_p: float | None = None,
+    top_k: int | None = None,
+    max_retries: int = 3,
+    backoff_base_seconds: float = 1.0,
+) -> str:
+    """Call the local Ollama chat endpoint and return the assistant text."""
+
+    base_url = CONFIG.ollama_base_url.rstrip("/")
+    url = f"{base_url}/api/chat"
+    options: dict[str, Any] = {
+        "temperature": temperature,
+        "num_predict": max_tokens,
+        "num_ctx": CONFIG.ollama_num_ctx,
+    }
+    if top_p is not None:
+        options["top_p"] = top_p
+    if top_k is not None:
+        options["top_k"] = top_k
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        "stream": False,
+        "options": options,
+    }
+
+    last_error: Exception | None = None
+    timeout = CONFIG.ollama_timeout_seconds
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = httpx.post(url, json=payload, timeout=timeout)
+            response.raise_for_status()
+            data = response.json()
+            message = data.get("message") or {}
+            content = message.get("content")
+            if not content:
+                raise ValueError("Ollama response missing assistant content")
+            return str(content).strip()
+        except (httpx.RequestError, httpx.HTTPStatusError, ValueError) as exc:
+            last_error = exc
+            _LOGGER.warning(
+                "Ollama call failed (attempt %s/%s): %s", attempt, max_retries, exc
+            )
+            log_event(
+                "llm.retry",
+                {
+                    "provider": "ollama",
+                    "model": model,
+                    "attempt": attempt,
+                    "error_type": exc.__class__.__name__,
+                },
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            last_error = exc
+            _LOGGER.exception("Unexpected Ollama failure: %s", exc)
+            log_event(
+                "llm.error",
+                {
+                    "provider": "ollama",
+                    "model": model,
+                    "attempt": attempt,
+                    "error_type": exc.__class__.__name__,
+                    "error": str(exc),
+                },
+            )
+
+        if attempt < max_retries:
+            sleep_for = backoff_base_seconds * (2 ** (attempt - 1))
+            jitter = random.uniform(0, sleep_for * 0.25)
+            time.sleep(sleep_for + jitter)
+
+    assert last_error is not None
+    log_event(
+        "llm.failed",
+        {
+            "provider": "ollama",
+            "model": model,
+            "attempts": max_retries,
+            "error_type": last_error.__class__.__name__,
+            "error": str(last_error),
+        },
+    )
+    raise last_error
+
+
 def _call_anthropic(
     model: str,
     prompt: str,
@@ -388,7 +544,7 @@ def _call_anthropic(
                 "model": model,
                 "max_tokens": max_tokens,
                 "temperature": effective_temperature,
-                "system": "You are a thoughtful journaling companion.",
+                "system": SYSTEM_PROMPT,
                 "messages": [
                     {
                         "role": "user",

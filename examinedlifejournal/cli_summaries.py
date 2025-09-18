@@ -8,7 +8,7 @@ from rich.console import Console
 from .config import CONFIG
 from .events import log_event
 from .history import load_recent_summaries
-from .llm import SummaryRequest, generate_summary
+from .llm import SummaryRequest, generate_summary, get_model_provider
 from .storage import load_transcript, write_transcript
 
 
@@ -87,7 +87,8 @@ def build_app() -> typer.Typer:
     ) -> None:
         """Generate summaries for any sessions missing them, in place."""
 
-        if not _has_env("ANTHROPIC_API_KEY"):
+        provider = get_model_provider(llm_model)
+        if provider == "anthropic" and not _has_env("ANTHROPIC_API_KEY"):
             console.print("[red]Environment variable ANTHROPIC_API_KEY is required.[/]")
             raise typer.Exit(code=2)
 
@@ -175,7 +176,8 @@ def build_app() -> typer.Typer:
                 p = sdir / p.name
             return p
 
-        if not _has_env("ANTHROPIC_API_KEY"):
+        provider = get_model_provider(llm_model)
+        if provider == "anthropic" and not _has_env("ANTHROPIC_API_KEY"):
             console.print("[red]Environment variable ANTHROPIC_API_KEY is required.[/]")
             raise typer.Exit(code=2)
 

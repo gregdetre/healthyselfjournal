@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=0.34.0",
+    "httpx>=0.27.2",
     "gjdutils",
     "jinja2>=3.1.2",
     "numpy>=1.26",

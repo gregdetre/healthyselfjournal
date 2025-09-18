@@ -6,6 +6,26 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 
+
+def _env_int(name: str, default: int) -> int:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        return default
+
 _SESSIONS_DIR_ENV = os.environ.get("SESSIONS_DIR") or os.environ.get("RECORDINGS_DIR")
 DEFAULT_RECORDINGS_DIR = (
     Path(_SESSIONS_DIR_ENV).expanduser().resolve()
@@ -42,6 +62,9 @@ DEFAULT_LLM_TOP_P = None
 DEFAULT_LLM_TOP_K = None
 DEFAULT_MAX_TOKENS_QUESTION = 1200
 DEFAULT_MAX_TOKENS_SUMMARY = 1200
+DEFAULT_OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+DEFAULT_OLLAMA_TIMEOUT_SECONDS = _env_float("OLLAMA_TIMEOUT_SECONDS", 30.0)
+DEFAULT_OLLAMA_NUM_CTX = _env_int("OLLAMA_NUM_CTX", 8192)
 
 # Text-to-speech defaults (OpenAI backend)
 DEFAULT_SPEAK_LLM = os.environ.get("SPEAK_LLM", "0").strip().lower() in {
@@ -86,6 +109,9 @@ class AppConfig:
     llm_top_k: int | None = DEFAULT_LLM_TOP_K
     llm_max_tokens_question: int = DEFAULT_MAX_TOKENS_QUESTION
     llm_max_tokens_summary: int = DEFAULT_MAX_TOKENS_SUMMARY
+    ollama_base_url: str = DEFAULT_OLLAMA_BASE_URL
+    ollama_timeout_seconds: float = DEFAULT_OLLAMA_TIMEOUT_SECONDS
+    ollama_num_ctx: int = DEFAULT_OLLAMA_NUM_CTX
     # Optional TTS of LLM questions
     speak_llm: bool = DEFAULT_SPEAK_LLM
     tts_model: str = DEFAULT_TTS_MODEL

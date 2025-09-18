@@ -14,7 +14,7 @@ from rich.console import Console
 from .config import CONFIG
 from .events import log_event
 from .history import load_recent_summaries
-from .llm import SummaryRequest, generate_summary
+from .llm import SummaryRequest, generate_summary, get_model_provider
 from .storage import load_transcript, write_transcript
 
 
@@ -390,8 +390,10 @@ def merge(
         )
 
     # 3) Optionally regenerate summary for the merged transcript
+    provider = get_model_provider(llm_model)
+
     if regenerate:
-        if not _has_env("ANTHROPIC_API_KEY"):
+        if provider == "anthropic" and not _has_env("ANTHROPIC_API_KEY"):
             console.print(
                 "[yellow]Skipping summary regeneration: ANTHROPIC_API_KEY not set.[/]"
             )
