@@ -1,3 +1,9 @@
+name
+
+llm question debug
+
+mic check option
+
 init
 
 rename & domain
