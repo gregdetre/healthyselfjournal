@@ -6,7 +6,7 @@ Reducing friction in journaling startup is critical for habit formation and ther
 
 ## See also
 
-- `../reference/OPENING_QUESTIONS.md` - Current question bank and default opener implementation
+- `../reference/OPENING_QUESTIONS.md` - Current embedded example questions and default opener implementation
 - `../reference/DIALOGUE_FLOW.md` - How opening questions integrate with conversation progression
 - `IMPLEMENTATION_INTENTIONS_HABITS.md` - When-then planning for journaling habit formation
 - `OPTIMAL_SESSION_TIMING.md` - Chronotype considerations for opening question effectiveness

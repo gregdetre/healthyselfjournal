@@ -17,7 +17,7 @@ See: `docs/reference/PRODUCT_VISION_FEATURES.md`
 - Current implementation highlights:
   - Real-time recording meter and keyboard controls; immediate WAV persistence; optional background MP3
   - OpenAI Whisper STT with retries; raw `.stt.json` persisted per segment
-  - Continuous dialogue loop with Claude; Jinja templates; question-bank fallback
+  - Continuous dialogue loop with Claude; Jinja templates; embedded example questions for variety
   - Summaries regenerated in the background and stored in session frontmatter
 
 ## Setup
@@ -49,7 +49,7 @@ See: `docs/reference/PRODUCT_VISION_FEATURES.md`
 
 - Core: `session.py`, `audio.py`, `transcription.py`, `llm.py`
 - Persistence & context: `storage.py`, `history.py`, `events.py`
-- CLI & prompts: `cli.py`, `prompts/*.jinja`, `question_bank.py`, `config.py`
+- CLI & prompts: `cli.py`, `prompts/*.jinja`, `config.py`
 
 ## Key reference docs
 

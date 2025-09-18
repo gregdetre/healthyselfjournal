@@ -25,7 +25,7 @@ Continuous Q&A loop with LLM-generated follow-up questions after each response.
 LLM sees:
 - Current session transcript
 - Recent session summaries
-- Question bank for variety
+- Embedded example questions in prompt for variety (referenced when user says "give me a question")
 
 ## Session Limits
 

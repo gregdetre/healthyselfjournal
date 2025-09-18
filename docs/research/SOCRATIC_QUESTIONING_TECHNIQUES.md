@@ -133,7 +133,7 @@ Socratic questioning is a systematic approach to inquiry that promotes self-disc
 
 ### Adaptive Question Design
 
-**Context Integration**: For voice journaling applications, questions should integrate current session transcripts, recent session summaries, and established question banks for variety and continuity.
+**Context Integration**: For voice journaling applications, questions should integrate current session transcripts, recent session summaries, and embedded example questions for variety and continuity.
 
 **Branching Logic**: Implement adaptive branching based on:
 - **First-time topics**: Use Socratic exploration to help users discover new insights
@@ -150,7 +150,7 @@ Socratic questioning is a systematic approach to inquiry that promotes self-disc
 
 **Session Management**: Research suggests 15-20 minute limits to prevent rumination, with gentle guidance when sessions approach optimal duration thresholds.
 
-### Question Bank Development
+### Example Question Development
 
 **Evidence-Based Categories**:
 - **Concrete/Specific**: For clarity and grounding ("What specifically happened when...")
@@ -163,7 +163,7 @@ Socratic questioning is a systematic approach to inquiry that promotes self-disc
 
 ### Question Progression Strategies
 
-**Session Opening**: Use consistent, non-threatening openers like "What's on your mind right now?" while maintaining variety through question bank rotation.
+**Session Opening**: Use consistent, non-threatening openers like "What's on your mind right now?" while maintaining variety through embedded example selection.
 
 **Mid-Session Adaptation**: Adjust questioning style based on client responses:
 - **Elaboration seeking**: "Tell me more about..."

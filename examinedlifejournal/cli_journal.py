@@ -299,7 +299,7 @@ def journal(
                 Panel.fit(
                     f"Resuming session {state.session_id}. Recording starts immediately.\n"
                     "Press any key to stop. Q saves then ends after this entry.\n\n"
-                    "Tip: Say 'give me a question' to get a quick prompt from the question bank.",
+                    "Tip: Say 'give me a question' to get a quick prompt from the built-in examples.",
                     title="Examined Life Journal",
                     border_style="magenta",
                 )
@@ -316,7 +316,7 @@ def journal(
             Panel.fit(
                 "Voice journaling session starting. Recording starts immediately.\n"
                 "Press any key to stop. Q saves then ends after this entry.\n\n"
-                "Tip: Say 'give me a question' to get a quick prompt from the question bank.",
+                "Tip: Say 'give me a question' to get a quick prompt from the built-in examples.",
                 title="Examined Life Journal",
                 border_style="magenta",
             )

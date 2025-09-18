@@ -6,7 +6,7 @@ Values and self-discovery questions facilitate deep identity exploration, person
 
 ## See also
 
-- `../reference/OPENING_QUESTIONS.md` - Implementation of default openers and question banks
+- `../reference/OPENING_QUESTIONS.md` - Implementation of default openers and embedded example questions
 - `../reference/DIALOGUE_FLOW.md` - Question progression strategies in conversational sessions
 - `DAILY_REFLECTION_QUESTIONS.md` - Daily practice frameworks and present moment awareness
 - `ANNUAL_QUARTERLY_REVIEW_QUESTIONS.md` - Long-term reflection and planning questions

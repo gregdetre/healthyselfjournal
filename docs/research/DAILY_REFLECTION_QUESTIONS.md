@@ -6,7 +6,7 @@ Daily reflection questions provide structured frameworks for consistent self-awa
 
 ## See also
 
-- `../reference/OPENING_QUESTIONS.md` - Implementation of default openers and question banks
+- `../reference/OPENING_QUESTIONS.md` - Implementation of default openers and embedded example questions
 - `../reference/DIALOGUE_FLOW.md` - Question progression strategies in conversational sessions
 - `COACHING_FRAMEWORKS_EVIDENCE.md` - Research evidence on coaching questions and effectiveness studies
 - `ANNUAL_QUARTERLY_REVIEW_QUESTIONS.md` - Longer-term reflection and planning questions

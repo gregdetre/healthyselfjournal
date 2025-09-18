@@ -6,7 +6,7 @@ This document synthesizes research evidence on coaching question effectiveness, 
 
 ## See also
 
-- `../reference/OPENING_QUESTIONS.md` - Implementation of default openers and question banks
+- `../reference/OPENING_QUESTIONS.md` - Implementation of default openers and embedded example questions
 - `../reference/DIALOGUE_FLOW.md` - Question progression strategies in conversational sessions
 - `../reference/LLM_PROMPT_TEMPLATES.md` - Technical implementation of adaptive question generation
 - `DAILY_REFLECTION_QUESTIONS.md` - Daily practice frameworks and present moment awareness
@@ -139,7 +139,7 @@ MI has extensive meta-analytic support showing effectiveness across diverse popu
 
 **Session Opening**:
 - **Consistency**: Use "What's on your mind right now?" as default for familiarity
-- **Variety options**: Rotate through question bank when users request alternatives
+- **Variety options**: Select from embedded example questions when users request alternatives
 - **Context sensitivity**: Adjust opener based on recent session themes
 
 **Mid-Session Development**:

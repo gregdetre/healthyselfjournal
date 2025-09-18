@@ -1,9 +1,5 @@
 name
 
-llm question debug
-
-mic check option
-
 init
 
 rename & domain
@@ -18,5 +14,5 @@ multi-platform
 
 ----
 
-get rid of the question bank?
+remove references to question bank in docs (done)
 

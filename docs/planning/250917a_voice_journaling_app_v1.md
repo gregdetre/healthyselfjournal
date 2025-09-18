@@ -168,12 +168,12 @@ Decision (V1): Soft reminder at ~20 minutes based on research; no automated brea
   - Enforce 50 summaries max and ~5000-token budget for history
 
 ### Stage: Question variety and adaptation
-- [x] Create initial question bank
+- [x] Embed initial example questions in prompt
   - Concrete/specific questions
   - Open/exploratory questions
   - Pattern-interrupting questions
 - [x] Implement "Give me a question" detection
-- [x] Add question selection logic to template
+- [x] Add embedded example selection logic to template
 - [ ] Test question variety over multiple sessions
 - [ ] Document question categories for future expansion
 

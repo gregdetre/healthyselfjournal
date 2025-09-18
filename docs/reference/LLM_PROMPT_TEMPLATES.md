@@ -6,7 +6,7 @@ Jinja2 templates for flexible prompt generation with context and conditionals.
 
 ## See also
 
-- `OPENING_QUESTIONS.md` - Question bank and variety strategies
+- `OPENING_QUESTIONS.md` - Embedded example questions and variety strategies
 - `CONVERSATION_SUMMARIES.md` - Context from previous sessions
 - `DIALOGUE_FLOW.md` - When different prompts are used
 
@@ -15,7 +15,7 @@ Jinja2 templates for flexible prompt generation with context and conditionals.
 Templates include:
 - Current session transcript
 - Recent session summaries for continuity
-- Question bank for inspiration
+- Embedded example questions for inspiration
 - Override parameters for custom openers
 
 ## Key Variables

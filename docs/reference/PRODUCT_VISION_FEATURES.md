@@ -28,7 +28,7 @@ A command-line journaling app using voice input to lower friction and dialogue-b
 - Voice recording with real-time meter and keyboard controls (press any key to stop; ESC cancels; Q saves then quits)
 - Immediate WAV persistence; optional background MP3 conversion when `ffmpeg` is available
 - OpenAI Whisper STT with retries; raw `.stt.json` responses persisted per segment
-- Continuous dialogue loop with Claude; Jinja templates; question bank fallback ("give me a question")
+- Continuous dialogue loop with Claude; Jinja templates; embedded example questions ("give me a question")
 - Recent session summaries loaded with a budget heuristic and included in prompts
 - Summary regeneration runs in the background after each exchange; stored in frontmatter
 - Resume the most recent session with `--resume`
@@ -44,7 +44,7 @@ A command-line journaling app using voice input to lower friction and dialogue-b
 - Question quality and style
   - Tighter, single‑focus follow‑ups; slightly lower temperature for clarity
   - Small prompt refinements for validation/rumination redirection
-  - Keep “give me a question” fallback for variety
+  - Keep “give me a question” via embedded examples for variety
 
 - Summary brevity and usefulness
   - Stricter brevity guidance in the prompt; reduce max tokens

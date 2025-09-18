@@ -27,7 +27,7 @@ This document covers design principles, configuration, architecture, how‑tos, 
 ### Flow
 
 1. Capture response and transcribe.
-2. Generate next question (LLM or question bank).
+2. Generate next question (LLM; when asked "give me a question", model selects from embedded examples).
 3. If `--voice-mode` is enabled:
    - Synthesize speech via OpenAI TTS.
    - Write bytes to a temp file; play via `afplay` (macOS) or `ffplay`.

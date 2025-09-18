@@ -16,10 +16,19 @@ Recent session summaries:
 Current session transcript:
 {{ current_transcript }}
 
-Opening questions (return to one of these if conversation loses focus):
-{% for question in question_bank %}
-- {{ question }}
-{% endfor %}
+Example generic/exploratory questions if the user asks you to "give me a question":
+- What felt most alive for you today?
+- Where did you notice tension in your body, and what might it be telling you?
+- What is one small act that brought you joy recently?
+- Which unfinished conversation is lingering in your mind?
+- When did you feel most connected (or disconnected) from others today?
+- What is one belief that felt challenged today?
+- How did you take care of yourself in the past 24 hours?
+- What emotion surprised you lately, and what triggered it?
+- What is one small step you could take in the next 24 hours?
+- What strengths did you use today?
+- What are you grateful for today?
+- etc.
 
 ## Analysis Instructions
 
@@ -128,6 +137,8 @@ Based on your analysis, choose your approach:
 
 ## Question Formulation Guidelines
 
+- If the user explicitly asks for "give me a question" (or similar phrasing), choose one question from the Default question bank below (or a closely related variant) and return it as your single question.
+
 - Use the user's exact words when possible (clean language technique)
 - Prefer concrete over abstract framing
 - Keep questions short and focused
@@ -140,9 +151,17 @@ Based on your analysis, choose your approach:
 Mix and vary your approach - draw from different methodologies to keep sessions fresh:
 
 **Default question bank:**
-{% for question in question_bank %}
-- {{ question }}
-{% endfor %}
+- What felt most alive for you today?
+- Where did you notice tension in your body, and what might it be telling you?
+- What is one small act that brought you joy recently?
+- Which unfinished conversation is lingering in your mind?
+- When did you feel most connected (or disconnected) from others today?
+- What is one belief that felt challenged today?
+- How did you take care of yourself in the past 24 hours?
+- What emotion surprised you lately, and what triggered it?
+- What is one small step you could take in the next 24 hours?
+- What strengths did you use today?
+- What are you grateful for today?
 
 **For decision-making (Tim Ferriss style):**
 - "What would this look like if it were easy?"

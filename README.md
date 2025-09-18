@@ -15,7 +15,7 @@ Core feature set (implemented today):
 - Live audio recording with real-time meter and simple controls (any key to stop; `ESC` cancels; `Q` saves then quits)
 - Immediate WAV persistence; background MP3 conversion when `ffmpeg` is available
 - OpenAI Whisper STT with retries; raw `.stt.json` stored per take
-- Claude-generated follow‑ups using Jinja prompts and a curated question bank fallback
+- Claude-generated follow‑ups using Jinja prompts with embedded example questions
 - Recent session summaries loaded under a budget and fed into prompts
 - Background summary regeneration written to YAML frontmatter
 - Resume the latest session with `--resume`; change location with `--sessions-dir`
@@ -145,7 +145,7 @@ Follow‑up questions are generated using `examinedlifejournal/prompts/question.
 - Adapts strategy (validation, redirection, Socratic deepening, or implementation planning)
 - Uses clean‑language techniques (user’s exact words), single‑focus questions, and brevity
 
-If the model cannot confidently select an approach, a curated question bank provides variety while staying within safe bounds.
+If the model cannot confidently select an approach, it can select from embedded example questions for safe variety.
 
 ## Storage, events, and formats
 

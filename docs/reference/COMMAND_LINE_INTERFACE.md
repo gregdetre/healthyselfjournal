@@ -26,7 +26,7 @@ uv run examinedlifejournal journal list [--sessions-dir PATH] [--nchars N]
 
 Files default to `./sessions/`; pass `--sessions-dir` to override for archival or testing.
 
-Tip: during a session, you can say "give me a question" to instantly get a question from the built‑in question bank (bypasses the LLM for speed/robustness).
+Tip: during a session, you can say "give me a question" to instantly get a question selected from built‑in examples embedded in the prompt.
 #### Listing sessions
 
 Show each session by `.md` filename stem with a summary snippet from frontmatter. Use `--nchars` to limit characters (full summary when omitted):

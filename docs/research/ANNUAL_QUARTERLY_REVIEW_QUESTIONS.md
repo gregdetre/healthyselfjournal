@@ -6,7 +6,7 @@ Annual and quarterly review questions provide structured frameworks for comprehe
 
 ## See also
 
-- `../reference/OPENING_QUESTIONS.md` - Implementation of default openers and question banks
+- `../reference/OPENING_QUESTIONS.md` - Implementation of default openers and embedded example questions
 - `../reference/DIALOGUE_FLOW.md` - Question progression strategies in conversational sessions
 - `DAILY_REFLECTION_QUESTIONS.md` - Daily practice frameworks and present moment awareness
 - `COACHING_FRAMEWORKS_EVIDENCE.md` - Research evidence on coaching questions and effectiveness studies

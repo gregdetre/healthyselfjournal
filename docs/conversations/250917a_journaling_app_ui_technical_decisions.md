@@ -64,7 +64,7 @@ User requirement: "Generate/regenerate the summary after each question and answe
 
 User specified: "We'll probably use Jinja for our prompt templates, so we can include variables and if statements."
 
-Default same opener with flexibility: "So we'll write the prompt to default to starting with the same opener. Then the user can always say, 'Give me a question.' So we'll probably need to include a bank of example questions that the LLM can use for inspiration (along with previous summaries, etc)."
+Default same opener with flexibility: "So we'll write the prompt to default to starting with the same opener. Then the user can always say, 'Give me a question.' We'll include embedded example questions in the prompt that the LLM can use for inspiration (along with previous summaries, etc)."
 
 ### Context Management
 
