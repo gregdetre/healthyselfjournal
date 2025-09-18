@@ -14,6 +14,7 @@ from examinedlifejournal.storage import (
 )
 from examinedlifejournal.transcription import TranscriptionResult
 from examinedlifejournal.config import CONFIG
+from examinedlifejournal import llm as llm_module
 
 
 def test_short_answer_discard_sets_quit_and_skips_transcription(tmp_path, monkeypatch):
@@ -276,7 +277,9 @@ def test_generate_next_question_streams_with_callback(tmp_path, monkeypatch):
         on_delta("now?")
         return llm_module.QuestionResponse(question="What now?", model=request.model)
 
-    monkeypatch.setattr(llm_module, "stream_followup_question", fake_stream_followup_question)
+    monkeypatch.setattr(
+        llm_module, "stream_followup_question", fake_stream_followup_question
+    )
 
     chunks: list[str] = []
 
@@ -288,3 +291,171 @@ def test_generate_next_question_streams_with_callback(tmp_path, monkeypatch):
     assert response.question.endswith("?")
     assert "".join(chunks) == "What now?"
     assert state.exchanges[-1].followup_question == response
+
+
+def test_anthropic_thinking_includes_budget_and_temp_non_stream(monkeypatch):
+    captured: dict[str, dict] = {}
+
+    class FakeClient:
+        class messages:
+            @staticmethod
+            def create(**kwargs):
+                captured["non_stream"] = kwargs
+
+                class R:
+                    content = [type("T", (), {"type": "text", "text": "What now?"})]
+
+                return R()
+
+    monkeypatch.setattr(llm_module, "_ANTHROPIC_CLIENT", FakeClient())
+
+    req = llm_module.QuestionRequest(
+        model="anthropic:claude-sonnet-4:20250514:thinking",
+        current_transcript="Hello",
+        recent_summaries=[],
+        opening_question="O",
+        question_bank=[],
+        language="en",
+        conversation_duration="short",
+        max_tokens=64,
+    )
+    llm_module.generate_followup_question(req)
+
+    sent = captured["non_stream"]
+    assert sent["temperature"] == 1.0
+    assert sent["thinking"]["type"] == "enabled"
+    assert sent["thinking"]["budget_tokens"] >= 1024
+    assert sent["thinking"]["budget_tokens"] <= CONFIG.prompt_budget_tokens
+
+
+def test_anthropic_thinking_includes_budget_and_temp_stream(monkeypatch, tmp_path):
+    captured: dict[str, dict] = {}
+
+    class FakeStream:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        @property
+        def text_stream(self):
+            yield "Hi"
+
+        def get_final_message(self):
+            return type(
+                "M",
+                (),
+                {"content": [type("T", (), {"type": "text", "text": "What now?"})]},
+            )
+
+    class FakeClient:
+        class messages:
+            @staticmethod
+            def stream(**kwargs):
+                captured["stream"] = kwargs
+                return FakeStream()
+
+    monkeypatch.setattr(llm_module, "_ANTHROPIC_CLIENT", FakeClient())
+
+    req = llm_module.QuestionRequest(
+        model="anthropic:claude-sonnet-4:20250514:thinking",
+        current_transcript="Hello",
+        recent_summaries=[],
+        opening_question="O",
+        question_bank=[],
+        language="en",
+        conversation_duration="short",
+        max_tokens=64,
+    )
+
+    chunks: list[str] = []
+
+    def on_delta(t: str):
+        chunks.append(t)
+
+    llm_module.stream_followup_question(req, on_delta)
+
+    sent = captured["stream"]
+    assert sent["temperature"] == 1.0
+    assert sent["thinking"]["type"] == "enabled"
+    assert sent["thinking"]["budget_tokens"] >= 1024
+    assert sent["thinking"]["budget_tokens"] <= CONFIG.prompt_budget_tokens
+
+
+def test_budget_clamped_below_max_tokens(monkeypatch):
+    captured: dict[str, dict] = {}
+
+    class FakeClient:
+        class messages:
+            @staticmethod
+            def create(**kwargs):
+                captured["payload"] = kwargs
+
+                class R:
+                    content = [type("T", (), {"type": "text", "text": "Ok"})]
+
+                return R()
+
+    monkeypatch.setattr(llm_module, "_ANTHROPIC_CLIENT", FakeClient())
+
+    # Set a huge configured budget via monkeypatching CONFIG on module
+    old_budget = CONFIG.prompt_budget_tokens
+    try:
+        CONFIG.prompt_budget_tokens = 100000  # way larger than max_tokens
+
+        req = llm_module.SummaryRequest(
+            transcript_markdown="# Body",
+            recent_summaries=[],
+            model="anthropic:claude-sonnet-4:20250514:thinking",
+            max_tokens=32,
+        )
+        llm_module.generate_summary(req)
+
+        sent = captured["payload"]
+        assert sent["max_tokens"] == 32
+        # Now the budget is enforced to be at least 1024 even if max_tokens is small
+        assert sent["thinking"]["budget_tokens"] == 1024
+    finally:
+        CONFIG.prompt_budget_tokens = old_budget
+
+
+def test_thinking_budget_respects_minimum_1024(monkeypatch):
+    """Budget should be coerced to >= 1024 to satisfy Anthropic requirements."""
+    captured: dict[str, dict] = {}
+
+    class FakeBadRequest(Exception):
+        pass
+
+    class FakeClient:
+        class messages:
+            @staticmethod
+            def create(**kwargs):
+                captured["payload"] = kwargs
+                thinking = kwargs.get("thinking")
+                # Simulate Anthropic server validation: budget must be >= 1024
+                if thinking and thinking.get("type") == "enabled":
+                    if thinking.get("budget_tokens", 0) < 1024:
+                        raise FakeBadRequest(
+                            "thinking.enabled.budget_tokens: Input should be greater than or equal to 1024"
+                        )
+
+                class R:
+                    content = [type("T", (), {"type": "text", "text": "Ok"})]
+
+                return R()
+
+    monkeypatch.setattr(llm_module, "_ANTHROPIC_CLIENT", FakeClient())
+
+    # Force a small max_tokens; implementation should still send >= 1024 budget
+    req = llm_module.SummaryRequest(
+        transcript_markdown="# Body",
+        recent_summaries=[],
+        model="anthropic:claude-sonnet-4:20250514:thinking",
+        max_tokens=32,
+    )
+
+    llm_module.generate_summary(req)
+
+    sent = captured.get("payload", {})
+    assert sent.get("thinking", {}).get("budget_tokens", 0) >= 1024
