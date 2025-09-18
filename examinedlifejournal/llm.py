@@ -154,10 +154,25 @@ def stream_followup_question(
                 "max_tokens": request.max_tokens,
             },
         )
+        # Ensure thinking temperature and budget obey API constraints
+        effective_temperature = 1.0 if thinking_enabled else 0.7
+        # Enforce Anthropic minimum budget requirement (>= 1024) when thinking is enabled
+        # and keep it strictly below max_tokens to avoid exhausting the output quota.
+        # Also clamp by configured prompt budget.
+        if thinking_enabled:
+            # Reserve at least 1 token for output; budget must be >= 1024
+            reserved_for_output = 1
+            max_allowed_by_output = max(request.max_tokens - reserved_for_output, 0)
+            effective_budget_tokens = max(
+                1024, min(CONFIG.prompt_budget_tokens, max_allowed_by_output)
+            )
+        else:
+            effective_budget_tokens = None
+
         stream_kwargs: dict[str, Any] = {
             "model": model_name,
             "max_tokens": request.max_tokens,
-            "temperature": 0.7,
+            "temperature": effective_temperature,
             "system": "You are a thoughtful journaling companion.",
             "messages": [
                 {
@@ -167,7 +182,10 @@ def stream_followup_question(
             ],
         }
         if thinking_enabled:
-            stream_kwargs["thinking"] = {"type": "enabled"}
+            stream_kwargs["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": effective_budget_tokens,
+            }
         with _ANTHROPIC_CLIENT.messages.stream(**stream_kwargs) as stream:
             for text in stream.text_stream:
                 try:
@@ -356,10 +374,20 @@ def _call_anthropic(
 
     for attempt in range(1, max_retries + 1):
         try:
+            effective_temperature = 1.0 if thinking_enabled else temperature
+            # Enforce Anthropic minimum budget requirement (>= 1024) when thinking is enabled
+            if thinking_enabled:
+                reserved_for_output = 1
+                max_allowed_by_output = max(max_tokens - reserved_for_output, 0)
+                effective_budget_tokens = max(
+                    1024, min(CONFIG.prompt_budget_tokens, max_allowed_by_output)
+                )
+            else:
+                effective_budget_tokens = None
             create_kwargs = {
                 "model": model,
                 "max_tokens": max_tokens,
-                "temperature": temperature,
+                "temperature": effective_temperature,
                 "system": "You are a thoughtful journaling companion.",
                 "messages": [
                     {
@@ -369,7 +397,10 @@ def _call_anthropic(
                 ],
             }
             if thinking_enabled:
-                create_kwargs["thinking"] = {"type": "enabled"}
+                create_kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": effective_budget_tokens,
+                }
             if top_p is not None:
                 create_kwargs["top_p"] = top_p
             if top_k is not None:
