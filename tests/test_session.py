@@ -2,18 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from examinedlifejournal.audio import AudioCaptureResult
-from examinedlifejournal.history import HistoricalSummary
-from examinedlifejournal.session import Exchange, SessionConfig, SessionManager
-from examinedlifejournal.storage import (
+from healthyselfjournal.audio import AudioCaptureResult
+from healthyselfjournal.history import HistoricalSummary
+from healthyselfjournal.session import Exchange, SessionConfig, SessionManager
+from healthyselfjournal.storage import (
     Frontmatter,
     TranscriptDocument,
     load_transcript,
     write_transcript,
 )
-from examinedlifejournal.transcription import TranscriptionResult
-from examinedlifejournal.config import CONFIG
-from examinedlifejournal import llm as llm_module
+from healthyselfjournal.transcription import TranscriptionResult
+from healthyselfjournal.config import CONFIG
+from healthyselfjournal import llm as llm_module
 
 
 def test_short_answer_discard_sets_quit_and_skips_transcription(tmp_path, monkeypatch):
@@ -40,7 +40,7 @@ def test_short_answer_discard_sets_quit_and_skips_transcription(tmp_path, monkey
     )
 
     monkeypatch.setattr(
-        "examinedlifejournal.session.record_response", lambda *a, **k: fake_capture
+        "healthyselfjournal.session.record_response", lambda *a, **k: fake_capture
     )
 
     # Backend should never be requested for discarded short answers
@@ -232,7 +232,7 @@ def test_generate_next_question_handles_give_me_a_question_via_llm(
 
     # Patch the symbol used inside session module to avoid real API call
     monkeypatch.setattr(
-        "examinedlifejournal.session.generate_followup_question",
+        "healthyselfjournal.session.generate_followup_question",
         fake_generate_followup_question,
     )
 
@@ -282,7 +282,7 @@ def test_generate_next_question_streams_with_callback(tmp_path, monkeypatch):
     )
 
     # Monkeypatch the underlying streaming call to emit two chunks and return a final question
-    from examinedlifejournal import llm as llm_module
+    from healthyselfjournal import llm as llm_module
 
     def fake_stream_followup_question(request, on_delta):
         on_delta("What ")

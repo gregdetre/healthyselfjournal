@@ -316,7 +316,7 @@ response = client.chat(
 
 - Run the journaling loop with the local model:
   ```bash
-  examinedlifejournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M
+  healthyselfjournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M
   ```
 - Override the Ollama host/port if it differs from the default:
   ```bash
@@ -324,7 +324,7 @@ response = client.chat(
   ```
 - Omit `--llm-model` (or use `anthropic:*`) to switch back to the Claude default.
 
-#### App Quickstart (Examined Life Journal)
+#### App Quickstart (Healthy Self Journal)
 
 ```bash
 # 1) Install and start Ollama, pull a model
@@ -335,7 +335,7 @@ ollama pull gemma3:27b-instruct-q4_K_M
 ollama run gemma3:27b-instruct-q4_K_M "Hello"
 
 # 3) Run the app locally with the Ollama model
-examinedlifejournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M
+healthyselfjournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M
 
 # (Optional) If Ollama is not on the default host/port
 export OLLAMA_BASE_URL=http://localhost:11434
@@ -480,7 +480,7 @@ ollama<0.4.0           # Breaking changes with newer models
 ### Related Internal Documentation
 - Selection process: `docs/conversations/250918b_local_llm_selection_for_journaling_app.md`
 - Product requirements: `docs/reference/PRODUCT_VISION_FEATURES.md`
-- Prompt templates: `examinedlifejournal/prompts/`
+- Prompt templates: `healthyselfjournal/prompts/`
 
 ---
 
@@ -500,11 +500,11 @@ I reviewed the guide alongside our code and current Ollama usage. Here are conci
 - KV cache type: Setting KV cache quantization via env var is not a documented Ollama interface. Remove or replace with officially supported options/modelfile guidance.
 - Context claims: If you state limitations like “>48K tokens degrades,” add a source and match the model’s actual context length for the specific Gemma 3 tag you recommend.
 
-### Align with our app (examinedlifejournal) behavior
+### Align with our app (healthyselfjournal) behavior
 - Officially supported env for our app:
   - We read only `OLLAMA_BASE_URL`, `OLLAMA_NUM_CTX`, `OLLAMA_TIMEOUT_SECONDS`. The other env vars in the guide won’t affect our app’s behavior.
 - CLI usage in our app is correct as documented:
-  - `examinedlifejournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M`
+  - `healthyselfjournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M`
   - To switch hosts, set `OLLAMA_BASE_URL` (defaults to `http://localhost:11434`).
 - Provider capabilities:
   - “Thinking” mode is not supported for `ollama:*` in our code. Add a note: only Anthropic supports the `:thinking` suffix; using it with Ollama will error.
@@ -562,4 +562,4 @@ export OLLAMA_HOST=0.0.0.0:11434
 
 If you’d like, I can apply these edits directly in the guide and add a small “App Quickstart” section.
 
-- I reviewed the guide against our code paths in `examinedlifejournal/llm.py`, `examinedlifejournal/config.py`, and `examinedlifejournal/cli_journal.py`. The main risks are the unsupported env vars and a couple of overconfident performance claims.
+- I reviewed the guide against our code paths in `healthyselfjournal/llm.py`, `healthyselfjournal/config.py`, and `healthyselfjournal/cli_journal.py`. The main risks are the unsupported env vars and a couple of overconfident performance claims.

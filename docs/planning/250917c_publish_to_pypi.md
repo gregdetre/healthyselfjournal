@@ -1,16 +1,16 @@
 ### Goal, context
 
-- Enable zero-flags execution via `uvx examinedlifejournal` for users.
-- Publish the `examinedlifejournal` package to PyPI (TestPyPI first), following a similar approach to `gjdutils` where sensible.
+- Enable zero-flags execution via `uvx healthyselfjournal` for users.
+- Publish the `healthyselfjournal` package to PyPI (TestPyPI first), following a similar approach to `gjdutils` where sensible.
 - Keep local dev ergonomics (editable local `gjdutils` via `[tool.uv.sources]`) while producing a clean distributable wheel for end users.
 
 
 ### References
 
 - `pyproject.toml` (root): current metadata, `[project.scripts]` entry, `dependencies`, `[tool.uv.sources]` for `gjdutils`.
-- `examinedlifejournal/__main__.py`: CLI entrypoint calling `examinedlifejournal.cli:app`.
-- `examinedlifejournal/llm.py`: loads prompt templates via `PROMPTS_DIR = Path(__file__).parent / "prompts"` → ensure prompt files ship in the wheel.
-- `examinedlifejournal/prompts/*.jinja`: runtime assets required by `llm.py`.
+- `healthyselfjournal/__main__.py`: CLI entrypoint calling `healthyselfjournal.cli:app`.
+- `healthyselfjournal/llm.py`: loads prompt templates via `PROMPTS_DIR = Path(__file__).parent / "prompts"` → ensure prompt files ship in the wheel.
+- `healthyselfjournal/prompts/*.jinja`: runtime assets required by `llm.py`.
 - `gjdutils/src/gjdutils/cli/pypi/{app.py, check.py, deploy.py}` and `src/gjdutils/pypi_build.py`: working PyPI flows for `gjdutils` (opinionated, but tightly coupled to `gjdutils`).
 - Repo rule doc: `docs/reference/SETUP.md` (venv + `uv` usage), `docs/reference/COMMAND_LINE_INTERFACE.md` (CLI expectations).
 - External: Standard packaging flow (Hatch build backend, `python -m build`, `twine upload`), `uvx` usage for running packages.
@@ -31,10 +31,10 @@
 #### Stage: Prepare packaging configuration
 - [ ] Add a build backend to `pyproject.toml` (Hatch):
   - `[build-system] requires = ["hatchling"]`, `build-backend = "hatchling.build"`.
-  - `[tool.hatch.build.targets.wheel] packages = ["examinedlifejournal"]`.
+  - `[tool.hatch.build.targets.wheel] packages = ["healthyselfjournal"]`.
   - Ensure non-Python assets are included (see next action).
 - [ ] Ensure prompt templates are included in wheels:
-  - Add Hatch build config to include `examinedlifejournal/prompts/*.jinja` (e.g., `tool.hatch.build.targets.wheel.force-include` mapping, or broader include for the package directory).
+  - Add Hatch build config to include `healthyselfjournal/prompts/*.jinja` (e.g., `tool.hatch.build.targets.wheel.force-include` mapping, or broader include for the package directory).
   - Acceptance: fresh wheel contains both `question.prompt.md.jinja` and `summary.prompt.md.jinja` paths under the package.
 - [ ] Review and finalize `project` metadata:
   - `name`, `version`, `description`, `readme`, `license`, `classifiers`, `urls`.
@@ -51,27 +51,27 @@
 - [ ] Clean builds and produce distributions:
   - `uv build` (or `python -m build`) → `dist/*.whl`, `dist/*.tar.gz`.
 - [ ] Verify wheel contents include prompts and console script:
-  - Inspect wheel (e.g., `unzip -l dist/*.whl | rg prompts/`), check that entry point `examinedlifejournal` exists in `RECORD`.
-- [ ] Smoke-test from wheel with `uvx --from dist/*.whl examinedlifejournal -- --help`.
+  - Inspect wheel (e.g., `unzip -l dist/*.whl | rg prompts/`), check that entry point `healthyselfjournal` exists in `RECORD`.
+- [ ] Smoke-test from wheel with `uvx --from dist/*.whl healthyselfjournal -- --help`.
 - [ ] Verify runtime prompt load without network/API:
-  - `uvx --from dist/*.whl python -c "import examinedlifejournal.llm as m; print(m._load_prompt('question.prompt.md.jinja')[:40])"` (ensures assets are bundled).
+  - `uvx --from dist/*.whl python -c "import healthyselfjournal.llm as m; print(m._load_prompt('question.prompt.md.jinja')[:40])"` (ensures assets are bundled).
 
 #### Stage: TestPyPI publish and validation
 - [ ] Configure credentials for TestPyPI (`~/.pypirc` or env vars for `twine`).
 - [ ] Upload to TestPyPI: `twine upload -r testpypi dist/*`.
 - [ ] Validate install from TestPyPI in a temp venv:
-  - `python -m venv /tmp/eljournal-testpypi && /tmp/eljournal-testpypi/bin/pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ examinedlifejournal`.
-  - Run `/tmp/.../bin/examinedlifejournal --help` and the prompt asset check above.
+  - `python -m venv /tmp/eljournal-testpypi && /tmp/eljournal-testpypi/bin/pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ healthyselfjournal`.
+  - Run `/tmp/.../bin/healthyselfjournal --help` and the prompt asset check above.
 
 #### Stage: PyPI publish and validation
 - [ ] Bump version if needed, ensure git clean, tag workflow (optional).
 - [ ] Upload to PyPI: `twine upload dist/*`.
-- [ ] Validate with `uvx examinedlifejournal -- --help` (and optionally `uvx --python 3.12 examinedlifejournal`).
-- [ ] Optional: pin run check `uvx examinedlifejournal==<version>`.
+- [ ] Validate with `uvx healthyselfjournal -- --help` (and optionally `uvx --python 3.12 healthyselfjournal`).
+- [ ] Optional: pin run check `uvx healthyselfjournal==<version>`.
 
 #### Stage: Documentation & follow-ups
 - [ ] Update `README.md` with install/run snippets:
-  - `uvx examinedlifejournal`
+  - `uvx healthyselfjournal`
   - Notes on Python 3.12, env vars, optional `ffmpeg`.
 - [ ] Update `docs/reference/SETUP.md` and `COMMAND_LINE_INTERFACE.md` with PyPI install notes.
 - [ ] (Optional) Add CI job for publishing on tag, using trusted publishing or API token.
@@ -82,7 +82,7 @@
 
 - The `gjdutils` CLI under `src/gjdutils/cli/pypi/` is tightly coupled to `gjdutils` (hard-coded package name in checks, metadata queries, install commands, and version existence checks).
 - Reusing as-is would require generalization (package name parameterization, metadata discovery), which adds maintenance and risk.
-- Recommendation: use the standard Build + Twine flow for `examinedlifejournal` now. If we later want a reusable publisher, we can extract a generic helper.
+- Recommendation: use the standard Build + Twine flow for `healthyselfjournal` now. If we later want a reusable publisher, we can extract a generic helper.
 
 
 ### Risks & mitigations
@@ -95,8 +95,8 @@
 
 ### Acceptance criteria (overall)
 
-- Running `uvx examinedlifejournal -- --help` works on a clean machine with only Python and `uv` installed.
-- `examinedlifejournal` installs and runs from TestPyPI and PyPI.
+- Running `uvx healthyselfjournal -- --help` works on a clean machine with only Python and `uv` installed.
+- `healthyselfjournal` installs and runs from TestPyPI and PyPI.
 - Prompt templates load at runtime from the installed wheel.
 - README and reference docs updated with clear install/run instructions and prerequisites.
 

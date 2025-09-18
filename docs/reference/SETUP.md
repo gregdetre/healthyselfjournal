@@ -8,7 +8,7 @@ This document explains how to set up and work on this project using uv, with a f
 - Evergreen guidance – structure and maintenance approach for evergreen docs: [WRITE_EVERGREEN_DOC.md](https://raw.githubusercontent.com/gregdetre/gjdutils/refs/heads/main/docs/instructions/WRITE_EVERGREEN_DOC.md)
 
 ## Principles and decisions
-- Prefer the external virtual environment at `/Users/greg/.venvs/experim__examinedlifejournal`.
+- Prefer the external virtual environment at `/Users/greg/.venvs/experim__healthyselfjournal`.
 - Use uv for dependency management and execution; when targeting the external venv, pass `--active` to uv project commands.
 - Keep a local editable clone of `gjdutils` at `./gjdutils` and track it in `pyproject.toml` via `[tool.uv.sources]`.
 
@@ -18,9 +18,9 @@ This document explains how to set up and work on this project using uv, with a f
 
 ## Project layout
 ```
-examinedlifejournal/
+healthyselfjournal/
   ├─ gjdutils/               # local clone (editable)
-  ├─ examinedlifejournal.py
+  ├─ healthyselfjournal.py
   ├─ pyproject.toml
   └─ docs/reference/SETUP.md
 ```
@@ -28,7 +28,7 @@ examinedlifejournal/
 ## Setup using the external venv (recommended)
 1) Activate the external virtual environment
 ```bash
-source /Users/greg/.venvs/experim__examinedlifejournal/bin/activate
+source /Users/greg/.venvs/experim__healthyselfjournal/bin/activate
 python -V
 ```
 
@@ -50,7 +50,7 @@ uv sync --active
 
 5) Run commands using the active venv
 ```bash
-uv run --active python examinedlifejournal.py --duration 3
+uv run --active python healthyselfjournal.py --duration 3
 uv run --active ipython
 ```
 
@@ -64,7 +64,7 @@ If you prefer a project-local environment:
 ```bash
 uv venv .venv
 uv sync              # no --active needed when using the project env
-uv run python examinedlifejournal.py --duration 3
+uv run python healthyselfjournal.py --duration 3
 ```
 Note: If both an active external venv and a project `.venv` exist, uv prefers the project `.venv` unless you pass `--active`.
 
@@ -72,7 +72,7 @@ Note: If both an active external venv and a project `.venv` exist, uv prefers th
 `pyproject.toml` excerpt:
 ```toml
 [project]
-name = "examinedlifejournal"
+name = "healthyselfjournal"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
@@ -87,7 +87,7 @@ gjdutils = { path = "./gjdutils", editable = true }
 Confirm that `gjdutils` resolves to the local project clone:
 ```bash
 uv run --active python -c "import gjdutils, pathlib; p=pathlib.Path(gjdutils.__file__).resolve(); print(p)"
-# Expect a path like: .../examinedlifejournal/gjdutils/src/gjdutils/__init__.py
+# Expect a path like: .../healthyselfjournal/gjdutils/src/gjdutils/__init__.py
 ```
 
 ## Gotchas and troubleshooting

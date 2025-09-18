@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import pytest
 
-from examinedlifejournal.tts import TTSOptions, synthesize_text
+from healthyselfjournal.tts import TTSOptions, synthesize_text
 
 
 def _has_openai_key() -> bool:

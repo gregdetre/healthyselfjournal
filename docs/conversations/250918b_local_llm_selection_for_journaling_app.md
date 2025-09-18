@@ -126,7 +126,7 @@ class OllamaClient:
 - **Local AI with Ollama** ([Devtutorial](https://devtutorial.io/local-ai-with-ollama-using-python-to-call-ollama-rest-api-p3817.html)) - Direct REST API examples
 
 ### Internal References
-- Original prompt template: `examinedlifejournal/prompts/question.prompt.md.jinja`
+- Original prompt template: `healthyselfjournal/prompts/question.prompt.md.jinja`
 - Selection criteria: `gjdutils/docs/instructions/THIRD_PARTY_LIBRARY_SELECTION.md`
 - Product vision: `docs/reference/PRODUCT_VISION_FEATURES.md`
 

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from examinedlifejournal.utils.time_utils import format_hh_mm_ss, format_mm_ss
-from examinedlifejournal.utils.audio_utils import maybe_delete_wav_when_safe
+from healthyselfjournal.utils.time_utils import format_hh_mm_ss, format_mm_ss
+from healthyselfjournal.utils.audio_utils import maybe_delete_wav_when_safe
 
 
 def test_format_mm_ss_and_hh_mm_ss_rounding_and_rollover():

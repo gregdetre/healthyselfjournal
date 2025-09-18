@@ -17,7 +17,7 @@ Model presets (`default`, `accuracy`, `fast`) resolve differently per backend. F
 ### CLI usage
 
 ```
-uv run --active examinedlifejournal journal \
+uv run --active healthyselfjournal journal \
   --stt-backend cloud-openai \
   --stt-model default \
   --stt-formatting sentences

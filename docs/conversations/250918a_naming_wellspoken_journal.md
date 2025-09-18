@@ -1,7 +1,7 @@
 # Naming the Voice Journaling App - January 18, 2025
 
 ## Context & Goals
-Exploring a better name for "examinedlifejournal" - seeking something more memorable, shorter, and aligned with the app's evidence-based wellbeing focus.
+Exploring a better name for "healthyselfjournal" - seeking something more memorable, shorter, and aligned with the app's evidence-based wellbeing focus.
 
 ## Key Background
 The app is a command-line, voice-first reflective journaling tool that:
@@ -67,4 +67,4 @@ Renaming would involve:
 
 ## Related Work
 - See `docs/reference/PRODUCT_VISION_FEATURES.md` for product vision
-- Original implementation: `examinedlifejournal` package
+- Original implementation: `healthyselfjournal` package

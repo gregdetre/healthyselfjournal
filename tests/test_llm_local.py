@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from examinedlifejournal import llm
+from healthyselfjournal import llm
 
 
 def test_get_model_provider() -> None:

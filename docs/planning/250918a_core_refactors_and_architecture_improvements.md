@@ -16,13 +16,13 @@ Non-goals for this effort:
 ## References
 
 Code (most relevant first):
-- `examinedlifejournal/cli_journal.py` — CLI entry for journaling loop; setup, backend resolution, panels, TTS, loop, streaming, finalize.
-- `examinedlifejournal/audio.py` — Recording/meter/controls, short-answer guard, post-processing, MP3 conversion.
-- `examinedlifejournal/session.py` — Session state, exchange recording, persistence, next-question generation, summaries.
-- `examinedlifejournal/transcription.py` — Backend selection, OpenAI/faster-whisper/MLX/whispercpp.
-- `examinedlifejournal/llm.py` — Prompt rendering, Anthropic/Ollama calls, streaming, thinking mode handling.
-- `examinedlifejournal/storage.py` — Markdown + frontmatter I/O (non-atomic), append helpers.
-- `examinedlifejournal/prompts/question.prompt.md.jinja` — Embedded example-questions behavior.
+- `healthyselfjournal/cli_journal.py` — CLI entry for journaling loop; setup, backend resolution, panels, TTS, loop, streaming, finalize.
+- `healthyselfjournal/audio.py` — Recording/meter/controls, short-answer guard, post-processing, MP3 conversion.
+- `healthyselfjournal/session.py` — Session state, exchange recording, persistence, next-question generation, summaries.
+- `healthyselfjournal/transcription.py` — Backend selection, OpenAI/faster-whisper/MLX/whispercpp.
+- `healthyselfjournal/llm.py` — Prompt rendering, Anthropic/Ollama calls, streaming, thinking mode handling.
+- `healthyselfjournal/storage.py` — Markdown + frontmatter I/O (non-atomic), append helpers.
+- `healthyselfjournal/prompts/question.prompt.md.jinja` — Embedded example-questions behavior.
 
 Docs:
 - `docs/reference/COMMAND_LINE_INTERFACE.md` — CLI behaviors/options.
@@ -50,8 +50,8 @@ Docs:
   - Anthropic request assembly: shared logic needed across `llm._call_anthropic` and `llm.stream_followup_question`.
   - Key handling: normalization logic in `audio._wait_for_stop` and `cli_journal._run_mic_check`.
 - Completed implementations:
-  - Added `examinedlifejournal/utils/time_utils.py` with `format_hh_mm_ss` and `format_mm_ss` and replaced call sites in `audio.py` and `session.py` (kept small shim functions for backward parity).
-  - Added `examinedlifejournal/utils/audio_utils.py` with `maybe_delete_wav_when_safe` and updated both `audio._maybe_start_mp3_conversion` and `session._persist_raw_transcription` to delegate.
+  - Added `healthyselfjournal/utils/time_utils.py` with `format_hh_mm_ss` and `format_mm_ss` and replaced call sites in `audio.py` and `session.py` (kept small shim functions for backward parity).
+  - Added `healthyselfjournal/utils/audio_utils.py` with `maybe_delete_wav_when_safe` and updated both `audio._maybe_start_mp3_conversion` and `session._persist_raw_transcription` to delegate.
   - Ran minimal tests: `pytest tests/test_storage.py` passed; broader suite hit external `OPENAI_API_KEY` requirement under `gjdutils` (expected offline).
 
 
@@ -59,14 +59,14 @@ Docs:
 
 ### Upfront preparatory actions
 - [ ] Ensure environment is ready
-  - [ ] Activate venv at `/Users/greg/.venvs/experim__examinedlifejournal` and run `uv sync --active`
+  - [ ] Activate venv at `/Users/greg/.venvs/experim__healthyselfjournal` and run `uv sync --active`
   - [ ] Run minimal offline tests: `pytest tests/test_storage.py`
 - [ ] Consider creating a feature branch `250918a_core_refactors` for this multi-stage work
   - [ ] If created, merge back into `main` at the end after all checks pass
 
 
 ### Stage: Extract shared duration formatting helpers
-- [x] Create `examinedlifejournal/utils/time_utils.py` with:
+- [x] Create `healthyselfjournal/utils/time_utils.py` with:
   - [x] `format_hh_mm_ss(seconds: float) -> str` (used by saved messages)
   - [x] `format_mm_ss(seconds: float) -> str` (used for conversation duration)
 - [x] Replace duplicates in `audio.py` and `session.py`
@@ -76,7 +76,7 @@ Docs:
 
 
 ### Stage: Factor safe WAV deletion into a single helper
-- [x] Create `examinedlifejournal/utils/audio_utils.py` with:
+- [x] Create `healthyselfjournal/utils/audio_utils.py` with:
   - [x] `maybe_delete_wav_when_safe(wav_path: Path) -> None`
     - Checks for sibling `.mp3` and `.stt.json` before deletion
     - Emits the existing `audio.wav.deleted` event
@@ -95,7 +95,7 @@ Docs:
 
 
 ### Stage: Standardize key handling
-- [ ] Add `examinedlifejournal/utils/keys.py` with:
+- [ ] Add `healthyselfjournal/utils/keys.py` with:
   - [ ] `read_one_key_normalized() -> Literal["ENTER","ESC","Q","SPACE","OTHER"]`
 - [ ] Replace local normalization in `audio._wait_for_stop` and `cli_journal._run_mic_check`
 - [ ] Ensure behavior parity for ESC sequences and Ctrl-C handling

@@ -59,12 +59,12 @@ def _verify_runtime_deps_for_command(command_name: str) -> None:
             console.print(f"Python: {sys.executable}")
             console.print("Activate the recommended venv and install deps, then retry:")
             console.print(
-                "  source /Users/greg/.venvs/experim__examinedlifejournal/bin/activate"
+                "  source /Users/greg/.venvs/experim__healthyselfjournal/bin/activate"
             )
             console.print("  uv sync --active")
             console.print()
             console.print("Or run without activating the venv using uv:")
-            console.print("  uv run --active examinedlifejournal journal")
+            console.print("  uv run --active healthyselfjournal journal")
             raise typer.Exit(code=3)
 
 

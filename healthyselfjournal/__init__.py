@@ -1,4 +1,4 @@
-"""Core package for the Examined Life Journal voice journaling app."""
+"""Core package for the Healthy Self Journal voice journaling app."""
 
 from __future__ import annotations
 

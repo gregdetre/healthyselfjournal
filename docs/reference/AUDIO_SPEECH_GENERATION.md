@@ -11,7 +11,7 @@ This document covers design principles, configuration, architecture, how‑tos, 
 - `AUDIO_VOICE_RECOGNITION_WHISPER.md` – STT capture/processing; ensures we don’t record while TTS is playing.
 - `BACKGROUND_PROCESSING.md` – Summary regeneration is scheduled in the background; TTS runs in the foreground just before the next capture.
 - `FILE_FORMATS_ORGANISATION.md` – Session files; TTS audio is not persisted (temporary only).
-- Code: `examinedlifejournal/cli.py` (flags and orchestration), `examinedlifejournal/tts.py` (synthesis + playback), `examinedlifejournal/config.py` (defaults and user preference), `examinedlifejournal/session.py` (loop), `examinedlifejournal/events.py` (metadata logging).
+- Code: `healthyselfjournal/cli.py` (flags and orchestration), `healthyselfjournal/tts.py` (synthesis + playback), `healthyselfjournal/config.py` (defaults and user preference), `healthyselfjournal/session.py` (loop), `healthyselfjournal/events.py` (metadata logging).
 
 ## Principles and key decisions
 
@@ -37,27 +37,27 @@ The microphone is not active during playback; recording starts after playback co
 
 ### Components
 
-- `examinedlifejournal/config.py`
+- `healthyselfjournal/config.py`
   - `speak_llm: bool` – feature toggle.
   - `tts_model`, `tts_voice`, `tts_format`, `tts_backend` – user preferences and defaults.
-- `examinedlifejournal/cli.py`
+- `healthyselfjournal/cli.py`
   - CLI options: `--voice-mode`, `--tts-model`, `--tts-voice`, `--tts-format`.
   - Requires `OPENAI_API_KEY` when speech is enabled (OpenAI backend).
   - Auto-disables `--stream-llm` when speaking.
-- `examinedlifejournal/tts.py`
+- `healthyselfjournal/tts.py`
   - `speak_text(text, TTSOptions)` – orchestrates synthesis and playback.
   - OpenAI synthesis (non-streaming, with streaming fallback) → temp file → `afplay`/`ffplay`.
   - During playback, pressing ENTER skips the spoken question immediately.
-- `examinedlifejournal/session.py`
+- `healthyselfjournal/session.py`
   - Prints the question and then records user audio; TTS is invoked from the CLI loop just before recording starts.
-- `examinedlifejournal/events.py`
+- `healthyselfjournal/events.py`
   - Logs `tts.request`, `tts.response`, `tts.error` with metadata (no content).
 
 ## How to use
 
 - Enable speech:
 ```bash
-uv run --active examinedlifejournal journal --voice-mode
+uv run --active healthyselfjournal journal --voice-mode
 ```
 
 - Environment:
@@ -70,7 +70,7 @@ uv run --active examinedlifejournal journal --voice-mode
 ## Troubleshooting
 
 - “attempted relative import with no known parent package” when launching:
-  - Prefer running the package as a module: `uv run --active python -m examinedlifejournal journal ...`.
+  - Prefer running the package as a module: `uv run --active python -m healthyselfjournal journal ...`.
   - Or ensure the package is run via its CLI entrypoint once defined.
 
 - “No audio player found (tried afplay, ffplay)”:

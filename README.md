@@ -1,4 +1,4 @@
-# Examined Life Journal
+# Healthy Self Journal
 
 Voice-first reflective journaling for the command line. Speak freely; your words are captured, transcribed with Whisper, and met with concise, evidence‑informed follow‑up questions from Claude to keep you moving forward without drifting into rumination.
 
@@ -23,8 +23,8 @@ Core feature set (implemented today):
 ## Snapshot: What it feels like
 
 ```text
-(experim__examinedlifejournal) experim/examinedlifejournal git:(main) ✗  uv run --active examinedlifejournal journal --resume
-╭───────────────────────────────── Examined Life Journal ──────────────────────────────────╮
+(experim__healthyselfjournal) experim/healthyselfjournal git:(main) ✗  uv run --active healthyselfjournal journal --resume
+╭───────────────────────────────── Healthy Self Journal ──────────────────────────────────╮
 │ Recording starts immediately.                                                            │
 │ Press any key to stop. ESC cancels the current take; Q saves then ends after this entry. │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
@@ -69,7 +69,7 @@ Quit requested. Ending session after summary update.
 Prefer the external virtualenv workflow in `docs/reference/SETUP.md`:
 
 ```bash
-source /Users/greg/.venvs/experim__examinedlifejournal/bin/activate
+source /Users/greg/.venvs/experim__healthyselfjournal/bin/activate
 uv sync --active
 ```
 
@@ -81,19 +81,19 @@ Use either pip or uvx:
 
 ```bash
 # pip
-pip install examinedlifejournal
-examinedlifejournal init
-examinedlifejournal journal
+pip install healthyselfjournal
+healthyselfjournal init
+healthyselfjournal journal
 
 # or uvx (no install needed)
-uvx examinedlifejournal -- init
-uvx examinedlifejournal -- journal
+uvx healthyselfjournal -- init
+uvx healthyselfjournal -- journal
 ```
 
 To run the dialogue loop fully offline, install Ollama + Gemma (see `docs/reference/OLLAMA_GEMMA_DEPLOYMENT_GUIDE.md`), ensure the daemon is running, then start the CLI with:
 
 ```bash
-examinedlifejournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M
+healthyselfjournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M
 ```
 
 Notes:
@@ -102,7 +102,7 @@ Notes:
 
 1. Activate the project virtualenv:
    ```bash
-   source /Users/greg/.venvs/experim__examinedlifejournal/bin/activate
+   source /Users/greg/.venvs/experim__healthyselfjournal/bin/activate
    ```
 2. Export keys:
    ```bash
@@ -111,7 +111,7 @@ Notes:
    ```
 3. Start a session:
    ```bash
-   uv run examinedlifejournal journal
+   uv run healthyselfjournal journal
    ```
 
 Handy flags:
@@ -140,7 +140,7 @@ Highlights of the approach:
 
 ## Prompting and question design
 
-Follow‑up questions are generated using `examinedlifejournal/prompts/question.prompt.md.jinja`:
+Follow‑up questions are generated using `healthyselfjournal/prompts/question.prompt.md.jinja`:
 - Analyzes emotional intensity, thought patterns, topic persistence, exhaustion, and change talk
 - Adapts strategy (validation, redirection, Socratic deepening, or implementation planning)
 - Uses clean‑language techniques (user’s exact words), single‑focus questions, and brevity

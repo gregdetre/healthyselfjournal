@@ -7,7 +7,7 @@ This document synthesizes research-backed strategies for establishing and mainta
 - `POTENTIAL_RESEARCH_TOPICS.md` - comprehensive research priorities for evidence-based journaling features
 - `docs/reference/SCIENTIFIC_RESEARCH_EVIDENCE.md` - broader research foundation for journaling benefits
 - `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md` - technical implementation of voice-based journaling interface
-- `examinedlifejournal/` - CLI application implementing these behavioral strategies
+- `healthyselfjournal/` - CLI application implementing these behavioral strategies
 - [BJ Fogg's Behavior Model](https://www.behaviormodel.org) - foundational behavior change framework
 - [Implementation Intentions Research](https://www.researchgate.net/publication/232586066_Implementation_Intentions_Strong_Effects_of_Simple_Plans) - Gollwitzer's seminal work on if-then planning
 

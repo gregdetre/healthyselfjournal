@@ -64,7 +64,7 @@ def run_init_wizard() -> None:
             "Welcome! This wizard will configure your API keys and recording options.\n\n"
             "- Cloud mode (recommended): best accuracy/latency; requires OpenAI + Anthropic keys.\n"
             "- Privacy mode: on-device STT if available (experimental).",
-            title="Examined Life Journal – Setup",
+            title="Healthy Self Journal – Setup",
             border_style="magenta",
         )
     )
@@ -143,7 +143,7 @@ def run_init_wizard() -> None:
             )
 
     # Friendly next-step hint
-    console.print("[bold]Next:[/] run [cyan]examinedlifejournal journal[/]")
+    console.print("[bold]Next:[/] run [cyan]healthyselfjournal journal[/]")
 
 
 def _smoke_test_setup(sessions_dir: Path, stt_backend_value: str) -> None:

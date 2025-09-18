@@ -1,10 +1,10 @@
 # Questionary Library Reference
 
-Questionary is a Python library for building beautiful, interactive command-line prompts with minimal code. Selected for the examinedlifejournal init wizard based on active maintenance, comprehensive features, and excellent community support.
+Questionary is a Python library for building beautiful, interactive command-line prompts with minimal code. Selected for the healthyselfjournal init wizard based on active maintenance, comprehensive features, and excellent community support.
 
 ## See also
 
-- `examinedlifejournal/cli.py` - existing Typer CLI where Questionary will integrate
+- `healthyselfjournal/cli.py` - existing Typer CLI where Questionary will integrate
 - `docs/planning/250917c_publish_to_pypi.md` - deployment planning that may benefit from setup wizard
 - [Official Questionary Documentation](https://questionary.readthedocs.io/) - comprehensive API reference and examples
 - [GitHub Repository](https://github.com/tmbo/questionary) - source code, issues, and examples directory
@@ -23,7 +23,7 @@ pip install questionary
 - **Dependencies**: prompt_toolkit 3.0.0+
 
 ### Integration with Existing Project
-Since examinedlifejournal already uses Typer and Rich, Questionary complements them perfectly:
+Since healthyselfjournal already uses Typer and Rich, Questionary complements them perfectly:
 ```python
 # Typer for CLI structure
 import typer

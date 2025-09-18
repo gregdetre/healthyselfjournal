@@ -10,11 +10,11 @@ Related Docs: docs/reference/RECORDING_CONTROLS.md
 
 ## Context & Goals
 
-The user reported: "We've been having trouble with capturing the ESC key reliably" in the examinedlifejournal application's recording controls. They requested evaluation of Python CLI libraries for keyboard shortcuts, following their third-party library selection criteria.
+The user reported: "We've been having trouble with capturing the ESC key reliably" in the healthyselfjournal application's recording controls. They requested evaluation of Python CLI libraries for keyboard shortcuts, following their third-party library selection criteria.
 
 ## Key Background
 
-Current implementation uses `readchar` (v4.0.6+) for keyboard input in `examinedlifejournal/audio.py`. The ESC key is meant to cancel recording without discarding audio, but there are reliability issues with detecting ESC keypresses across different terminals.
+Current implementation uses `readchar` (v4.0.6+) for keyboard input in `healthyselfjournal/audio.py`. The ESC key is meant to cancel recording without discarding audio, but there are reliability issues with detecting ESC keypresses across different terminals.
 
 ## Main Discussion
 
@@ -119,4 +119,4 @@ with term.cbreak():  # Raw mode, no echo
 ## Related Work
 
 - `docs/reference/RECORDING_CONTROLS.md` - Current recording control documentation
-- `examinedlifejournal/audio.py` - Implementation requiring keyboard input improvements
+- `healthyselfjournal/audio.py` - Implementation requiring keyboard input improvements

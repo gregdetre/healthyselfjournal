@@ -9,7 +9,7 @@ Auto-start voice recording interface with visual feedback and keyboard controls.
 The journaling loop is started from the project root:
 
 ```bash
-uv run examinedlifejournal journal \
+uv run healthyselfjournal journal \
   [--sessions-dir PATH] \
   [--llm-model SPEC] \
   [--stt-backend BACKEND] [--stt-model MODEL] [--stt-compute COMPUTE] [--stt-formatting MODE] \
@@ -21,7 +21,7 @@ uv run examinedlifejournal journal \
   [--mic-check/--no-mic-check]
 
 # List existing sessions with summary snippets
-uv run examinedlifejournal journal list [--sessions-dir PATH] [--nchars N]
+uv run healthyselfjournal journal list [--sessions-dir PATH] [--nchars N]
 ```
 
 Files default to `./sessions/`; pass `--sessions-dir` to override for archival or testing.
@@ -32,7 +32,7 @@ Tip: during a session, you can say "give me a question" to instantly get a quest
 Show each session by `.md` filename stem with a summary snippet from frontmatter. Use `--nchars` to limit characters (full summary when omitted):
 
 ```bash
-uv run examinedlifejournal journal list --sessions-dir ./sessions --nchars 200
+uv run healthyselfjournal journal list --sessions-dir ./sessions --nchars 200
 ```
 
 
@@ -46,9 +46,9 @@ Getting started:
 
 - First-time users should run the setup wizard:
   ```bash
-  examinedlifejournal init
+  healthyselfjournal init
   # or
-  uvx examinedlifejournal -- init
+  uvx healthyselfjournal -- init
   ```
 - See `INIT_FLOW.md` for the init wizard flow and configuration details.
 
@@ -81,7 +81,7 @@ Environment variables:
 Backfill missing transcriptions for saved WAV files in `--sessions-dir`.
 
 ```bash
-uv run examinedlifejournal reconcile \
+uv run healthyselfjournal reconcile \
   [--sessions-dir PATH] \
   [--stt-backend BACKEND] [--stt-model MODEL] [--stt-compute COMPUTE] \
   [--language LANG] [--limit N]
@@ -97,13 +97,13 @@ Minimal commands for working with summaries stored in session frontmatter:
 
 ```bash
 # List (default shows only missing)
-uv run examinedlifejournal summaries list [--sessions-dir PATH] [--missing-only/--all]
+uv run healthyselfjournal summaries list [--sessions-dir PATH] [--missing-only/--all]
 
 # Backfill (default only missing; use --all to regenerate all)
-uv run examinedlifejournal summaries backfill [--sessions-dir PATH] [--llm-model SPEC] [--missing-only/--all] [--limit N]
+uv run healthyselfjournal summaries backfill [--sessions-dir PATH] [--llm-model SPEC] [--missing-only/--all] [--limit N]
 
 # Regenerate a single file's summary
-uv run examinedlifejournal summaries regenerate [--sessions-dir PATH] [--llm-model SPEC] yyMMdd_HHmm[.md]
+uv run healthyselfjournal summaries regenerate [--sessions-dir PATH] [--llm-model SPEC] yyMMdd_HHmm[.md]
 ```
 
 - `--missing-only/--all` defaults to missing-only for both commands.
@@ -114,7 +114,7 @@ uv run examinedlifejournal summaries regenerate [--sessions-dir PATH] [--llm-mod
 Merge two sessions, keeping the earlier one. Moves assets, appends later Q&A to earlier, updates frontmatter, and regenerates the summary by default.
 
 ```bash
-uv run examinedlifejournal merge [--sessions-dir PATH] [--llm-model SPEC] [--regenerate/--no-regenerate] [--dry-run] [--ignore-missing] yyMMdd_HHmm[.md] yyMMdd_HHmm[.md]
+uv run healthyselfjournal merge [--sessions-dir PATH] [--llm-model SPEC] [--regenerate/--no-regenerate] [--dry-run] [--ignore-missing] yyMMdd_HHmm[.md] yyMMdd_HHmm[.md]
 ```
 
 Notes:
@@ -161,10 +161,10 @@ Recording started… [████████░░░░░░░░] Press an
 Examples:
 ```bash
 # One-flag voice mode with defaults (shimmer, gpt-4o-mini-tts, wav)
-uv run examinedlifejournal journal --voice-mode
+uv run healthyselfjournal journal --voice-mode
 
 # Explicit control
-uv run examinedlifejournal journal --voice-mode --tts-voice shimmer --tts-model gpt-4o-mini-tts --tts-format wav
+uv run healthyselfjournal journal --voice-mode --tts-voice shimmer --tts-model gpt-4o-mini-tts --tts-format wav
 ```
 
 Notes:

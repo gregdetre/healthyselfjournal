@@ -6,8 +6,8 @@ Large-v2 is preferred by default for local Whisper because it is reputedly stron
 
 ### References
 
-- `examinedlifejournal/transcription.py` — current OpenAI Audio Transcriptions call-site
-- `examinedlifejournal/session.py` — STT invocation and transcript writes
+- `healthyselfjournal/transcription.py` — current OpenAI Audio Transcriptions call-site
+- `healthyselfjournal/session.py` — STT invocation and transcript writes
 - `legacy_transcribe_cli.py` — prior MLX/faster-whisper wiring
 - `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md` — legacy local STT guidance (to update)
 - `docs/reference/COMMAND_LINE_INTERFACE.md` — CLI conventions
@@ -83,7 +83,7 @@ Deliverable: `docs/reference/BACKEND_BENCHMARKS.md` with WER and xRT on small En
 - [x] Ensure O(text length) with minimal latency
 
 #### Stage: CLI & docs
-- [x] Add CLI flags to `examinedlifejournal/cli.py`
+- [x] Add CLI flags to `healthyselfjournal/cli.py`
 - [x] Update `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md` with new architecture, defaults, and setup steps
 - [x] Document `auto-private` behavior and explicit modes (no implicit fallback)
 

@@ -2,18 +2,18 @@
 
 ### Introduction
 
-This document describes the initialization flow for non‑technical users. The `init` wizard collects API keys, lets users choose between Cloud and Privacy modes, configures the sessions directory, optionally runs a smoke test, and persists configuration so `examinedlifejournal journal` works out of the box.
+This document describes the initialization flow for non‑technical users. The `init` wizard collects API keys, lets users choose between Cloud and Privacy modes, configures the sessions directory, optionally runs a smoke test, and persists configuration so `healthyselfjournal journal` works out of the box.
 
 ### See also
 
 - `../reference/COMMAND_LINE_INTERFACE.md` – how to run commands (`journal`, `reconcile`, `summaries/*`).
 - `../reference/SETUP.md` – development/venv setup; context for env variables and uv workflow.
 - `../reference/libraries/QUESTIONARY.md` – prompt library usage patterns and tips.
-- `../../examinedlifejournal/cli.py` – Typer CLI including `init` and auto‑init in `journal`.
-- `../../examinedlifejournal/__init__.py` – `.env`/`.env.local` autoloading at import time.
-- `../../examinedlifejournal/config.py` – defaults and env‑driven configuration (e.g., `SESSIONS_DIR`, `STT_*`).
-- `../../examinedlifejournal/transcription.py` – STT backends and selection logic.
-- `../../examinedlifejournal/audio.py` – recording utilities used by the smoke test.
+- `../../healthyselfjournal/cli.py` – Typer CLI including `init` and auto‑init in `journal`.
+- `../../healthyselfjournal/__init__.py` – `.env`/`.env.local` autoloading at import time.
+- `../../healthyselfjournal/config.py` – defaults and env‑driven configuration (e.g., `SESSIONS_DIR`, `STT_*`).
+- `../../healthyselfjournal/transcription.py` – STT backends and selection logic.
+- `../../healthyselfjournal/audio.py` – recording utilities used by the smoke test.
 - `../planning/250917c_publish_to_pypi.md` – packaging goals and user install paths.
 
 ### Principles, key decisions
@@ -27,8 +27,8 @@ This document describes the initialization flow for non‑technical users. The `
 
 ### Current state
 
-- `examinedlifejournal init` launches an interactive Questionary wizard.
-- `examinedlifejournal journal` auto‑runs the wizard if critical prerequisites are missing.
+- `healthyselfjournal init` launches an interactive Questionary wizard.
+- `healthyselfjournal journal` auto‑runs the wizard if critical prerequisites are missing.
 - Configuration is written to `.env.local` in the current working directory and applied to the current process immediately.
 - Optional smoke test records a 1‑second WAV and, in Cloud mode, attempts a tiny transcription call.
 
@@ -39,7 +39,7 @@ Auto‑init triggers at the start of `journal` when running in a TTY if either c
 - `ANTHROPIC_API_KEY` is missing (required for the default Anthropic LLM), or
 - STT backend resolves to `cloud-openai` and `OPENAI_API_KEY` is missing.
 
-If stdin is not a TTY, the CLI aborts with instructions to run `examinedlifejournal init`.
+If stdin is not a TTY, the CLI aborts with instructions to run `healthyselfjournal init`.
 
 Notes:
 - `.env` and `.env.local` are autoloaded on package import; values set there satisfy detection.
@@ -96,13 +96,13 @@ Notes:
 
 ### Common flows
 
-- First run via `uvx examinedlifejournal` → auto‑init launches → user selects Cloud → keys entered → sessions at `./sessions` → optional smoke test → run `journal`.
-- Switching to Privacy mode later: edit `.env.local` (`STT_BACKEND=auto-private`) or re‑run `examinedlifejournal init` and choose Privacy.
+- First run via `uvx healthyselfjournal` → auto‑init launches → user selects Cloud → keys entered → sessions at `./sessions` → optional smoke test → run `journal`.
+- Switching to Privacy mode later: edit `.env.local` (`STT_BACKEND=auto-private`) or re‑run `healthyselfjournal init` and choose Privacy.
 - No keys yet: run `init`, skip Cloud, select Privacy; if no local backends present, users can still record audio with `journal`, then backfill later after enabling Cloud or installing local STT.
 
 ### Troubleshooting
 
-- “Environment variable X is required”: run `examinedlifejournal init` or export the variable before running `journal`.
+- “Environment variable X is required”: run `healthyselfjournal init` or export the variable before running `journal`.
 - macOS microphone permissions: grant access in System Settings → Privacy & Security → Microphone.
 - `.env.local` not picked up: ensure you’re running commands from the directory containing `.env.local`, or export variables in your shell profile.
 - Local STT unavailable in Privacy mode: install `mlx-whisper` (Apple Silicon), or `faster-whisper`, or switch to Cloud.

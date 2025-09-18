@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from examinedlifejournal.history import load_recent_summaries
-from examinedlifejournal.storage import Frontmatter, TranscriptDocument, append_exchange_body, load_transcript, write_transcript
+from healthyselfjournal.history import load_recent_summaries
+from healthyselfjournal.storage import Frontmatter, TranscriptDocument, append_exchange_body, load_transcript, write_transcript
 
 
 def test_transcript_round_trip(tmp_path):

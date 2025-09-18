@@ -23,7 +23,7 @@ See: `docs/reference/PRODUCT_VISION_FEATURES.md`
 ## Setup
 
 - See `docs/reference/SETUP.md` for uv + external venv workflow
-- Preferred venv: `/Users/greg/.venvs/experim__examinedlifejournal` (source it first)
+- Preferred venv: `/Users/greg/.venvs/experim__healthyselfjournal` (source it first)
 - `gjdutils` is a local editable dep via `[tool.uv.sources]`
 - `ffmpeg` on PATH enables background MP3 conversion (optional)
 
@@ -31,7 +31,7 @@ See: `docs/reference/PRODUCT_VISION_FEATURES.md`
 
 - Activate venv, then:
   - `uv sync --active`
-  - `uv run --active examinedlifejournal journal [--sessions-dir PATH]`
+  - `uv run --active healthyselfjournal journal [--sessions-dir PATH]`
 
 ## Tests
 
@@ -41,7 +41,7 @@ See: `docs/reference/PRODUCT_VISION_FEATURES.md`
 
 ## Logs & saved files
 
-- Event log: `sessions/events.log` (metadata-only; see `examinedlifejournal/events.py`)
+- Event log: `sessions/events.log` (metadata-only; see `healthyselfjournal/events.py`)
 - Session outputs under `./sessions/` (markdown + per-session audio dir)
 - Details: `docs/reference/FILE_FORMATS_ORGANISATION.md`
 

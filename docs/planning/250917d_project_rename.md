@@ -12,7 +12,7 @@ Rename the entire project (package name, CLI command, imports, branding, docs, a
 - gjdutils/docs/instructions/RENAME_OR_MOVE.md — safe rename/move process
 - gjdutils/docs/reference/SD_STRING_DISPLACEMENT_FIND_REPLACE.md — safe find/replace tool
 - pyproject.toml — project name, scripts, package discovery
-- examinedlifejournal/ — current package to be renamed
+- healthyselfjournal/ — current package to be renamed
 - tests/ — imports and CLI references
 
 
@@ -45,7 +45,7 @@ Acceptance: Names are fixed and documented here; `git status` is clean.
   - [project].name = NEW_DIST_NAME
   - [project.scripts] = { NEW_CLI_NAME = "NEW_PACKAGE_NAME.__main__:app" }
   - [tool.setuptools.packages.find].include = ["NEW_PACKAGE_NAME*"]
-- [ ] Remove old script entry `examinedlifejournal`.
+- [ ] Remove old script entry `healthyselfjournal`.
 
 Acceptance: `uv sync --active` completes without errors.
 
@@ -53,33 +53,33 @@ Acceptance: `uv sync --active` completes without errors.
 #### Stage: Rename package directory and update imports
 - [ ] Rename the package directory:
 ```bash
-git mv examinedlifejournal NEW_PACKAGE_NAME
+git mv healthyselfjournal NEW_PACKAGE_NAME
 ```
 - [ ] Update imports, strings, and paths across repo using `sd` with preview then apply:
 ```bash
 # Preview everywhere
-sd -ps "examinedlifejournal" "NEW_PACKAGE_NAME" .
+sd -ps "healthyselfjournal" "NEW_PACKAGE_NAME" .
 # Apply
-sd -s "examinedlifejournal" "NEW_PACKAGE_NAME" .
+sd -s "healthyselfjournal" "NEW_PACKAGE_NAME" .
 ```
-- [ ] Update user-facing brand strings (panels, help text) from "Examined Life Journal" to the new brand using `sd` preview then apply.
+- [ ] Update user-facing brand strings (panels, help text) from "Healthy Self Journal" to the new brand using `sd` preview then apply.
 
-Acceptance: `rg NEW_PACKAGE_NAME` shows imports updated; no lingering `examinedlifejournal` imports.
+Acceptance: `rg NEW_PACKAGE_NAME` shows imports updated; no lingering `healthyselfjournal` imports.
 
 
 #### Stage: Update docs and examples
 - [ ] Replace CLI command and name in `docs/reference/*.md` and `README.md`:
-  - `examinedlifejournal` → NEW_CLI_NAME
-  - "Examined Life Journal" → New brand
+  - `healthyselfjournal` → NEW_CLI_NAME
+  - "Healthy Self Journal" → New brand
 - [ ] Update any code blocks and example commands.
 
-Acceptance: `rg -n "examinedlifejournal|Examined Life Journal" docs README.md` returns no results.
+Acceptance: `rg -n "healthyselfjournal|Healthy Self Journal" docs README.md` returns no results.
 
 
 #### Stage: Clean environment and verify locally
 - [ ] Remove build metadata and re-sync deps:
 ```bash
-rm -rf examinedlifejournal.egg-info
+rm -rf healthyselfjournal.egg-info
 uv sync --active
 ```
 - [ ] Run tests (offline set):
@@ -129,7 +129,7 @@ Acceptance: `pip install NEW_DIST_NAME` installs the new CLI name.
 #### Stage: Post-rename hygiene
 - [ ] Final sweep for stragglers:
 ```bash
-rg -n "examinedlifejournal|Examined Life Journal" .
+rg -n "healthyselfjournal|Healthy Self Journal" .
 ```
 - [ ] Update any external scripts or dotfiles that reference the old CLI.
 - [ ] Announce change in CHANGELOG / release notes (optional).

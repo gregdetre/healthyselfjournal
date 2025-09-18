@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from examinedlifejournal import transcription
-from examinedlifejournal.transcription import (
+from healthyselfjournal import transcription
+from healthyselfjournal.transcription import (
     AUTO_PRIVATE_BACKEND,
     CLOUD_BACKEND,
     LOCAL_FASTER_BACKEND,

@@ -153,7 +153,7 @@ def journal(
             stt_compute = os.environ.get("STT_COMPUTE", stt_compute)
         else:
             console.print(
-                "[red]Configuration incomplete.[/] Run [cyan]examinedlifejournal init[/] to get set up."
+                "[red]Configuration incomplete.[/] Run [cyan]healthyselfjournal init[/] to get set up."
             )
             raise typer.Exit(code=2)
 
@@ -276,7 +276,7 @@ def journal(
             console.print(
                 Panel.fit(
                     "No prior sessions found. Starting a new session.",
-                    title="Examined Life Journal",
+                    title="Healthy Self Journal",
                     border_style="magenta",
                 )
             )
@@ -300,7 +300,7 @@ def journal(
                     f"Resuming session {state.session_id}. Recording starts immediately.\n"
                     "Press any key to stop. Q saves then ends after this entry.\n\n"
                     "Tip: Say 'give me a question' to get a quick prompt from the built-in examples.",
-                    title="Examined Life Journal",
+                    title="Healthy Self Journal",
                     border_style="magenta",
                 )
             )
@@ -309,7 +309,7 @@ def journal(
             if pending:
                 console.print(
                     f"[yellow]{pending} recording(s) pending transcription.[/] "
-                    f"Run [cyan]examinedlifejournal reconcile --sessions-dir '{sessions_dir}'[/] to backfill."
+                    f"Run [cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/] to backfill."
                 )
     else:
         console.print(
@@ -317,7 +317,7 @@ def journal(
                 "Voice journaling session starting. Recording starts immediately.\n"
                 "Press any key to stop. Q saves then ends after this entry.\n\n"
                 "Tip: Say 'give me a question' to get a quick prompt from the built-in examples.",
-                title="Examined Life Journal",
+                title="Healthy Self Journal",
                 border_style="magenta",
             )
         )
@@ -327,7 +327,7 @@ def journal(
         if pending:
             console.print(
                 f"[yellow]{pending} recording(s) pending transcription.[/] "
-                f"Run [cyan]examinedlifejournal reconcile --sessions-dir '{sessions_dir}'[/] to backfill."
+                f"Run [cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/] to backfill."
             )
 
     try:
@@ -371,7 +371,7 @@ def journal(
                 console.print(
                     f"[red]Transcription failed:[/] {exc}\n"
                     "[yellow]Your audio was saved.[/] You can backfill later with: "
-                    "[cyan]examinedlifejournal reconcile --sessions-dir '{sessions_dir}'[/]"
+                    "[cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/]"
                 )
                 log_event(
                     "cli.error",
@@ -566,7 +566,7 @@ def journal(
             if pending:
                 console.print(
                     f"[yellow]{pending} recording(s) still pending transcription.[/] "
-                    f"Use [cyan]examinedlifejournal reconcile --sessions-dir '{sessions_dir}'[/] to process them."
+                    f"Use [cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/] to process them."
                 )
 
 
@@ -712,8 +712,8 @@ def _run_mic_check(selection, *, language: str, stt_formatting: str) -> None:
 def build_app() -> typer.Typer:
     """Build the Typer sub-app for `journal` with subcommands.
 
-    Invoking `examinedlifejournal journal` with no subcommand runs the interactive
-    journaling loop (default). `examinedlifejournal journal list` lists sessions.
+    Invoking `healthyselfjournal journal` with no subcommand runs the interactive
+    journaling loop (default). `healthyselfjournal journal list` lists sessions.
     """
 
     app = typer.Typer(
