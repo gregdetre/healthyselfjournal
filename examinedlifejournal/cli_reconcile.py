@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import contextlib
+import wave
 
 import typer
 from rich.console import Console
@@ -12,6 +14,7 @@ from .transcription import (
     resolve_backend_selection,
     create_transcription_backend,
 )
+from .audio import analyze_wav_shortness
 
 
 console = Console()
@@ -51,6 +54,16 @@ def reconcile(
         "--limit",
         help="Maximum number of recordings to reconcile (0 = no limit).",
     ),
+    min_duration: float = typer.Option(
+        0.1,
+        "--min-duration",
+        help="Minimum duration (seconds) to attempt transcription.",
+    ),
+    too_short_action: str = typer.Option(
+        "skip",
+        "--too-short",
+        help="Action for recordings under thresholds: skip, mark, or delete.",
+    ),
 ) -> None:
     """Backfill missing transcriptions for saved WAV files."""
 
@@ -85,6 +98,72 @@ def reconcile(
         stt_json = wav.with_suffix(".stt.json")
         if stt_json.exists():
             skipped += 1
+            continue
+        # Offline preflight: compute duration and voiced seconds; treat <min_duration or short-guard as too short
+        try:
+            duration_s, voiced_s, is_short = analyze_wav_shortness(
+                wav,
+                duration_threshold_seconds=max(
+                    min_duration, CONFIG.short_answer_duration_seconds
+                ),
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            duration_s, voiced_s, is_short = 0.0, 0.0, True
+        # Also guard against corrupt/zero-length WAVs via stdlib as a fallback
+        if duration_s <= 0.0:
+            with contextlib.suppress(Exception):
+                with wave.open(str(wav), "rb") as wf:
+                    frames = wf.getnframes()
+                    rate = wf.getframerate() or 1
+                    duration_s = frames / float(rate)
+            if duration_s <= 0.0:
+                is_short = True
+
+        if duration_s < min_duration or is_short:
+            action = (too_short_action or "skip").strip().lower()
+            if action not in {"skip", "mark", "delete"}:
+                action = "skip"
+            if action == "delete":
+                with contextlib.suppress(Exception):
+                    wav.unlink(missing_ok=True)
+                console.print(
+                    f"[yellow]Deleted too-short recording:[/] {wav.name} ({duration_s:.3f}s; voiced {voiced_s:.3f}s)"
+                )
+                processed += 1
+                if limit and processed >= limit:
+                    break
+                continue
+            if action == "mark":
+                try:
+                    payload = {
+                        "text": "",
+                        "meta": {
+                            "skipped_reason": "short_duration",
+                            "duration_seconds": round(duration_s, 3),
+                            "voiced_seconds": round(voiced_s, 3),
+                            "backend": selection.backend_id,
+                            "model": selection.model,
+                        },
+                    }
+                    _write_json_atomic(stt_json, payload)
+                    console.print(
+                        f"[yellow]Marked too-short recording (no STT):[/] {wav.name} ({duration_s:.3f}s; voiced {voiced_s:.3f}s)"
+                    )
+                except Exception:
+                    console.print(
+                        f"[yellow]Skipped too-short recording (failed to mark):[/] {wav.name} ({duration_s:.3f}s)"
+                    )
+                processed += 1
+                if limit and processed >= limit:
+                    break
+                continue
+            # Default: skip
+            console.print(
+                f"[yellow]Skipped too-short recording:[/] {wav.name} ({duration_s:.3f}s; voiced {voiced_s:.3f}s)"
+            )
+            processed += 1
+            if limit and processed >= limit:
+                break
             continue
         try:
             result = backend.transcribe(wav, language=language)
@@ -131,5 +210,3 @@ def _has_env(var_name: str) -> bool:
     import os
 
     return bool(os.environ.get(var_name))
-
-

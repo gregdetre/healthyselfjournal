@@ -57,6 +57,9 @@ def record_response(
     meter_refresh_hz: float = 20.0,
     ffmpeg_path: str | None = None,
     print_saved_message: bool = True,
+    convert_to_mp3: bool = True,
+    max_seconds: float | None = None,
+    enforce_short_answer_guard: bool = True,
 ) -> AudioCaptureResult:
     """Record audio until a keypress while updating a visual meter."""
 
@@ -233,6 +236,13 @@ def record_response(
                             live.update(message, refresh=True)
                             last_render = time.monotonic()
 
+                        # Auto-stop after a fixed duration if requested
+                        if (
+                            max_seconds is not None
+                            and (time.monotonic() - start_time) >= max_seconds
+                        ):
+                            stop_event.set()
+
                         if stop_event.is_set() and frames_queue.empty():
                             break
 
@@ -292,33 +302,36 @@ def record_response(
 
     # Short-answer auto-discard gating: skip saving/transcribing if likely accidental
     discarded_short = False
-    if (
-        duration_sec <= CONFIG.short_answer_duration_seconds
-        and voiced_seconds <= CONFIG.short_answer_voiced_seconds
-    ):
-        # Treat as noise/accidental: delete wav and do not convert to mp3
-        wav_path.unlink(missing_ok=True)
-        discarded_short = True
-        console.print(Text("Very short answer detected; discarded.", style="yellow"))
-        log_event(
-            "audio.record.discarded_short",
-            {
-                "wav": wav_path.name,
-                "duration_seconds": round(duration_sec, 2),
-                "voiced_seconds": round(voiced_seconds, 2),
-                "threshold_duration": CONFIG.short_answer_duration_seconds,
-                "threshold_voiced": CONFIG.short_answer_voiced_seconds,
-            },
-        )
-        return AudioCaptureResult(
-            wav_path=wav_path,
-            mp3_path=None,
-            duration_seconds=duration_sec,
-            voiced_seconds=voiced_seconds,
-            cancelled=False,
-            quit_after=quit_flag.is_set(),
-            discarded_short_answer=True,
-        )
+    if enforce_short_answer_guard:
+        if (
+            duration_sec <= CONFIG.short_answer_duration_seconds
+            and voiced_seconds <= CONFIG.short_answer_voiced_seconds
+        ):
+            # Treat as noise/accidental: delete wav and do not convert to mp3
+            wav_path.unlink(missing_ok=True)
+            discarded_short = True
+            console.print(
+                Text("Very short answer detected; discarded.", style="yellow")
+            )
+            log_event(
+                "audio.record.discarded_short",
+                {
+                    "wav": wav_path.name,
+                    "duration_seconds": round(duration_sec, 2),
+                    "voiced_seconds": round(voiced_seconds, 2),
+                    "threshold_duration": CONFIG.short_answer_duration_seconds,
+                    "threshold_voiced": CONFIG.short_answer_voiced_seconds,
+                },
+            )
+            return AudioCaptureResult(
+                wav_path=wav_path,
+                mp3_path=None,
+                duration_seconds=duration_sec,
+                voiced_seconds=voiced_seconds,
+                cancelled=False,
+                quit_after=quit_flag.is_set(),
+                discarded_short_answer=True,
+            )
 
     # Lightweight post-processing: trim leading/trailing silence and attenuate peaks
     try:
@@ -329,10 +342,12 @@ def record_response(
         # Fail-safe: never block the flow due to post-processing issues
         _LOGGER.debug("Post-processing skipped due to error", exc_info=True)
 
-    mp3_path = _maybe_start_mp3_conversion(
-        wav_path,
-        ffmpeg_path=ffmpeg_path,
-    )
+    mp3_path = None
+    if convert_to_mp3:
+        mp3_path = _maybe_start_mp3_conversion(
+            wav_path,
+            ffmpeg_path=ffmpeg_path,
+        )
 
     if print_saved_message:
         console.print(
@@ -605,3 +620,92 @@ def _postprocess_wav_simple(wav_path: Path, input_sample_rate: int) -> Optional[
         pass
 
     return len(trimmed) / float(sr)
+
+
+def analyze_wav_shortness(
+    wav_path: Path,
+    *,
+    window_seconds: float = 0.02,
+    rms_threshold_dbfs: float | None = None,
+    duration_threshold_seconds: float | None = None,
+    voiced_threshold_seconds: float | None = None,
+) -> tuple[float, float, bool]:
+    """Analyze a WAV to estimate total and voiced duration and apply short-answer guard.
+
+    Returns a tuple: (duration_seconds, voiced_seconds, is_short_by_guard).
+
+    - Uses the same voiced detection logic (RMS vs dBFS threshold) as live capture
+      to approximate "voiced" time from saved audio.
+    - Threshold defaults are sourced from CONFIG when not provided.
+    """
+    try:
+        audio, sr = sf.read(wav_path, dtype="float32", always_2d=False)
+    except Exception:
+        # Fallback: try to compute duration only via stdlib wave module
+        try:
+            import wave
+
+            with wave.open(str(wav_path), "rb") as wf:
+                frames = wf.getnframes()
+                rate = wf.getframerate() or 1
+                duration_only = frames / float(rate)
+            # Without samples we cannot approximate voiced_seconds
+            voiced_only = 0.0
+            # Guard decision based solely on duration threshold if available
+            dur_th = (
+                duration_threshold_seconds
+                if duration_threshold_seconds is not None
+                else CONFIG.short_answer_duration_seconds
+            )
+            is_short = duration_only <= dur_th
+            return duration_only, voiced_only, is_short
+        except Exception:
+            # As a last resort, treat as zero-length
+            return 0.0, 0.0, True
+
+    # Downmix defensively if multi-channel
+    if getattr(audio, "ndim", 1) == 2:
+        try:
+            audio = audio.mean(axis=1)
+        except Exception:
+            audio = np.ascontiguousarray(audio[:, 0])
+
+    total_samples = int(getattr(audio, "shape", (0,))[0])
+    if total_samples <= 0 or sr <= 0:
+        return 0.0, 0.0, True
+
+    duration_seconds = total_samples / float(sr)
+
+    # Windowed RMS to approximate voiced seconds
+    window_samples = max(1, int(sr * max(0.005, float(window_seconds))))
+    threshold_dbfs = (
+        rms_threshold_dbfs
+        if rms_threshold_dbfs is not None
+        else CONFIG.voice_rms_dbfs_threshold
+    )
+
+    voiced_seconds = 0.0
+    # Iterate in non-overlapping windows; tail may be shorter
+    for start in range(0, total_samples, window_samples):
+        end = min(start + window_samples, total_samples)
+        chunk = audio[start:end]
+        if chunk.size == 0:
+            continue
+        rms_value = float(np.sqrt(np.mean(np.square(chunk), dtype=np.float64)))
+        if _rms_above_threshold(rms_value, threshold_dbfs):
+            voiced_seconds += (end - start) / float(sr)
+
+    # Apply the same guard semantics as in live capture
+    dur_th = (
+        duration_threshold_seconds
+        if duration_threshold_seconds is not None
+        else CONFIG.short_answer_duration_seconds
+    )
+    voice_th = (
+        voiced_threshold_seconds
+        if voiced_threshold_seconds is not None
+        else CONFIG.short_answer_voiced_seconds
+    )
+    is_short = duration_seconds <= dur_th and voiced_seconds <= voice_th
+
+    return duration_seconds, voiced_seconds, is_short
