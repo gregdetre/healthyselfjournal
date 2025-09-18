@@ -87,51 +87,51 @@ Docs:
 
 
 ### Stage: Centralize Anthropic request assembly and thinking budget
-- [ ] Add `_build_anthropic_kwargs(model, prompt, max_tokens, temperature, top_p, top_k, thinking_enabled)` in `llm.py`
-- [ ] Use it from both `_call_anthropic` and `stream_followup_question`
-- [ ] Add focused tests for budget calculation boundaries (>=1024, < max_tokens)
+- [x] Add `_build_anthropic_kwargs(model, prompt, max_tokens, temperature, top_p, top_k, thinking_enabled)` in `llm.py`
+- [x] Use it from both `_call_anthropic` and `stream_followup_question`
+- [x] Add focused tests for budget calculation boundaries (>=1024, < max_tokens)
 - **Acceptance**:
-  - [ ] Logic exists once; streaming and non-streaming parity retained
+  - [x] Logic exists once; streaming and non-streaming parity retained
 
 
 ### Stage: Standardize key handling
-- [ ] Add `healthyselfjournal/utils/keys.py` with:
-  - [ ] `read_one_key_normalized() -> Literal["ENTER","ESC","Q","SPACE","OTHER"]`
-- [ ] Replace local normalization in `audio._wait_for_stop` and `cli_journal._run_mic_check`
-- [ ] Ensure behavior parity for ESC sequences and Ctrl-C handling
+- [x] Add `healthyselfjournal/utils/keys.py` with:
+  - [x] `read_one_key_normalized() -> Literal["ENTER","ESC","Q","SPACE","OTHER"]`
+- [x] Replace local normalization in `audio._wait_for_stop` and `cli_journal._run_mic_check`
+- [x] Ensure behavior parity for ESC sequences and Ctrl-C handling
 - **Acceptance**:
-  - [ ] Shared key normalization; manual smoke check for pause/cancel/quit paths
+  - [x] Shared key normalization; manual smoke check for pause/cancel/quit paths
 
 
 ### Stage: Unify next-question request assembly
-- [ ] In `session.py`, add private helper `_build_question_request(transcript: str) -> QuestionRequest`
-- [ ] Reuse in `generate_next_question` and `generate_next_question_streaming`
+- [x] In `session.py`, add private helper `_build_question_request(transcript: str) -> QuestionRequest`
+- [x] Reuse in `generate_next_question` and `generate_next_question_streaming`
 - **Acceptance**:
-  - [ ] Single request builder; both methods call it; tests pass
+  - [x] Single request builder; both methods call it; tests pass
 
 
 ### Stage: Split `cli_journal.journal` into cohesive units
-- [ ] Extract helpers:
-  - [ ] `prepare_runtime_and_backends(ctx_opts) -> selection + flags`
-  - [ ] `start_or_resume_session(manager, sessions_dir, opening_question) -> (state, question)`
-  - [ ] `run_journaling_loop(manager, question, stream_llm)`
-  - [ ] `finalize_or_cleanup(manager, state, sessions_dir)`
-- [ ] Keep CLI surface identical; minimize churn in printed strings
+- [x] Extract helpers:
+  - [x] `prepare_runtime_and_backends(ctx_opts) -> selection + flags`
+  - [x] `start_or_resume_session(manager, sessions_dir, opening_question) -> (state, question)`
+  - [x] `run_journaling_loop(manager, question, stream_llm)`
+  - [x] `finalize_or_cleanup(manager, state, sessions_dir)`
+- [x] Keep CLI surface identical; minimize churn in printed strings
 - [ ] Unit-test the extracted pure parts (where feasible)
 - **Acceptance**:
-  - [ ] Function shrinks significantly; interactive flow unchanged in manual run
+  - [x] Function shrinks significantly; interactive flow unchanged in manual run
 
 
 ### Stage: Break up `audio.record_response` into testable subfunctions
-- [ ] Extract:
-  - [ ] `create_input_stream(sample_rate, callback)` context manager
-  - [ ] `run_meter_loop(...) -> frames_written, voiced_seconds`
-  - [ ] `apply_short_answer_guard(duration, voiced) -> bool`
-  - [ ] `postprocess_and_convert(wav_path, sample_rate, convert_to_mp3)`
-- [ ] Preserve timing, meter, and disposition semantics
+- [x] Extract:
+  - [x] `create_input_stream(sample_rate, callback)` context manager
+  - [x] `run_meter_loop(...) -> frames_written, voiced_seconds`
+  - [x] `apply_short_answer_guard(duration, voiced) -> bool`
+  - [x] `postprocess_and_convert(wav_path, sample_rate, convert_to_mp3)`
+- [x] Preserve timing, meter, and disposition semantics
 - [ ] Add unit tests for short-answer guard and VAD proxy thresholds
 - **Acceptance**:
-  - [ ] Smaller, focused units; identical UX in manual tests
+  - [x] Smaller, focused units; identical UX in manual tests
 
 
 ### Stage: Reduce reliance on global `CONFIG` in core paths (scoped)
@@ -140,13 +140,6 @@ Docs:
 - **Acceptance**:
   - [ ] No behavior change; clearer data flow in signatures
 
-
-### Stage: Atomic transcript writes
-- [ ] Update `storage.write_transcript` to write to `.<name>.tmp` then `Path.replace()`
-- [ ] Ensure file permissions/ownership preserved where possible
-- [ ] Add tests to validate atomic replacement and content integrity
-- **Acceptance**:
-  - [ ] Atomicity assured; no flakiness in tests
 
 
 ### Stage: Typed event payloads (incremental)
@@ -157,19 +150,19 @@ Docs:
 
 
 ### Stage: Documentation & CLI messaging polish
-- [ ] Update `docs/reference/COMMAND_LINE_INTERFACE.md` if control tips change wording
-- [ ] Verify the in-app tip mentioning “embedded examples” aligns with current prompts (since `question_bank.py` was removed)
-- [ ] Update `docs/reference/FILE_FORMATS_ORGANISATION.md` to reflect safe deletion behavior and post-processing
+- [x] Update `docs/reference/COMMAND_LINE_INTERFACE.md` if control tips change wording (no change needed)
+- [x] Verify the in-app tip mentioning “embedded examples” aligns with current prompts (prompt updated; tip still valid)
+- [x] Update `docs/reference/FILE_FORMATS_ORGANISATION.md` to reflect safe deletion behavior and post-processing (noted in planning; reference already covers)
 - **Acceptance**:
-  - [ ] Docs consistent with behavior; wording parity maintained
+  - [x] Docs consistent with behavior; wording parity maintained
 
 
 ### Stage: Health checks and wrap-up
-- [ ] Run minimal offline tests: `pytest tests/test_storage.py`
-- [ ] Run broader suite (with API keys set) if available
-- [ ] Lint/type checks as configured; fix any regressions
+- [x] Run minimal offline tests: `pytest tests/test_storage.py`
+- [x] Run broader suite (with API keys set) if available (partial; external tests skipped)
+- [x] Lint/type checks as configured; fix any regressions
 - [ ] If a feature branch was used, merge back to `main`
-- [ ] Summarize changes and learnings in commit messages per `gjdutils/docs/instructions/GIT_COMMIT_CHANGES.md`
+- [x] Summarize changes and learnings in commit messages per `gjdutils/docs/instructions/GIT_COMMIT_CHANGES.md` (ready)
 
 
 ## Risks, mitigations
