@@ -59,9 +59,10 @@ Quit requested. Ending session after summary update.
 
 - Python 3.12+
 - `ffmpeg` on `PATH` (optional, for background MP3 conversion)
-- Environment variables:
-  - `OPENAI_API_KEY` – voice transcription
-  - `ANTHROPIC_API_KEY` – question/summary generation
+- Environment variables (set according to the backends you use):
+  - `OPENAI_API_KEY` – required for OpenAI speech-to-text or TTS features.
+  - `ANTHROPIC_API_KEY` – required only when using `anthropic:*` models for questions/summaries (cloud default).
+  - `OLLAMA_BASE_URL` – optional override when running local `ollama:*` models (defaults to `http://localhost:11434`).
 
 ## Setup
 
@@ -87,6 +88,12 @@ examinedlifejournal journal
 # or uvx (no install needed)
 uvx examinedlifejournal -- init
 uvx examinedlifejournal -- journal
+```
+
+To run the dialogue loop fully offline, install Ollama + Gemma (see `docs/reference/OLLAMA_GEMMA_DEPLOYMENT_GUIDE.md`), ensure the daemon is running, then start the CLI with:
+
+```bash
+examinedlifejournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M
 ```
 
 Notes:

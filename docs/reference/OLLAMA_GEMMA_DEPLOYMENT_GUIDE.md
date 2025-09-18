@@ -16,10 +16,10 @@ Ollama is an open-source platform for running Large Language Models (LLMs) local
 - **Model Management**: Easy model pulling, quantization support, automatic memory management
 
 ### Gemma 3 27B Advantages (2025)
-- **Superior Performance**: Outperforms Llama 3 405B and Qwen2.5-70B despite being smaller
+- **Strong Performance**: Competitive with larger models on several public benchmarks
 - **Memory Efficiency**: Q4 quantization reduces from 54GB to 14.1GB with minimal quality loss
 - **QAT Technology**: 54% less perplexity drop with quantization vs standard approaches
-- **Practical Size**: Fits comfortably in 24GB VRAM with room to spare
+- **Practical Size**: Fits within ~14GB VRAM at Q4 on 24GB cards; keep headroom for system use
 
 ## Platform-Specific Installation
 
@@ -37,13 +37,12 @@ brew install ollama
 #### Key Features
 - **Automatic Metal acceleration**: Up to 40% better performance vs x86 emulation
 - **Unified Memory Architecture**: Leverages Apple's shared memory design
-- **Neural Engine support**: Dedicated ML hardware acceleration
 - **No configuration needed**: GPU acceleration works out of the box
 
 #### Performance Expectations
-- Base M1 (8GB): Can run 3B models, ~40 tokens/s
-- M3 (24GB): Comfortably runs Gemma 3 27B Q4, ~50-70 tokens/s
-- M2/M3 Ultra (64GB+): Can run 110B parameter models with 4-bit quantization
+- Base M1 (8GB): Suitable for 3–7B quantized models; speed varies by context
+- M3 (24GB): Can run Gemma 3 27B Q4; throughput depends on context/quantization
+- M2/M3 Ultra (64GB+): Larger 70–110B 4‑bit models are possible with caveats
 
 #### Verification
 ```bash
@@ -59,7 +58,7 @@ OLLAMA_DEBUG=1 ollama serve
 #### Prerequisites
 - NVIDIA GPU with compute capability 5.0+ (check [NVIDIA docs](https://developer.nvidia.com/cuda-gpus))
 - Latest NVIDIA drivers (version 560+)
-- CUDA Toolkit 11.8+ (for GPU acceleration)
+- (Optional) CUDA Toolkit 11.8+ for developer tooling; not required for Ollama runtime
 
 #### Installation
 ```powershell
@@ -178,11 +177,7 @@ ollama pull gemma3:4b-instruct-q4_K_M   # 2.6GB
 
 #### 1. High VRAM Usage
 - **Problem**: Unusually high VRAM consumption vs similar models
-- **Solution**:
-  ```bash
-  export OLLAMA_FLASH_ATTENTION=1
-  export OLLAMA_KV_CACHE_TYPE=q8_0
-  ```
+- **Solution**: Prefer smaller context (`num_ctx`), lighter quantization (Q2_K), or batch size reductions via request options.
 
 #### 2. Random Crashes
 - **Problem**: Gemma3:27b crashes randomly while other models work
@@ -190,11 +185,8 @@ ollama pull gemma3:4b-instruct-q4_K_M   # 2.6GB
 - **Alternative**: Use Gemma 2 27B or Qwen2.5 32B
 
 #### 3. Incorrect Model Size Detection (v0.7)
-- **Problem**: Reports 26GB instead of 24GB, fewer GPU layers
-- **Solution**: Manually set GPU layers:
-  ```bash
-  export OLLAMA_GPU_LAYERS=62
-  ```
+- **Problem**: Reports unexpected size or GPU layer mapping
+- **Solution**: Use supported request options (e.g., `num_gpu`, `main_gpu`) if available in your Ollama version; otherwise prefer updated Ollama versions.
 
 #### 4. Poor Long Context Performance
 - **Problem**: Model loses track with contexts >48K tokens
@@ -205,11 +197,7 @@ ollama pull gemma3:4b-instruct-q4_K_M   # 2.6GB
 
 #### 5. Segmentation Violations
 - **Problem**: SIGSEGV after multiple API calls
-- **Solution**: Implement retry logic, consider memory limits:
-  ```bash
-  export OLLAMA_MAX_MEMORY=32g
-  export OLLAMA_GPU_MEMORY=16g
-  ```
+- **Solution**: Add retries/backoff and reduce memory pressure (`num_ctx`, `num_batch`); upgrade Ollama.
 
 ### Platform-Specific Gotchas
 
@@ -324,17 +312,51 @@ response = client.chat(
 )
 ```
 
+### CLI configuration
+
+- Run the journaling loop with the local model:
+  ```bash
+  examinedlifejournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M
+  ```
+- Override the Ollama host/port if it differs from the default:
+  ```bash
+  export OLLAMA_BASE_URL=http://localhost:11434
+  ```
+- Omit `--llm-model` (or use `anthropic:*`) to switch back to the Claude default.
+
+#### App Quickstart (Examined Life Journal)
+
+```bash
+# 1) Install and start Ollama, pull a model
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull gemma3:27b-instruct-q4_K_M
+
+# 2) Verify the model runs
+ollama run gemma3:27b-instruct-q4_K_M "Hello"
+
+# 3) Run the app locally with the Ollama model
+examinedlifejournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M
+
+# (Optional) If Ollama is not on the default host/port
+export OLLAMA_BASE_URL=http://localhost:11434
+```
+
+Note: “thinking” mode is not supported for `ollama:*` models in this app. Use the suffix only with `anthropic:*` models.
+
 ## Performance Optimization
 
-### Memory Management
-```bash
-# Set memory limits
-export OLLAMA_MAX_MEMORY=24g      # System RAM limit
-export OLLAMA_GPU_MEMORY=20g      # VRAM limit
-export OLLAMA_GPU_MEMORY_FRACTION=0.8  # Use 80% of VRAM
+> Quality vs speed: Quality improves with higher precision quantization, larger `num_ctx`, and less aggressive sampling; speed improves with smaller context, lower precision quantization, and tighter sampling (lower `top_k`, lower `temperature`). Balance these per your hardware and UX goals.
 
-# Enable new memory estimator (2025)
-export OLLAMA_NEW_ESTIMATES=1
+### Memory and Throughput (via options)
+```python
+# Adjust using per-request options instead of env vars
+options = {
+  "num_ctx": 8192,
+  "num_batch": 256,
+  "temperature": 0.7,
+  "top_p": 0.95,
+  "repeat_penalty": 1.1
+}
 ```
 
 ### Context Window Tuning
@@ -343,9 +365,8 @@ export OLLAMA_NEW_ESTIMATES=1
 options = {
     "num_ctx": 8192,        # Reasonable context
     "num_batch": 512,       # Larger batches
-    "num_gpu": 62,         # Max GPU layers for 27B
-    "main_gpu": 0,         # Primary GPU
-    "low_vram": False      # Full GPU usage
+    "num_gpu": 62,         # If supported for your version
+    "main_gpu": 0          # If multi-GPU
 }
 
 # For quick responses (prioritize speed)
@@ -353,7 +374,7 @@ options = {
     "num_ctx": 2048,       # Smaller context
     "num_batch": 128,      # Smaller batches
     "temperature": 0.5,    # Less randomness
-    "top_k": 10           # Limit token choices
+    "top_k": 10            # Limit token choices
 }
 ```
 
@@ -464,3 +485,81 @@ ollama<0.4.0           # Breaking changes with newer models
 ---
 
 *This guide focuses on practical deployment with emphasis on Apple Silicon as the primary platform, while providing comprehensive coverage for Windows and Linux environments. Regular updates recommended as Ollama and Gemma models evolve rapidly.*
+
+## Appendix: Review/Critique (Verbatim)
+
+I reviewed the guide alongside our code and current Ollama usage. Here are concise, high‑impact corrections and improvements.
+
+### Critical factual corrections
+- Neural Engine claim (macOS): Ollama uses Metal (GPU) on Apple Silicon; it does not use the Apple Neural Engine. Remove “Neural Engine support.”
+- Benchmark claim: “Gemma 3 27B outperforms Llama 3 405B” is not credible; please remove or soften with a reputable citation (e.g., “competitive with larger models on select tasks”) and link to benchmarks.
+- Windows CUDA toolkit: Installing the full CUDA Toolkit isn’t strictly required to run Ollama; up‑to‑date NVIDIA drivers are generally sufficient. Rephrase to “Install latest NVIDIA driver; CUDA Toolkit optional unless you need dev tools.”
+- Env vars listed as tuning knobs:
+  - Unverified/likely unsupported: `OLLAMA_FLASH_ATTENTION`, `OLLAMA_KV_CACHE_TYPE`, `OLLAMA_GPU_LAYERS`, `OLLAMA_MAX_MEMORY`, `OLLAMA_GPU_MEMORY`, `OLLAMA_GPU_MEMORY_FRACTION`, `OLLAMA_NEW_ESTIMATES`. Prefer request “options” (per API) and/or Modelfile settings instead of env vars. Keep only documented server env vars like `OLLAMA_HOST`, `OLLAMA_MODELS`, `OLLAMA_ORIGINS`, `OLLAMA_NUM_PARALLEL`, `OLLAMA_MAX_LOADED_MODELS`, `OLLAMA_KEEP_ALIVE` (verify against the official docs you cite).
+- GPU layers vs options: The guide sets both `OLLAMA_GPU_LAYERS=62` and JSON `options={"num_gpu": 62}`. Drop the env var and keep the API option (or whichever the current Ollama docs endorse). Keep the naming consistent (“num_gpu” or “gpu_layers,” per current API docs).
+- KV cache type: Setting KV cache quantization via env var is not a documented Ollama interface. Remove or replace with officially supported options/modelfile guidance.
+- Context claims: If you state limitations like “>48K tokens degrades,” add a source and match the model’s actual context length for the specific Gemma 3 tag you recommend.
+
+### Align with our app (examinedlifejournal) behavior
+- Officially supported env for our app:
+  - We read only `OLLAMA_BASE_URL`, `OLLAMA_NUM_CTX`, `OLLAMA_TIMEOUT_SECONDS`. The other env vars in the guide won’t affect our app’s behavior.
+- CLI usage in our app is correct as documented:
+  - `examinedlifejournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M`
+  - To switch hosts, set `OLLAMA_BASE_URL` (defaults to `http://localhost:11434`).
+- Provider capabilities:
+  - “Thinking” mode is not supported for `ollama:*` in our code. Add a note: only Anthropic supports the `:thinking` suffix; using it with Ollama will error.
+- Options we send to Ollama:
+  - We set `num_ctx` from `OLLAMA_NUM_CTX` and pass common decoding knobs (temperature/top_p/top_k). If the guide lists additional options (mirostat, repeat_penalty, etc.), call them “optional tunings; not all are set by default in this app.”
+- Python examples:
+  - Keep the “Direct REST API” example; that matches our implementation. Mark the official `ollama` Python library example as an alternative approach (we don’t depend on it).
+
+### Tone and scope adjustments
+- Performance numbers: Replace specific tokens/sec claims with ranges + caveats (model quantization, context, system load, Ollama version), and/or provide a brief table with “approximate” labels and a link to a benchmark.
+- Model sizes and memory: Keep the Q4_K_M size guidance, but say “fits within memory” rather than promising “room to spare,” and note that unified memory pressure can still impact stability.
+- Platform notes:
+  - macOS Docker: keeping “no GPU accel in Docker” is correct; emphasize “run natively.”
+  - Windows: keep “WSL GPU passthrough issues” caution, but clarify that native Windows is preferred.
+  - Linux AMD: keep ROCm caveats; suggest checking Ollama issues for current support status.
+
+### Safer replacements (suggested text swaps)
+- Replace the env‑var tuning block with API options:
+```bash
+# Instead of env vars, adjust per-request options in your client:
+# Examples (choose those supported by your Ollama version/model):
+options = {
+  "num_ctx": 8192,
+  "num_predict": 512,
+  "temperature": 0.7,
+  "top_p": 0.95,
+  "top_k": 40,
+  "repeat_penalty": 1.1,
+  "repeat_last_n": 64,
+  "mirostat": 2,
+  "mirostat_tau": 5.0,
+  "num_gpu": 62,     # if supported for your model/GPU
+  "main_gpu": 0,     # multi-GPU setups only
+  "low_vram": false  # if supported and needed
+}
+```
+- Keep only documented server env vars:
+```bash
+# Common server env vars
+export OLLAMA_HOST=0.0.0.0:11434
+# Optional (verify with docs): OLLAMA_MODELS, OLLAMA_ORIGINS, OLLAMA_NUM_PARALLEL, OLLAMA_MAX_LOADED_MODELS, OLLAMA_KEEP_ALIVE
+```
+- Remove “Neural Engine support.” Reword Apple Silicon section to emphasize Metal acceleration and unified memory.
+
+### Small nits/clarity
+- Add a “Quickstart for this app” box showing:
+  - Install/run Ollama; pull model; verify with `ollama run`; export `OLLAMA_BASE_URL` if not default; run our CLI with `--llm-model ollama:...`.
+- Add a short “What affects quality vs speed?” sidebar to set expectations (quantization, context length, batch size).
+- Pin model tags in examples (e.g., `gemma3:27b-instruct-q4_K_M@<digest>` if you want true reproducibility).
+
+### What I checked against code
+- Our app uses REST `/api/chat`, sets `num_ctx`, and honors `OLLAMA_BASE_URL/NUM_CTX/TIMEOUT` only.
+- `--llm-model` provider parsing is consistent with documentation; thinking mode rejected for Ollama.
+- README/CLI docs already reference this guide and the `--llm-model` switch correctly.
+
+If you’d like, I can apply these edits directly in the guide and add a small “App Quickstart” section.
+
+- I reviewed the guide against our code paths in `examinedlifejournal/llm.py`, `examinedlifejournal/config.py`, and `examinedlifejournal/cli_journal.py`. The main risks are the unsupported env vars and a couple of overconfident performance claims.

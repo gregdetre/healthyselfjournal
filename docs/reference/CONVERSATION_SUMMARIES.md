@@ -47,4 +47,4 @@ uv run examinedlifejournal summaries backfill --sessions-dir ./sessions --all
 
 Notes:
 - Uses the same prompt and recent-history context as the live flow.
-- Requires `ANTHROPIC_API_KEY`.
+- Requires `ANTHROPIC_API_KEY` only when the chosen `--llm-model` uses the Anthropic provider; local `ollama:*` models run offline (ensure the Ollama daemon is available).

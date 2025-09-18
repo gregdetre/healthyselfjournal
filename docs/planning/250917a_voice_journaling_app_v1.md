@@ -29,12 +29,6 @@ Core requirements:
 - Include current session + recent summaries in context
 - Transparent mode switching based on emotional context
 
-## Progress Update (2025-02-16)
-
-- Core CLI, session manager, and audio/transcription/LLM pipelines wired end-to-end; recordings persist immediately with optional MP3 conversion.
-- YAML frontmatter now holds rolling summaries, audio metadata, and recent-session context; summary regeneration happens after every exchange.
-- README/TESTING docs refreshed and initial pytest coverage in place for storage/history helpers.
-- Still to do: broaden automated tests (audio/session flow, LLM integration), verify ffmpeg/device enumeration on target machines, document/example transcript, and run a full E2E session.
 
 ## Decisions and constraints (V1)
 
@@ -103,6 +97,7 @@ Decision (V1): Soft reminder at ~20 minutes based on research; no automated brea
   - `FFMPEG_PATH` (optional override)
   - `RETRY_MAX_ATTEMPTS`, `RETRY_BACKOFF_BASE_MS`
 - [ ] Read `/Users/greg/dev/spideryarn/reading/docs/reference/LLM_MODEL_CONFIGURATION.md` and align with the model string scheme.
+- [x] Add Ollama configuration knobs (`OLLAMA_BASE_URL`, timeout, context) and provider-aware env handling for local models.
 
 ### Stage: Basic audio recording with visual feedback
 - [ ] Write test for audio recording functionality

@@ -61,7 +61,7 @@ uv run --active examinedlifejournal journal --voice-mode
 ```
 
 - Environment:
-  - `ANTHROPIC_API_KEY` – always required for dialogue/summaries.
+  - `ANTHROPIC_API_KEY` – required when the journaling loop uses `anthropic:*` models (default cloud mode).
   - `OPENAI_API_KEY` – required when `--voice-mode` is enabled (OpenAI TTS) and when `--stt-backend cloud-openai`.
 
 - Format selection:
@@ -114,5 +114,4 @@ uv run --active examinedlifejournal journal --voice-mode
 - `tts_model = "gpt-4o-mini-tts"`
 - `tts_voice = "shimmer"`
 - `tts_format = "wav"`
-
 

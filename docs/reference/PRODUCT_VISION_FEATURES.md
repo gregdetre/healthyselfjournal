@@ -10,6 +10,7 @@ A command-line journaling app using voice input to lower friction and dialogue-b
 - `DIALOGUE_FLOW.md` - Question sequencing and session management
 - `FILE_FORMATS_ORGANISATION.md` - Storage structure for audio and transcripts
 - `LLM_PROMPT_TEMPLATES.md` - Jinja templates for adaptive questioning
+- `PRIVACY.md` - Privacy, local-first data handling, and network boundaries
 - `../conversations/250117a_journaling_app_ui_technical_decisions.md` - Technical decisions
 - `../conversations/250916a_journaling_app_dialogue_design.md` - Dialogue design rationale
 - `../research/JOURNALLING_SCIENTIFIC_EVIDENCE_RESEARCH.md` - Evidence base

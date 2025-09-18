@@ -36,7 +36,7 @@ This document describes the initialization flow for non‑technical users. The `
 
 Auto‑init triggers at the start of `journal` when running in a TTY if either condition holds:
 
-- `ANTHROPIC_API_KEY` is missing (required for LLM questions), or
+- `ANTHROPIC_API_KEY` is missing (required for the default Anthropic LLM), or
 - STT backend resolves to `cloud-openai` and `OPENAI_API_KEY` is missing.
 
 If stdin is not a TTY, the CLI aborts with instructions to run `examinedlifejournal init`.
@@ -52,7 +52,7 @@ Notes:
    - Privacy mode (experimental): attempts on‑device STT (`auto-private`).
 
 2) Keys
-   - Anthropic API key (required): the wizard opens `https://console.anthropic.com/settings/api-keys` in your browser; after you create a key and copy it, press Enter. It will try to read your clipboard automatically; if not present, you can paste into a masked prompt. The key is validated via a lightweight models listing call.
+   - Anthropic API key (required for Cloud mode; optional if you intend to use a local `ollama:*` model): the wizard opens `https://console.anthropic.com/settings/api-keys` in your browser; after you create a key and copy it, press Enter. It will try to read your clipboard automatically; if not present, you can paste into a masked prompt. The key is validated via a lightweight models listing call.
    - OpenAI API key (required for Cloud mode; optional/unused for Privacy mode): similarly, the wizard opens `https://platform.openai.com/api-keys`, attempts clipboard capture, falls back to masked paste, and validates with a lightweight models listing call.
 
 3) Sessions directory
@@ -87,6 +87,7 @@ Notes:
 - Privacy mode (experimental)
   - Tries local backends via `auto-private` (prefers `mlx-whisper` on Apple Silicon, then `faster-whisper`, then `whispercpp`).
   - If no local backend is available, running `journal` with `auto-private` will raise a helpful error; users can switch to Cloud mode or install local extras.
+  - Combine with `--llm-model ollama:...` (and a running Ollama daemon) to keep dialogue offline.
 
 ### Smoke test details
 
@@ -111,4 +112,3 @@ Notes:
 - Add `doctor` command to run comprehensive diagnostics (keys, audio, ffmpeg, local backends).
 - Add `demo` command for an offline, no‑keys quick tour.
 - Package extras to simplify local STT installs (e.g., `[local-macos]`, `[local]`).
-

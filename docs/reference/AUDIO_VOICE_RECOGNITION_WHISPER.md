@@ -65,7 +65,7 @@ uv add whispercpp
 
 Environment requirements:
 
-- `journal`: always requires `ANTHROPIC_API_KEY` (dialogue and summaries). `OPENAI_API_KEY` is only required when `--stt-backend cloud-openai` is selected.
+- `journal`: requires `ANTHROPIC_API_KEY` when the LLM provider is `anthropic:*` (default cloud mode). Local `ollama:*` models keep dialogue/summaries offline. `OPENAI_API_KEY` is still needed only when `--stt-backend cloud-openai` is selected.
 - `reconcile`: requires `OPENAI_API_KEY` only when `--stt-backend cloud-openai` is selected. Local backends run fully offline if their dependencies are installed.
 
 ### Formatting behaviour
