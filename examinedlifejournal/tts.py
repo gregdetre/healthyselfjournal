@@ -8,6 +8,8 @@ Default backend uses OpenAI TTS and plays back via a local audio player
 
 from dataclasses import dataclass
 import os
+import sys
+import select
 import shutil
 import subprocess
 import tempfile
@@ -234,16 +236,82 @@ def _play_audio_bytes(data: bytes, *, file_ext: str = "wav") -> None:
 
     # Try afplay first (macOS), then ffplay (ffmpeg)
     try:
+
+        def _play_with_enter_skip(cmd: list[str]) -> None:
+            """Run player command and allow skipping on ENTER when in a TTY.
+
+            - Spawns the player as a subprocess and waits for completion.
+            - If stdin is a TTY, polls for an ENTER (\n or \r); on detection, terminates playback early.
+            - Silences player stdout/stderr to keep the UI clean.
+            """
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception as e:
+                raise TTSError(f"Failed to start audio player: {e}") from e
+
+            player_name = os.path.basename(cmd[0]) if cmd else "player"
+
+            if hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
+                # Poll stdin for ENTER while the player is running
+                try:
+                    while proc.poll() is None:
+                        try:
+                            rlist, _, _ = select.select([sys.stdin], [], [], 0.05)
+                        except Exception:
+                            # If select() isn't available, fall back to blocking wait
+                            proc.wait()
+                            break
+                        if rlist:
+                            try:
+                                ch = sys.stdin.read(1)
+                            except Exception:
+                                ch = ""
+                            if ch in ("\n", "\r"):
+                                try:
+                                    proc.terminate()
+                                except Exception:
+                                    try:
+                                        proc.kill()
+                                    except Exception:
+                                        pass
+                                log_event(
+                                    "tts.skip",
+                                    {
+                                        "reason": "enter",
+                                        "player": player_name,
+                                        "format": file_ext,
+                                    },
+                                )
+                                break
+                    # Ensure the process has ended
+                    try:
+                        proc.wait(timeout=1)
+                    except Exception:
+                        pass
+                except KeyboardInterrupt:
+                    # Propagate standard interruption semantics
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+                    raise
+            else:
+                # Non-interactive: just wait for playback to finish
+                proc.wait()
+
         afplay = shutil.which("afplay")
         if afplay:
-            subprocess.run([afplay, tmp_path], check=True)
+            _play_with_enter_skip([afplay, tmp_path])
             return
 
         ffplay = shutil.which("ffplay")
         if ffplay:
-            subprocess.run(
-                [ffplay, "-nodisp", "-autoexit", "-loglevel", "error", tmp_path],
-                check=True,
+            _play_with_enter_skip(
+                [ffplay, "-nodisp", "-autoexit", "-loglevel", "error", tmp_path]
             )
             return
 

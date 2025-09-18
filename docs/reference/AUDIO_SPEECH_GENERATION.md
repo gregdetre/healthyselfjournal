@@ -47,6 +47,7 @@ The microphone is not active during playback; recording starts after playback co
 - `examinedlifejournal/tts.py`
   - `speak_text(text, TTSOptions)` – orchestrates synthesis and playback.
   - OpenAI synthesis (non-streaming, with streaming fallback) → temp file → `afplay`/`ffplay`.
+  - During playback, pressing ENTER skips the spoken question immediately.
 - `examinedlifejournal/session.py`
   - Prints the question and then records user audio; TTS is invoked from the CLI loop just before recording starts.
 - `examinedlifejournal/events.py`
