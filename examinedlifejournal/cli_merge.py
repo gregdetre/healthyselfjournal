@@ -5,6 +5,8 @@ from datetime import datetime
 import os
 from pathlib import Path
 from typing import Iterable, MutableMapping
+import contextlib
+import wave
 
 import typer
 from rich.console import Console
@@ -262,6 +264,7 @@ def merge(
             )
 
     # 1) Move asset files from later subfolder into earlier subfolder
+    moved_files: list[Path] = []
     if not drop.assets_dir.exists():
         if ignore_missing:
             console.print(
@@ -282,6 +285,7 @@ def merge(
             console.print(f"Move: {src.name} → {dst.relative_to(sessions_dir)}")
             if not dry_run:
                 src.rename(dst)
+                moved_files.append(dst)
         # Attempt to remove the now-empty directory
         try:
             remaining = (
@@ -308,9 +312,48 @@ def merge(
 
     merged_body = _merge_bodies(keep_doc.body, drop_doc.body)
 
+    # Build drop-side audio list: prefer frontmatter; if empty, derive from moved files
+    keep_audio_list = keep_doc.frontmatter.data.get("audio_file") or []
+
+    drop_audio_list = drop_doc.frontmatter.data.get("audio_file") or []
+    if not drop_audio_list:
+        derived_targets: list[Path] = []
+        if moved_files:
+            derived_targets = moved_files
+        else:
+            # Derive by scanning keep assets for files that originated from drop stamp
+            if keep.assets_dir.exists():
+                derived_targets = sorted(
+                    p
+                    for p in keep.assets_dir.iterdir()
+                    if p.is_file() and p.name.startswith(f"{drop.stamp}_")
+                )
+        # Reduce to unique base stems and prefer mp3 entry
+        by_stem: dict[str, dict] = {}
+        for f in derived_targets:
+            stem = f.stem.split(".")[0]
+            rec = by_stem.setdefault(
+                stem,
+                {"wav": None, "mp3": None, "duration_seconds": 0.0},
+            )
+            if f.suffix.lower() == ".mp3":
+                rec["mp3"] = f.name
+            elif f.suffix.lower() == ".wav":
+                rec["wav"] = f.name
+                # Try to compute duration from WAV
+                try:
+                    with contextlib.closing(wave.open(str(f), "rb")) as wf:
+                        frames = wf.getnframes()
+                        rate = wf.getframerate()
+                        if rate:
+                            rec["duration_seconds"] = round(frames / float(rate), 2)
+                except Exception:
+                    pass
+        drop_audio_list = [v for _, v in sorted(by_stem.items())]
+
     merged_audio_list = _merge_audio_lists(
-        keep_doc.frontmatter.data.get("audio_file") or [],
-        drop_doc.frontmatter.data.get("audio_file") or [],
+        keep_audio_list,
+        drop_audio_list,
     )
     merged_duration = _sum_duration_seconds(merged_audio_list)
 
