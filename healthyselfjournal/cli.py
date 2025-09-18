@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import importlib
 import sys
+from pathlib import Path
 
 import typer
 from rich.console import Console
 
+from .config import CONFIG
 from .cli_init import init as init_cmd
 from .cli_reconcile import reconcile as reconcile_cmd
 from .cli_summaries import build_app as build_summaries_app
@@ -87,6 +89,51 @@ app.add_typer(journal_app, name="journal")
 app.command()(reconcile_cmd)
 app.command()(init_cmd)
 app.command()(merge_cmd)
+
+
+@app.command()
+def web(
+    sessions_dir: Path = typer.Option(
+        CONFIG.recordings_dir,
+        "--sessions-dir",
+        help="Directory where session markdown and audio artifacts are stored.",
+    ),
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        help="Interface to bind the development server to.",
+    ),
+    port: int = typer.Option(
+        8765,
+        "--port",
+        help="Port to serve the web interface on.",
+    ),
+    reload: bool = typer.Option(
+        False,
+        "--reload/--no-reload",
+        help="Enable FastHTML/uvicorn autoreload (development only).",
+    ),
+) -> None:
+    """Launch the FastHTML-powered web interface (imports only when invoked)."""
+
+    # Lazy import to avoid importing FastHTML at CLI startup
+    from .web.app import WebAppConfig, run_app
+
+    config = WebAppConfig(
+        sessions_dir=sessions_dir,
+        host=host,
+        port=port,
+        reload=reload,
+    )
+    console.print(
+        f"[green]Starting Healthy Self Journal web server on {host}:{port}[/]"
+    )
+    console.print(f"Sessions directory: [cyan]{config.sessions_dir.expanduser()}[/]")
+
+    try:
+        run_app(config)
+    except KeyboardInterrupt:  # pragma: no cover - direct CLI interrupt
+        console.print("\n[cyan]Server stopped.[/]")
 
 
 @app.command()
