@@ -1,14 +1,12 @@
-name
+finish refactor
 
-init
-
-rename & domain
+web interface
 
 PyPI, uvx
 
-Web interface
+init
 
-Fully private mode that uses a local model for the LLM questioning.
+fully private mode that uses a local model for the LLM questioning.
 
 multi-platform
 
