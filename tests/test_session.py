@@ -329,7 +329,7 @@ def test_anthropic_thinking_includes_budget_and_temp_non_stream(monkeypatch):
         question_bank=[],
         language="en",
         conversation_duration="short",
-        max_tokens=64,
+        max_tokens=2048,
     )
     llm_module.generate_followup_question(req)
 
@@ -380,7 +380,7 @@ def test_anthropic_thinking_includes_budget_and_temp_stream(monkeypatch, tmp_pat
         question_bank=[],
         language="en",
         conversation_duration="short",
-        max_tokens=64,
+        max_tokens=2048,
     )
 
     chunks: list[str] = []
