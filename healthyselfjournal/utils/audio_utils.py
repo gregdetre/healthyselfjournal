@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """Audio-related utilities shared across modules."""
 
 from pathlib import Path

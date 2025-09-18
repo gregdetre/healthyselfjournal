@@ -7,6 +7,7 @@ real-time RMS meter and keyboard control handling described in the V1 plan.
 """
 
 from dataclasses import dataclass
+import contextlib
 import itertools
 import logging
 import math
@@ -169,64 +170,19 @@ def record_response(
             subtype="PCM_16",
         ) as wav_file:
 
-            with sd.InputStream(
-                samplerate=sample_rate,
-                channels=1,
-                dtype="float32",
-                callback=_audio_callback,
-            ):
-                status_text = Text("Recording", style="bold green")
-                start_time = time.monotonic()
-                last_render = 0.0
-
+            with create_input_stream(sample_rate, _audio_callback):
                 with Live(console=console, auto_refresh=False) as live:
-                    while not (stop_event.is_set() and frames_queue.empty()):
-                        try:
-                            chunk = frames_queue.get(timeout=0.05)
-                        except queue.Empty:
-                            chunk = None
-
-                        if chunk is not None:
-                            wav_file.write(chunk)
-                            frames_written += len(chunk)
-                            # Update voiced time using simple RMS threshold in dBFS
-                            # This is a lightweight proxy for VAD
-                            frame_duration_sec = len(chunk) / sample_rate
-                            # Convert RMS to dBFS-like scale: db = 20*log10(rms)
-                            # Use configured threshold (e.g., -40 dBFS) to count as voiced
-                            rms_value = float(
-                                np.sqrt(np.mean(np.square(chunk), dtype=np.float64))
-                            )
-                            if _rms_above_threshold(
-                                rms_value, CONFIG.voice_rms_dbfs_threshold
-                            ):
-                                voiced_seconds += frame_duration_sec
-
-                        if time.monotonic() - last_render >= 1.0 / meter_refresh_hz:
-                            # Drain the latest level regardless to keep queues fresh
-                            level = _drain_latest_level(level_queue)
-                            is_paused = paused_event.is_set()
-                            # Update status text based on pause state
-                            status_text = (
-                                Text("Paused", style="bold yellow")
-                                if is_paused
-                                else Text("Recording", style="bold green")
-                            )
-                            message = _render_meter(
-                                level, status_text, paused=is_paused
-                            )
-                            live.update(message, refresh=True)
-                            last_render = time.monotonic()
-
-                        # Auto-stop after a fixed duration if requested
-                        if (
-                            max_seconds is not None
-                            and (time.monotonic() - start_time) >= max_seconds
-                        ):
-                            stop_event.set()
-
-                        if stop_event.is_set() and frames_queue.empty():
-                            break
+                    frames_written, voiced_seconds = run_meter_loop(
+                        live=live,
+                        wav_file=wav_file,
+                        sample_rate=sample_rate,
+                        frames_queue=frames_queue,
+                        level_queue=level_queue,
+                        paused_event=paused_event,
+                        stop_event=stop_event,
+                        meter_refresh_hz=meter_refresh_hz,
+                        max_seconds=max_seconds,
+                    )
 
                 duration_sec = max(frames_written / sample_rate, 0.0)
 
@@ -283,37 +239,20 @@ def record_response(
     _LOGGER.debug("Captured %.2f seconds to %s", duration_sec, wav_path)
 
     # Short-answer auto-discard gating: skip saving/transcribing if likely accidental
-    discarded_short = False
-    if enforce_short_answer_guard:
-        if (
-            duration_sec <= CONFIG.short_answer_duration_seconds
-            and voiced_seconds <= CONFIG.short_answer_voiced_seconds
-        ):
-            # Treat as noise/accidental: delete wav and do not convert to mp3
-            wav_path.unlink(missing_ok=True)
-            discarded_short = True
-            console.print(
-                Text("Very short answer detected; discarded.", style="yellow")
-            )
-            log_event(
-                "audio.record.discarded_short",
-                {
-                    "wav": wav_path.name,
-                    "duration_seconds": round(duration_sec, 2),
-                    "voiced_seconds": round(voiced_seconds, 2),
-                    "threshold_duration": CONFIG.short_answer_duration_seconds,
-                    "threshold_voiced": CONFIG.short_answer_voiced_seconds,
-                },
-            )
-            return AudioCaptureResult(
-                wav_path=wav_path,
-                mp3_path=None,
-                duration_seconds=duration_sec,
-                voiced_seconds=voiced_seconds,
-                cancelled=False,
-                quit_after=quit_flag.is_set(),
-                discarded_short_answer=True,
-            )
+    if enforce_short_answer_guard and apply_short_answer_guard(
+        duration_sec, voiced_seconds, console
+    ):
+        # Treat as noise/accidental: delete wav and do not convert to mp3
+        wav_path.unlink(missing_ok=True)
+        return AudioCaptureResult(
+            wav_path=wav_path,
+            mp3_path=None,
+            duration_seconds=duration_sec,
+            voiced_seconds=voiced_seconds,
+            cancelled=False,
+            quit_after=quit_flag.is_set(),
+            discarded_short_answer=True,
+        )
 
     # Lightweight post-processing: trim leading/trailing silence and attenuate peaks
     try:
@@ -325,11 +264,13 @@ def record_response(
         _LOGGER.debug("Post-processing skipped due to error", exc_info=True)
 
     mp3_path = None
-    if convert_to_mp3:
-        mp3_path = _maybe_start_mp3_conversion(
-            wav_path,
-            ffmpeg_path=ffmpeg_path,
-        )
+    duration_sec, mp3_path = postprocess_and_convert(
+        wav_path,
+        sample_rate=sample_rate,
+        ffmpeg_path=ffmpeg_path,
+        convert_to_mp3=convert_to_mp3,
+        current_duration=duration_sec,
+    )
 
     if print_saved_message:
         console.print(
@@ -408,6 +349,126 @@ def _rms_above_threshold(rms: float, threshold_dbfs: float) -> bool:
         return False
     db = 20.0 * math.log10(rms + 1e-10)
     return db >= threshold_dbfs
+
+
+@contextlib.contextmanager
+def create_input_stream(
+    sample_rate: int, callback
+) -> "contextlib.AbstractContextManager[object]":
+    """Context manager wrapper for sd.InputStream to simplify testing and reuse."""
+    with sd.InputStream(
+        samplerate=sample_rate,
+        channels=1,
+        dtype="float32",
+        callback=callback,
+    ) as stream:
+        yield stream
+
+
+def run_meter_loop(
+    *,
+    live: "Live",
+    wav_file: sf.SoundFile,
+    sample_rate: int,
+    frames_queue: "queue.Queue[np.ndarray]",
+    level_queue: "queue.Queue[float]",
+    paused_event: threading.Event,
+    stop_event: threading.Event,
+    meter_refresh_hz: float,
+    max_seconds: float | None,
+) -> tuple[int, float]:
+    """Run the capture + meter loop until stop.
+
+    Returns (frames_written, voiced_seconds).
+    """
+    frames_written = 0
+    voiced_seconds = 0.0
+    status_text = Text("Recording", style="bold green")
+    start_time = time.monotonic()
+    last_render = 0.0
+
+    while not (stop_event.is_set() and frames_queue.empty()):
+        try:
+            chunk = frames_queue.get(timeout=0.05)
+        except queue.Empty:
+            chunk = None
+
+        if chunk is not None:
+            wav_file.write(chunk)
+            frames_written += len(chunk)
+            frame_duration_sec = len(chunk) / sample_rate
+            rms_value = float(np.sqrt(np.mean(np.square(chunk), dtype=np.float64)))
+            if _rms_above_threshold(rms_value, CONFIG.voice_rms_dbfs_threshold):
+                voiced_seconds += frame_duration_sec
+
+        if time.monotonic() - last_render >= 1.0 / meter_refresh_hz:
+            level = _drain_latest_level(level_queue)
+            is_paused = paused_event.is_set()
+            status_text = (
+                Text("Paused", style="bold yellow")
+                if is_paused
+                else Text("Recording", style="bold green")
+            )
+            message = _render_meter(level, status_text, paused=is_paused)
+            live.update(message, refresh=True)
+            last_render = time.monotonic()
+
+        if max_seconds is not None and (time.monotonic() - start_time) >= max_seconds:
+            stop_event.set()
+
+        if stop_event.is_set() and frames_queue.empty():
+            break
+
+    return frames_written, voiced_seconds
+
+
+def apply_short_answer_guard(
+    duration_seconds: float, voiced_seconds: float, console: "Console"
+) -> bool:
+    """Return True if capture should be discarded as a very short answer."""
+    if (
+        duration_seconds <= CONFIG.short_answer_duration_seconds
+        and voiced_seconds <= CONFIG.short_answer_voiced_seconds
+    ):
+        console.print(Text("Very short answer detected; discarded.", style="yellow"))
+        log_event(
+            "audio.record.discarded_short",
+            {
+                "duration_seconds": round(duration_seconds, 2),
+                "voiced_seconds": round(voiced_seconds, 2),
+                "threshold_duration": CONFIG.short_answer_duration_seconds,
+                "threshold_voiced": CONFIG.short_answer_voiced_seconds,
+            },
+        )
+        return True
+    return False
+
+
+def postprocess_and_convert(
+    wav_path: Path,
+    *,
+    sample_rate: int,
+    ffmpeg_path: str | None,
+    convert_to_mp3: bool,
+    current_duration: float,
+) -> tuple[float, Optional[Path]]:
+    """Apply post-processing and optional MP3 conversion.
+
+    Returns (possibly_updated_duration, mp3_path_or_none).
+    """
+    duration_sec = current_duration
+    try:
+        new_duration = _postprocess_wav_simple(wav_path, sample_rate)
+        if new_duration is not None:
+            duration_sec = new_duration
+    except Exception:
+        _LOGGER.debug("Post-processing skipped due to error", exc_info=True)
+
+    mp3_path: Optional[Path] = None
+    if convert_to_mp3:
+        mp3_path = _maybe_start_mp3_conversion(wav_path, ffmpeg_path=ffmpeg_path)
+
+    return duration_sec, mp3_path
 
 
 def _maybe_start_mp3_conversion(
