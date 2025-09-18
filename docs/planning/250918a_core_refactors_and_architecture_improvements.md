@@ -22,7 +22,7 @@ Code (most relevant first):
 - `examinedlifejournal/transcription.py` — Backend selection, OpenAI/faster-whisper/MLX/whispercpp.
 - `examinedlifejournal/llm.py` — Prompt rendering, Anthropic/Ollama calls, streaming, thinking mode handling.
 - `examinedlifejournal/storage.py` — Markdown + frontmatter I/O (non-atomic), append helpers.
-- `examinedlifejournal/prompts/question.prompt.md.jinja` — Embedded question-bank behavior.
+- `examinedlifejournal/prompts/question.prompt.md.jinja` — Embedded example-questions behavior.
 
 Docs:
 - `docs/reference/COMMAND_LINE_INTERFACE.md` — CLI behaviors/options.
@@ -158,7 +158,7 @@ Docs:
 
 ### Stage: Documentation & CLI messaging polish
 - [ ] Update `docs/reference/COMMAND_LINE_INTERFACE.md` if control tips change wording
-- [ ] Verify the in-app tip mentioning the “question bank” aligns with current embedded prompts (since `question_bank.py` was removed)
+- [ ] Verify the in-app tip mentioning “embedded examples” aligns with current prompts (since `question_bank.py` was removed)
 - [ ] Update `docs/reference/FILE_FORMATS_ORGANISATION.md` to reflect safe deletion behavior and post-processing
 - **Acceptance**:
   - [ ] Docs consistent with behavior; wording parity maintained

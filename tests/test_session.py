@@ -4,7 +4,6 @@ from pathlib import Path
 
 from examinedlifejournal.audio import AudioCaptureResult
 from examinedlifejournal.history import HistoricalSummary
-from examinedlifejournal.question_bank import QUESTION_BANK
 from examinedlifejournal.session import Exchange, SessionConfig, SessionManager
 from examinedlifejournal.storage import (
     Frontmatter,
@@ -182,7 +181,9 @@ def test_session_complete_updates_frontmatter(tmp_path):
     ]
 
 
-def test_generate_next_question_uses_question_bank(tmp_path, monkeypatch):
+def test_generate_next_question_handles_give_me_a_question_via_llm(
+    tmp_path, monkeypatch
+):
     base_dir = tmp_path / "session"
     config = SessionConfig(
         base_dir=base_dir,
@@ -222,12 +223,23 @@ def test_generate_next_question_uses_question_bank(tmp_path, monkeypatch):
         )
     )
 
-    monkeypatch.setattr("random.choice", lambda seq: seq[0])
+    # Mock the LLM path to ensure we still get a question mark and proper model echo
+    def fake_generate_followup_question(req):
+        # When user asks for variety, prompt instructs model to pick from embedded bank
+        return llm_module.QuestionResponse(
+            question="What felt most alive for you today?", model=req.model
+        )
+
+    # Patch the symbol used inside session module to avoid real API call
+    monkeypatch.setattr(
+        "examinedlifejournal.session.generate_followup_question",
+        fake_generate_followup_question,
+    )
 
     response = manager.generate_next_question("Could you give me a question?")
 
-    assert response.question == QUESTION_BANK[0]
-    assert response.model == "question-bank"
+    assert response.question.endswith("?")
+    assert response.model == config.llm_model
     assert state.exchanges[-1].followup_question == response
 
 
@@ -326,6 +338,8 @@ def test_anthropic_thinking_includes_budget_and_temp_non_stream(monkeypatch):
     assert sent["thinking"]["type"] == "enabled"
     assert sent["thinking"]["budget_tokens"] >= 1024
     assert sent["thinking"]["budget_tokens"] <= CONFIG.prompt_budget_tokens
+    # Also ensure budget < max_tokens to preserve output room
+    assert sent["thinking"]["budget_tokens"] < req.max_tokens
 
 
 def test_anthropic_thinking_includes_budget_and_temp_stream(monkeypatch, tmp_path):
@@ -381,6 +395,7 @@ def test_anthropic_thinking_includes_budget_and_temp_stream(monkeypatch, tmp_pat
     assert sent["thinking"]["type"] == "enabled"
     assert sent["thinking"]["budget_tokens"] >= 1024
     assert sent["thinking"]["budget_tokens"] <= CONFIG.prompt_budget_tokens
+    assert sent["thinking"]["budget_tokens"] < req.max_tokens
 
 
 def test_budget_clamped_below_max_tokens(monkeypatch):
