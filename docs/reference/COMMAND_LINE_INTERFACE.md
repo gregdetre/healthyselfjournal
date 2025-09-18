@@ -69,7 +69,7 @@ Other useful options:
 
 #### Mic check
 
-- `--mic-check/--no-mic-check`: enabled by default. On startup (including when `--resume` is used), records a fixed 3 second sample so you can verify your mic level and transcription quality. The temporary recording is transcribed and shown, then discarded. Press ENTER to continue, ESC to try again, or `q` to quit.
+- `--mic-check/--no-mic-check`: disabled by default. When enabled (including when `--resume` is used), records a fixed 3 second sample so you can verify your mic level and transcription quality. The temporary recording is transcribed and shown, then discarded. Press ENTER to continue, ESC to try again, or `q` to quit.
 
 Environment variables:
 

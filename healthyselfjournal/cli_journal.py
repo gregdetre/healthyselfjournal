@@ -120,7 +120,7 @@ def journal(
         help="Append a debug postscript to LLM questions about techniques used.",
     ),
     mic_check: bool = typer.Option(
-        True,
+        False,
         "--mic-check/--no-mic-check",
         help="Run a 3s mic check on startup (ENTER continue, ESC retry, q quit).",
     ),
@@ -157,62 +157,22 @@ def journal(
             )
             raise typer.Exit(code=2)
 
-    provider = get_model_provider(llm_model)
-    if provider == "anthropic":
-        _require_env("ANTHROPIC_API_KEY")
-
-    try:
-        apply_transcript_formatting("sample", stt_formatting)
-    except ValueError as exc:
-        console.print(f"[red]Invalid --stt-formatting:[/] {exc}")
-        raise typer.Exit(code=2)
-
-    try:
-        selection = resolve_backend_selection(stt_backend, stt_model, stt_compute)
-    except (ValueError, BackendNotAvailableError) as exc:
-        console.print(f"[red]STT configuration error:[/] {exc}")
-        raise typer.Exit(code=2)
-
-    CONFIG.model_stt = selection.model
-    CONFIG.stt_backend = selection.backend_id
-    CONFIG.stt_compute = selection.compute
-    CONFIG.stt_formatting = stt_formatting
-
-    if selection.reason:
-        console.print(
-            f"[cyan]auto-private[/] -> using [bold]{selection.backend_id}[/] ({selection.reason})"
+    selection, stream_llm, tts_model, tts_voice, tts_format = (
+        prepare_runtime_and_backends(
+            llm_model=llm_model,
+            stt_backend=stt_backend,
+            stt_model=stt_model,
+            stt_compute=stt_compute,
+            stt_formatting=stt_formatting,
+            voice_mode=voice_mode,
+            tts_model=tts_model,
+            tts_voice=tts_voice,
+            tts_format=tts_format,
+            language=language,
+            mic_check=mic_check,
+            stream_llm=stream_llm,
         )
-    if selection.warnings:
-        for warning in selection.warnings:
-            console.print(f"[yellow]STT warning:[/] {warning}")
-
-    # Propagate config flags for TTS
-    # Convenience: --voice-mode turns on TTS and sets sensible defaults
-    if voice_mode:
-        CONFIG.speak_llm = True
-        tts_model = tts_model or "gpt-4o-mini-tts"
-        tts_voice = tts_voice or "shimmer"
-        tts_format = tts_format or "wav"
-
-    # Allow explicit config override via env/CONFIG but not via removed flag
-    CONFIG.tts_model = str(tts_model)
-    CONFIG.tts_voice = str(tts_voice)
-    CONFIG.tts_format = str(tts_format)
-
-    # When speaking is enabled, disable LLM streaming for clearer UX
-    if CONFIG.speak_llm and stream_llm:
-        console.print(
-            "[yellow]Speech enabled; disabling streaming display for clarity.[/]"
-        )
-        stream_llm = False
-
-    # Require OpenAI key only if using cloud STT
-    if selection.backend_id == "cloud-openai":
-        _require_env("OPENAI_API_KEY")
-
-    # Also require OpenAI key when TTS is enabled (OpenAI backend)
-    if CONFIG.speak_llm:
-        _require_env("OPENAI_API_KEY")
+    )
 
     # Initialize append-only metadata event logger
     init_event_logger(sessions_dir)
@@ -269,305 +229,25 @@ def journal(
         except Exception as exc:
             console.print(f"[yellow]Mic check failed; continuing:[/] {exc}")
 
-    # Determine whether to start new or resume recent session
-    if resume:
-        markdown_files = sorted((p for p in sessions_dir.glob("*.md")), reverse=True)
-        if not markdown_files:
-            console.print(
-                Panel.fit(
-                    "No prior sessions found. Starting a new session.",
-                    title="Healthy Self Journal",
-                    border_style="magenta",
-                )
-            )
-            state = manager.start()
-            question = opening_question
-        else:
-            latest_md = markdown_files[0]
-            state = manager.resume(latest_md)
-            doc = load_transcript(state.markdown_path)
-            if doc.body.strip():
-                try:
-                    next_q = manager.generate_next_question(doc.body)
-                    question = next_q.question
-                except Exception as exc:
-                    console.print(f"[red]Question generation failed:[/] {exc}")
-                    question = opening_question
-            else:
-                question = opening_question
-            console.print(
-                Panel.fit(
-                    f"Resuming session {state.session_id}. Recording starts immediately.\n"
-                    "Press any key to stop. Q saves then ends after this entry.\n\n"
-                    "Tip: Say 'give me a question' to get a quick prompt from the built-in examples.",
-                    title="Healthy Self Journal",
-                    border_style="magenta",
-                )
-            )
-            # Surface pending transcription work, but don't auto-run.
-            pending = _count_missing_stt(sessions_dir)
-            if pending:
-                console.print(
-                    f"[yellow]{pending} recording(s) pending transcription.[/] "
-                    f"Run [cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/] to backfill."
-                )
-    else:
-        console.print(
-            Panel.fit(
-                "Voice journaling session starting. Recording starts immediately.\n"
-                "Press any key to stop. Q saves then ends after this entry.\n\n"
-                "Tip: Say 'give me a question' to get a quick prompt from the built-in examples.",
-                title="Healthy Self Journal",
-                border_style="magenta",
-            )
-        )
-        state = manager.start()
-        question = opening_question
-        pending = _count_missing_stt(sessions_dir)
-        if pending:
-            console.print(
-                f"[yellow]{pending} recording(s) pending transcription.[/] "
-                f"Run [cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/] to backfill."
-            )
+    state, question = start_or_resume_session(
+        manager,
+        sessions_dir=sessions_dir,
+        opening_question=opening_question,
+        resume=resume,
+    )
 
     try:
-        while True:
-            console.print(
-                Panel.fit(
-                    question,
-                    title="AI",
-                    border_style="cyan",
-                )
-            )
-            console.print()
-
-            # Speak the assistant's question before recording, if enabled
-            if CONFIG.speak_llm:
-                try:
-                    console.print(
-                        Text(
-                            "(Press ENTER to skip the spoken question)",
-                            style="dim",
-                        )
-                    )
-                    speak_text(
-                        question,
-                        TTSOptions(
-                            backend="openai",
-                            model=CONFIG.tts_model,
-                            voice=CONFIG.tts_voice,
-                            audio_format=CONFIG.tts_format,  # type: ignore[arg-type]
-                        ),
-                    )
-                except Exception as exc:  # pragma: no cover - runtime path
-                    console.print(
-                        f"[yellow]TTS failed; continuing without speech:[/] {exc}"
-                    )
-
-            try:
-                exchange = manager.record_exchange(question, console)
-            except Exception as exc:  # pragma: no cover - runtime error surface
-                # Keep the session alive: audio is already saved on disk.
-                console.print(
-                    f"[red]Transcription failed:[/] {exc}\n"
-                    "[yellow]Your audio was saved.[/] You can backfill later with: "
-                    "[cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/]"
-                )
-                log_event(
-                    "cli.error",
-                    {
-                        "where": "record_exchange",
-                        "error_type": exc.__class__.__name__,
-                        "error": str(exc),
-                        "action": "continue_without_transcript",
-                    },
-                )
-                # Re-ask the same question so the user can continue.
-                # Skip transcript display and summary scheduling.
-                continue
-
-            if exchange is None:
-                # Could be cancelled or discarded short answer; message accordingly
-                if manager.state and manager.state.quit_requested:
-                    console.print(
-                        "[cyan]Quit requested. Ending session after summary update.[/]"
-                    )
-                    break
-                # Provide clearer feedback depending on disposition flags
-                if manager.state and getattr(manager.state, "last_cancelled", False):
-                    console.print(
-                        "[yellow]Cancelled. Take discarded. Re-asking the same question...[/]"
-                    )
-                    # Reset flag to avoid stale messaging on next loop
-                    manager.state.last_cancelled = False
-                elif manager.state and getattr(
-                    manager.state, "last_discarded_short", False
-                ):
-                    console.print(
-                        "[yellow]Very short/quiet; take discarded. Re-asking the same question...[/]"
-                    )
-                    manager.state.last_discarded_short = False
-                else:
-                    console.print(
-                        "[yellow]No usable answer captured (cancelled or very short). Re-asking...[/]"
-                    )
-                continue
-
-            console.print()
-            console.print(
-                Panel.fit(exchange.transcript, title="You", border_style="green")
-            )
-
-            try:
-                # Background scheduling to reduce latency
-                manager.schedule_summary_regeneration()
-            except Exception as exc:
-                console.print(f"[red]Summary scheduling failed:[/] {exc}")
-                log_event(
-                    "cli.error",
-                    {
-                        "where": "schedule_summary_regeneration",
-                        "error_type": exc.__class__.__name__,
-                        "error": str(exc),
-                    },
-                )
-
-            transcript_doc = load_transcript(state.markdown_path)
-
-            if exchange.audio.quit_after:
-                console.print(
-                    "[cyan]Quit requested. Ending session after summary update.[/]"
-                )
-                break
-
-            try:
-                if stream_llm:
-                    buffer: list[str] = []
-
-                    def on_delta(chunk: str) -> None:
-                        # Accumulate and re-render live panel
-                        buffer.append(chunk)
-
-                    # Render live as tokens stream in
-                    with Live(
-                        console=console, auto_refresh=True, transient=True
-                    ) as live:
-                        # Use a small spinner-like feedback until first token arrives
-                        live.update(
-                            Panel.fit(
-                                Text("Thinking…", style="italic cyan"),
-                                title="Next Question",
-                                border_style="cyan",
-                            )
-                        )
-                        next_question = manager.generate_next_question_streaming(
-                            transcript_doc.body, on_delta
-                        )
-                        # Final render with the fully assembled text
-                        streamed_text = "".join(buffer)
-                        question_text = (
-                            next_question.question
-                            if next_question.question
-                            else streamed_text
-                        )
-                        live.update(
-                            Panel.fit(
-                                question_text,
-                                title="Next Question",
-                                border_style="cyan",
-                            )
-                        )
-                else:
-                    next_question = manager.generate_next_question(transcript_doc.body)
-            except Exception as exc:
-                console.print(f"[red]Question generation failed:[/] {exc}")
-                log_event(
-                    "cli.error",
-                    {
-                        "where": "generate_next_question",
-                        "error_type": exc.__class__.__name__,
-                        "error": str(exc),
-                    },
-                )
-                break
-
-            question = next_question.question
-
+        run_journaling_loop(
+            manager=manager,
+            initial_question=question,
+            stream_llm=stream_llm,
+            sessions_dir=sessions_dir,
+            state=state,
+        )
     except KeyboardInterrupt:
         console.print("[red]Session interrupted by user.[/]")
     finally:
-        # If nothing was recorded and this wasn't a resume, don't keep an empty session file
-        is_empty_session = False
-        try:
-            if manager.state is not None and not manager.state.resumed:
-                has_exchanges = len(manager.state.exchanges) > 0
-                has_audio_artifacts = (
-                    any(manager.state.audio_dir.glob("*.wav"))
-                    or any(manager.state.audio_dir.glob("*.mp3"))
-                    or any(manager.state.audio_dir.glob("*.stt.json"))
-                )
-                doc = load_transcript(state.markdown_path)
-                body_empty = not bool(doc.body.strip())
-                is_empty_session = (
-                    (not has_exchanges) and (not has_audio_artifacts) and body_empty
-                )
-        except Exception:
-            # Defensive: if anything goes wrong here, fall back to normal finalize
-            is_empty_session = False
-
-        if is_empty_session:
-            # Best-effort shutdown of background executor without writing anything
-            try:
-                if getattr(manager, "_summary_executor", None) is not None:
-                    manager._summary_executor.shutdown(wait=False)
-            except Exception:
-                pass
-
-            # Remove the empty markdown and per-session audio dir (if still empty)
-            try:
-                state.markdown_path.unlink(missing_ok=True)
-            except Exception:
-                pass
-            try:
-                if state.audio_dir.exists() and not any(state.audio_dir.iterdir()):
-                    state.audio_dir.rmdir()
-            except Exception:
-                pass
-
-            log_event(
-                "cli.cancelled",
-                {
-                    "session_id": state.session_id,
-                    "reason": "no_recordings",
-                },
-            )
-            console.print("[yellow]Session cancelled; nothing saved.[/]")
-        else:
-            # Surface progress while waiting for the final summary flush
-            console.print("[cyan]Finalizing summary before exit…[/]")
-            manager.complete()
-            console.print("[green]Summary updated.[/]")
-            log_event(
-                "cli.end",
-                {
-                    "transcript_file": state.markdown_path.name,
-                    "session_id": state.session_id,
-                },
-            )
-            console.print(
-                Panel.fit(
-                    f"Session saved to {state.markdown_path.name}",
-                    title="Session Complete",
-                    border_style="magenta",
-                )
-            )
-            # Remind user if there is pending STT work.
-            pending = _count_missing_stt(sessions_dir)
-            if pending:
-                console.print(
-                    f"[yellow]{pending} recording(s) still pending transcription.[/] "
-                    f"Use [cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/] to process them."
-                )
+        finalize_or_cleanup(manager=manager, state=state, sessions_dir=sessions_dir)
 
 
 def _require_env(var_name: str) -> None:
@@ -707,6 +387,389 @@ def _run_mic_check(selection, *, language: str, stt_formatting: str) -> None:
                 return
             except KeyboardInterrupt:
                 raise typer.Exit(code=0)
+
+
+def prepare_runtime_and_backends(
+    *,
+    llm_model: str,
+    stt_backend: str,
+    stt_model: str,
+    stt_compute: str,
+    stt_formatting: str,
+    voice_mode: bool,
+    tts_model: str,
+    tts_voice: str,
+    tts_format: str,
+    language: str,
+    mic_check: bool,
+    stream_llm: bool,
+):
+    """Resolve and validate runtime settings and STT/TTS backends.
+
+    Returns (selection, stream_llm, tts_model, tts_voice, tts_format).
+    """
+    provider = get_model_provider(llm_model)
+    if provider == "anthropic":
+        _require_env("ANTHROPIC_API_KEY")
+
+    try:
+        apply_transcript_formatting("sample", stt_formatting)
+    except ValueError as exc:
+        console.print(f"[red]Invalid --stt-formatting:[/] {exc}")
+        raise typer.Exit(code=2)
+
+    try:
+        selection = resolve_backend_selection(stt_backend, stt_model, stt_compute)
+    except (ValueError, BackendNotAvailableError) as exc:
+        console.print(f"[red]STT configuration error:[/] {exc}")
+        raise typer.Exit(code=2)
+
+    CONFIG.model_stt = selection.model
+    CONFIG.stt_backend = selection.backend_id
+    CONFIG.stt_compute = selection.compute
+    CONFIG.stt_formatting = stt_formatting
+
+    if selection.reason:
+        console.print(
+            f"[cyan]auto-private[/] -> using [bold]{selection.backend_id}[/] ({selection.reason})"
+        )
+    if selection.warnings:
+        for warning in selection.warnings:
+            console.print(f"[yellow]STT warning:[/] {warning}")
+
+    # Propagate config flags for TTS
+    if voice_mode:
+        CONFIG.speak_llm = True
+        tts_model = tts_model or "gpt-4o-mini-tts"
+        tts_voice = tts_voice or "shimmer"
+        tts_format = tts_format or "wav"
+
+    CONFIG.tts_model = str(tts_model)
+    CONFIG.tts_voice = str(tts_voice)
+    CONFIG.tts_format = str(tts_format)
+
+    # When speaking is enabled, disable LLM streaming for clearer UX
+    if CONFIG.speak_llm and stream_llm:
+        console.print(
+            "[yellow]Speech enabled; disabling streaming display for clarity.[/]"
+        )
+        stream_llm = False
+
+    # Require OpenAI key only if using cloud STT
+    if selection.backend_id == "cloud-openai":
+        _require_env("OPENAI_API_KEY")
+
+    # Also require OpenAI key when TTS is enabled (OpenAI backend)
+    if CONFIG.speak_llm:
+        _require_env("OPENAI_API_KEY")
+
+    return selection, stream_llm, tts_model, tts_voice, tts_format
+
+
+def start_or_resume_session(
+    manager: SessionManager,
+    *,
+    sessions_dir: Path,
+    opening_question: str,
+    resume: bool,
+):
+    """Start a new session or resume the most recent, returning (state, question)."""
+    if resume:
+        markdown_files = sorted((p for p in sessions_dir.glob("*.md")), reverse=True)
+        if not markdown_files:
+            console.print(
+                Panel.fit(
+                    "No prior sessions found. Starting a new session.",
+                    title="Healthy Self Journal",
+                    border_style="magenta",
+                )
+            )
+            state = manager.start()
+            question = opening_question
+        else:
+            latest_md = markdown_files[0]
+            state = manager.resume(latest_md)
+            doc = load_transcript(state.markdown_path)
+            if doc.body.strip():
+                try:
+                    next_q = manager.generate_next_question(doc.body)
+                    question = next_q.question
+                except Exception as exc:
+                    console.print(f"[red]Question generation failed:[/] {exc}")
+                    question = opening_question
+            else:
+                question = opening_question
+            console.print(
+                Panel.fit(
+                    f"Resuming session {state.session_id}. Recording starts immediately.\n"
+                    "Press any key to stop. Q saves then ends after this entry.\n\n"
+                    "Tip: Say 'give me a question' to get a quick prompt from the built-in examples.",
+                    title="Healthy Self Journal",
+                    border_style="magenta",
+                )
+            )
+            # Surface pending transcription work, but don't auto-run.
+            pending = _count_missing_stt(sessions_dir)
+            if pending:
+                console.print(
+                    f"[yellow]{pending} recording(s) pending transcription.[/] "
+                    f"Run [cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/] to backfill."
+                )
+    else:
+        console.print(
+            Panel.fit(
+                "Voice journaling session starting. Recording starts immediately.\n"
+                "Press any key to stop. Q saves then ends after this entry.\n\n"
+                "Tip: Say 'give me a question' to get a quick prompt from the built-in examples.",
+                title="Healthy Self Journal",
+                border_style="magenta",
+            )
+        )
+        state = manager.start()
+        question = opening_question
+        pending = _count_missing_stt(sessions_dir)
+        if pending:
+            console.print(
+                f"[yellow]{pending} recording(s) pending transcription.[/] "
+                f"Run [cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/] to backfill."
+            )
+
+    return state, question
+
+
+def run_journaling_loop(
+    *,
+    manager: SessionManager,
+    initial_question: str,
+    stream_llm: bool,
+    sessions_dir: Path,
+    state,
+) -> None:
+    """Run the main capture → transcribe → ask loop until quit/cancel."""
+    question = initial_question
+    while True:
+        console.print(
+            Panel.fit(
+                question,
+                title="AI",
+                border_style="cyan",
+            )
+        )
+        console.print()
+
+        # Speak the assistant's question before recording, if enabled
+        if CONFIG.speak_llm:
+            try:
+                console.print(
+                    Text(
+                        "(Press ENTER to skip the spoken question)",
+                        style="dim",
+                    )
+                )
+                speak_text(
+                    question,
+                    TTSOptions(
+                        backend="openai",
+                        model=CONFIG.tts_model,
+                        voice=CONFIG.tts_voice,
+                        audio_format=CONFIG.tts_format,  # type: ignore[arg-type]
+                    ),
+                )
+            except Exception as exc:  # pragma: no cover - runtime path
+                console.print(
+                    f"[yellow]TTS failed; continuing without speech:[/] {exc}"
+                )
+
+        try:
+            exchange = manager.record_exchange(question, console)
+        except Exception as exc:  # pragma: no cover - runtime error surface
+            # Keep the session alive: audio is already saved on disk.
+            console.print(
+                f"[red]Transcription failed:[/] {exc}\n"
+                "[yellow]Your audio was saved.[/] You can backfill later with: "
+                "[cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/]"
+            )
+            log_event(
+                "cli.error",
+                {
+                    "where": "record_exchange",
+                    "error_type": exc.__class__.__name__,
+                    "error": str(exc),
+                    "action": "continue_without_transcript",
+                },
+            )
+            # Re-ask the same question so the user can continue.
+            # Skip transcript display and summary scheduling.
+            continue
+
+        if exchange is None:
+            # Could be cancelled or discarded short answer; message accordingly
+            if manager.state and manager.state.quit_requested:
+                console.print(
+                    "[cyan]Quit requested. Ending session after summary update.[/]"
+                )
+                break
+            # Provide clearer feedback depending on disposition flags
+            if manager.state and getattr(manager.state, "last_cancelled", False):
+                console.print(
+                    "[yellow]Cancelled. Take discarded. Re-asking the same question...[/]"
+                )
+                manager.state.last_cancelled = False
+            elif manager.state and getattr(
+                manager.state, "last_discarded_short", False
+            ):
+                console.print(
+                    "[yellow]Very short/quiet; take discarded. Re-asking the same question...[/]"
+                )
+                manager.state.last_discarded_short = False
+            else:
+                console.print(
+                    "[yellow]No usable answer captured (cancelled or very short). Re-asking...[/]"
+                )
+            continue
+
+        console.print()
+        console.print(Panel.fit(exchange.transcript, title="You", border_style="green"))
+
+        try:
+            # Background scheduling to reduce latency
+            manager.schedule_summary_regeneration()
+        except Exception as exc:
+            console.print(f"[red]Summary scheduling failed:[/] {exc}")
+            log_event(
+                "cli.error",
+                {
+                    "where": "schedule_summary_regeneration",
+                    "error_type": exc.__class__.__name__,
+                    "error": str(exc),
+                },
+            )
+
+        transcript_doc = load_transcript(state.markdown_path)
+
+        if exchange.audio.quit_after:
+            console.print(
+                "[cyan]Quit requested. Ending session after summary update.[/]"
+            )
+            break
+
+        try:
+            if stream_llm:
+                buffer: list[str] = []
+
+                def on_delta(chunk: str) -> None:
+                    buffer.append(chunk)
+
+                with Live(console=console, auto_refresh=True, transient=True) as live:
+                    live.update(
+                        Panel.fit(
+                            Text("Thinking…", style="italic cyan"),
+                            title="Next Question",
+                            border_style="cyan",
+                        )
+                    )
+                    next_question = manager.generate_next_question_streaming(
+                        transcript_doc.body, on_delta
+                    )
+                    streamed_text = "".join(buffer)
+                    question_text = (
+                        next_question.question
+                        if next_question.question
+                        else streamed_text
+                    )
+                    live.update(
+                        Panel.fit(
+                            question_text,
+                            title="Next Question",
+                            border_style="cyan",
+                        )
+                    )
+            else:
+                next_question = manager.generate_next_question(transcript_doc.body)
+        except Exception as exc:
+            console.print(f"[red]Question generation failed:[/] {exc}")
+            log_event(
+                "cli.error",
+                {
+                    "where": "generate_next_question",
+                    "error_type": exc.__class__.__name__,
+                    "error": str(exc),
+                },
+            )
+            break
+
+        question = next_question.question
+
+
+def finalize_or_cleanup(*, manager: SessionManager, state, sessions_dir: Path) -> None:
+    """Finalize session and clean up empty artifacts as in original flow."""
+    # If nothing was recorded and this wasn't a resume, don't keep an empty session file
+    is_empty_session = False
+    try:
+        if manager.state is not None and not manager.state.resumed:
+            has_exchanges = len(manager.state.exchanges) > 0
+            has_audio_artifacts = (
+                any(manager.state.audio_dir.glob("*.wav"))
+                or any(manager.state.audio_dir.glob("*.mp3"))
+                or any(manager.state.audio_dir.glob("*.stt.json"))
+            )
+            doc = load_transcript(state.markdown_path)
+            body_empty = not bool(doc.body.strip())
+            is_empty_session = (
+                (not has_exchanges) and (not has_audio_artifacts) and body_empty
+            )
+    except Exception:
+        is_empty_session = False
+
+    if is_empty_session:
+        try:
+            if getattr(manager, "_summary_executor", None) is not None:
+                manager._summary_executor.shutdown(wait=False)
+        except Exception:
+            pass
+
+        try:
+            state.markdown_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        try:
+            if state.audio_dir.exists() and not any(state.audio_dir.iterdir()):
+                state.audio_dir.rmdir()
+        except Exception:
+            pass
+
+        log_event(
+            "cli.cancelled",
+            {
+                "session_id": state.session_id,
+                "reason": "no_recordings",
+            },
+        )
+        console.print("[yellow]Session cancelled; nothing saved.[/]")
+    else:
+        console.print("[cyan]Finalizing summary before exit…[/]")
+        manager.complete()
+        console.print("[green]Summary updated.[/]")
+        log_event(
+            "cli.end",
+            {
+                "transcript_file": state.markdown_path.name,
+                "session_id": state.session_id,
+            },
+        )
+        console.print(
+            Panel.fit(
+                f"Session saved to {state.markdown_path.name}",
+                title="Session Complete",
+                border_style="magenta",
+            )
+        )
+        pending = _count_missing_stt(sessions_dir)
+        if pending:
+            console.print(
+                f"[yellow]{pending} recording(s) still pending transcription.[/] "
+                f"Use [cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/] to process them."
+            )
 
 
 def build_app() -> typer.Typer:
