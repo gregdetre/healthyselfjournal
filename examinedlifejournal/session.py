@@ -101,6 +101,7 @@ class SessionConfig:
     stt_auto_private_reason: str | None = None
     stt_backend_selection: BackendSelection | None = None
     stt_warnings: List[str] = field(default_factory=list)
+    llm_questions_debug: bool = False
 
 
 class SessionManager:
@@ -437,6 +438,7 @@ class SessionManager:
             language=self.config.language,
             conversation_duration=duration_mm_ss,
             max_tokens=CONFIG.llm_max_tokens_question,
+            llm_questions_debug=self.config.llm_questions_debug,
         )
         response = generate_followup_question(request)
         if self.state.exchanges:
@@ -488,6 +490,7 @@ class SessionManager:
             language=self.config.language,
             conversation_duration=duration_mm_ss,
             max_tokens=CONFIG.llm_max_tokens_question,
+            llm_questions_debug=self.config.llm_questions_debug,
         )
         response = llm_module.stream_followup_question(request, on_delta)
         if self.state.exchanges:

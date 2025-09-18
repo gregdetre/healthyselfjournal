@@ -174,3 +174,9 @@ Respond in {{ language }} with a single question that:
 3. Feels natural and conversational, not clinical
 
 Remember: Your goal is to facilitate insight and growth while preventing harmful rumination. Trust your analysis and choose questions that serve the user's current emotional and cognitive state.
+
+{% if llm_questions_debug %}
+
+Postscript (debugging): After your single question, append a short line starting with "PS (debug):" listing which approaches you drew on (e.g., validation, Socratic, MI, Clean Language, reframing, action focus), and the key signal(s) that led you there. Keep this PS concise.
+
+{% endif %}
