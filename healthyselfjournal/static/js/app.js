@@ -89,6 +89,13 @@ class RecorderController {
             }
             void this.toggleRecording();
         });
+        // Clickable session ID to reveal the markdown file in Finder (macOS)
+        if (this.elements.revealLink && this.config.revealEndpoint) {
+            this.elements.revealLink.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                void fetch(this.config.revealEndpoint, { method: 'POST' }).catch(() => { });
+            });
+        }
         window.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') {
                 this.cancelRecording();
@@ -139,14 +146,19 @@ class RecorderController {
             });
         }
         // Optionally speak the initial question, then auto-start recording
+        // In voice mode, wait until playback has started; recording begins after TTS ends
+        const initialQuestion = this.elements.currentQuestion.textContent ?? '';
         if (this.config.voiceEnabled && this.config.ttsEndpoint) {
-            void this.playTts(this.elements.currentQuestion.textContent ?? '');
+            void this.playTts(initialQuestion).finally(() => {
+                this.autoStartAfterQuestion();
+            });
         }
-        // Auto-start recording after the opening question is displayed
-        // Mirrors CLI behaviour of starting immediately
-        setTimeout(() => {
-            this.autoStartAfterQuestion();
-        }, 0);
+        else {
+            // Non-voice mode: start immediately after question is displayed
+            setTimeout(() => {
+                this.autoStartAfterQuestion();
+            }, 0);
+        }
     }
     fail(message) {
         this.setStatus(message);
@@ -347,9 +359,10 @@ class RecorderController {
         meta.textContent = `Segment ${payload.segment_label} · ${(durationMs / 1000).toFixed(1)}s`;
         historyItem.append(qHeading, qBody, aHeading, aBody, meta);
         this.elements.historyList.prepend(historyItem);
-        // Update cumulative duration display
+        // Update cumulative duration display (minutes-only text when available)
         if (this.elements.totalDuration) {
-            this.elements.totalDuration.textContent = payload.total_duration_hms;
+            this.elements.totalDuration.textContent =
+                payload.total_duration_minutes_text || payload.total_duration_hms;
         }
         // Optionally speak the next question using server-side TTS, then auto-start recording
         if (this.config.voiceEnabled && this.config.ttsEndpoint) {
@@ -484,6 +497,7 @@ function bootstrap() {
     const voiceEnabled = (body.dataset.voiceEnabled ?? 'false') === 'true';
     const ttsEndpoint = body.dataset.ttsEndpoint;
     const ttsMime = body.dataset.ttsMime;
+    const revealEndpoint = body.dataset.revealEndpoint;
     const elements = {
         recordButton: document.getElementById('record-button'),
         statusText: document.getElementById('status-text'),
@@ -494,7 +508,15 @@ function bootstrap() {
         recordTimer: document.getElementById('record-timer') || undefined,
         recordTimerValue: document.getElementById('record-timer-value') || undefined,
         voiceToggle: document.getElementById('voice-toggle') || undefined,
+        revealLink: document.getElementById('reveal-session') || undefined,
     };
+    // Ensure initial total duration text reflects minutes-only value if provided on body dataset
+    if (elements.totalDuration) {
+        const minutesText = body.dataset.totalMinutesText;
+        if (minutesText) {
+            elements.totalDuration.textContent = minutesText;
+        }
+    }
     if (!elements.recordButton || !elements.statusText || !elements.meterBar) {
         console.error('Missing critical DOM elements.');
         return;
@@ -507,6 +529,7 @@ function bootstrap() {
         voiceEnabled,
         ttsEndpoint,
         ttsMime,
+        revealEndpoint,
     };
     new RecorderController(elements, config);
 }

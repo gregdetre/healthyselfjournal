@@ -15,13 +15,14 @@
         data-tts-endpoint="/session/{{ session_id }}/tts"
         data-tts-mime="{{ tts_mime }}"
         data-total-seconds="{{ total_seconds }}"
-        data-total-hms="{{ total_hms }}">
+        data-total-hms="{{ total_hms }}"
+        data-total-minutes-text="{{ total_minutes_text }}">
 
     <main class="hsj-container">
       <header class="hsj-header">
         <h1>Healthy Self Journal</h1>
         <p class="hsj-session-id">Session <a id="reveal-session" href="#" title="Reveal in Finder">{{ session_id }}</a></p>
-        <p class="hsj-total-duration">Total duration so far: <span id="total-duration">{{ total_hms }}</span></p>
+        <p class="hsj-total-duration">Total duration so far: <span id="total-duration">{{ total_minutes_text }}</span></p>
         <div class="hsj-voice-toggle">
           <label>
             <input type="checkbox" id="voice-toggle" {% if voice_attr == 'true' %}checked{% endif %} />
@@ -47,6 +48,67 @@
       <section class="hsj-history">
         <h2>Session history</h2>
         <div id="history-list"></div>
+      </section>
+
+      <section class="hsj-debug">
+        <details>
+          <summary>Debug / Config</summary>
+          <div class="hsj-debug-grid">
+            <div>
+              <h3>Server</h3>
+              <ul>
+                <li><strong>Host</strong>: {{ server_host }}</li>
+                <li><strong>Port</strong>: {{ server_port }}</li>
+                <li><strong>Reload</strong>: {{ 'true' if server_reload else 'false' }}</li>
+                <li><strong>Resume</strong>: {{ 'true' if server_resume else 'false' }}</li>
+                <li><strong>Sessions dir</strong>: {{ sessions_dir }}</li>
+                <li><strong>App version</strong>: {{ app_version }}</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Session</h3>
+              <ul>
+                <li><strong>Session ID</strong>: {{ session_id }}</li>
+                <li><strong>Total</strong>: {{ total_hms }} ({{ total_seconds }}s)</li>
+              </ul>
+            </div>
+            <div>
+              <h3>LLM</h3>
+              <ul>
+                <li><strong>Model</strong>: {{ llm_model }}</li>
+              </ul>
+            </div>
+            <div>
+              <h3>STT</h3>
+              <ul>
+                <li><strong>Backend</strong>: {{ stt_backend }}</li>
+                <li><strong>Model</strong>: {{ stt_model }}</li>
+                <li><strong>Compute</strong>: {{ stt_compute }}</li>
+                <li><strong>Formatting</strong>: {{ stt_formatting }}</li>
+                {% if stt_auto_reason %}
+                <li><strong>Auto-private</strong>: {{ stt_auto_reason }}</li>
+                {% endif %}
+                {% if stt_warnings and stt_warnings|length > 0 %}
+                <li><strong>Warnings</strong>:
+                  <ul>
+                  {% for w in stt_warnings %}
+                    <li>{{ w }}</li>
+                  {% endfor %}
+                  </ul>
+                </li>
+                {% endif %}
+              </ul>
+            </div>
+            <div>
+              <h3>Client thresholds</h3>
+              <ul>
+                <li><strong>Short duration</strong>: {{ short_duration }}s</li>
+                <li><strong>Short voiced</strong>: {{ short_voiced }}s</li>
+                <li><strong>Voice RMS threshold</strong>: {{ voice_rms_dbfs_threshold }} dBFS</li>
+              </ul>
+            </div>
+          </div>
+        </details>
       </section>
     </main>
 

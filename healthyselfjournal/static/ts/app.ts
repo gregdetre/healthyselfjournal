@@ -15,6 +15,7 @@ interface RecorderConfig {
   voiceEnabled: boolean;
   ttsEndpoint?: string;
   ttsMime?: string;
+  revealEndpoint?: string;
 }
 
 interface DOMElements {
@@ -27,6 +28,7 @@ interface DOMElements {
   recordTimer?: HTMLElement;
   recordTimerValue?: HTMLElement;
   voiceToggle?: HTMLInputElement;
+  revealLink?: HTMLAnchorElement;
 }
 
 interface UploadSuccessResponse {
@@ -36,6 +38,7 @@ interface UploadSuccessResponse {
   duration_seconds: number;
   total_duration_seconds: number;
   total_duration_hms: string;
+  total_duration_minutes_text?: string;
   transcript: string;
   next_question: string;
   llm_model?: string | null;
@@ -79,6 +82,14 @@ class RecorderController {
       }
       void this.toggleRecording();
     });
+
+    // Clickable session ID to reveal the markdown file in Finder (macOS)
+    if (this.elements.revealLink && this.config.revealEndpoint) {
+      this.elements.revealLink.addEventListener('click', (ev: MouseEvent) => {
+        ev.preventDefault();
+        void fetch(this.config.revealEndpoint!, { method: 'POST' }).catch(() => {});
+      });
+    }
 
     window.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -132,15 +143,18 @@ class RecorderController {
     }
 
     // Optionally speak the initial question, then auto-start recording
+    // In voice mode, wait until playback has started; recording begins after TTS ends
+    const initialQuestion = this.elements.currentQuestion.textContent ?? '';
     if (this.config.voiceEnabled && this.config.ttsEndpoint) {
-      void this.playTts(this.elements.currentQuestion.textContent ?? '');
+      void this.playTts(initialQuestion).finally(() => {
+        this.autoStartAfterQuestion();
+      });
+    } else {
+      // Non-voice mode: start immediately after question is displayed
+      setTimeout(() => {
+        this.autoStartAfterQuestion();
+      }, 0);
     }
-
-    // Auto-start recording after the opening question is displayed
-    // Mirrors CLI behaviour of starting immediately
-    setTimeout(() => {
-      this.autoStartAfterQuestion();
-    }, 0);
   }
 
   private fail(message: string): void {
@@ -433,9 +447,10 @@ class RecorderController {
     historyItem.append(qHeading, qBody, aHeading, aBody, meta);
     this.elements.historyList.prepend(historyItem);
 
-    // Update cumulative duration display
+    // Update cumulative duration display (minutes-only text when available)
     if (this.elements.totalDuration) {
-      this.elements.totalDuration.textContent = payload.total_duration_hms;
+      this.elements.totalDuration.textContent =
+        payload.total_duration_minutes_text || payload.total_duration_hms;
     }
 
     // Optionally speak the next question using server-side TTS, then auto-start recording
@@ -581,6 +596,7 @@ function bootstrap(): void {
   const voiceEnabled = (body.dataset.voiceEnabled ?? 'false') === 'true';
   const ttsEndpoint = body.dataset.ttsEndpoint;
   const ttsMime = body.dataset.ttsMime;
+  const revealEndpoint = body.dataset.revealEndpoint;
 
   const elements: DOMElements = {
     recordButton: document.getElementById('record-button') as HTMLButtonElement,
@@ -592,7 +608,16 @@ function bootstrap(): void {
     recordTimer: document.getElementById('record-timer') as HTMLElement | null || undefined,
     recordTimerValue: document.getElementById('record-timer-value') as HTMLElement | null || undefined,
     voiceToggle: document.getElementById('voice-toggle') as HTMLInputElement | null || undefined,
+    revealLink: document.getElementById('reveal-session') as HTMLAnchorElement | null || undefined,
   };
+
+  // Ensure initial total duration text reflects minutes-only value if provided on body dataset
+  if (elements.totalDuration) {
+    const minutesText = body.dataset.totalMinutesText;
+    if (minutesText) {
+      elements.totalDuration.textContent = minutesText;
+    }
+  }
 
   if (!elements.recordButton || !elements.statusText || !elements.meterBar) {
     console.error('Missing critical DOM elements.');
@@ -607,6 +632,7 @@ function bootstrap(): void {
     voiceEnabled,
     ttsEndpoint,
     ttsMime,
+    revealEndpoint,
   };
 
   new RecorderController(elements, config);
