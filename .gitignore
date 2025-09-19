@@ -216,3 +216,12 @@ backup/
 obsolete/
 sessions/
 
+# Frontend/node artifacts
+node_modules/
+
+# Local session key
+.sesskey
+
+# macOS Finder metadata
+.DS_Store
+
