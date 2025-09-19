@@ -7,11 +7,13 @@ Single source for command discovery. See linked pages for detailed flags.
 
 - `journal cli` – Terminal-based recording. See `CLI_RECORDING_INTERFACE.md`.
 - `journal web` – Launch local browser interface. See `WEB_RECORDING_INTERFACE.md`.
-- `journal list --pending` – Show sessions with outstanding transcription segments and the reconcile hint.
+- `journal list --pending` – Show sessions with outstanding transcription segments and the fix hint.
 - `session list` – Show sessions with summary snippets. See `SESSIONS.md`.
-- `summarise ...` – List/backfill/regenerate summaries.
-- `reconcile` – Backfill missing STT for saved WAV/webm/ogg files, replace markdown placeholders, and remove error sentinels.
-- `merge` – Merge two sessions into the earlier one.
+- `session summaries` – Show which sessions are missing summaries (moved from summarise list).
+- `fix stt` – Backfill missing STT for saved WAV/webm/ogg files, replace markdown placeholders, and remove error sentinels.
+- `fix backfill` – Generate summaries where missing.
+- `fix regenerate <file>` – Regenerate a summary for a specific session file.
+- `session merge` – Merge two sessions into the earlier one.
 - `init` – Setup wizard for first-time configuration.
 - `diagnose` – Diagnostics for mic/STT, local/cloud LLM, and TTS.
 
@@ -21,6 +23,8 @@ Single source for command discovery. See linked pages for detailed flags.
   - Downloads a `.gguf` model into the managed directory:
     `~/Library/Application Support/HealthySelfJournal/models/llama/` on macOS.
   - If you set `[llm].local_model_url` and `local_model_sha256` in `user_config.toml`, you can omit flags.
+  - If `--url` is omitted in a TTY, the CLI will offer to paste a URL interactively,
+    optionally accept a SHA-256, and can save these to `user_config.toml` for reuse.
   - Example:
 
 ```bash
@@ -37,10 +41,10 @@ Related:
 Each command lives in its own `cli_*.py` module for clarity:
 - `cli_journal_cli.py` – journaling CLI sub-app
 - `cli_journal_web.py` – journaling web sub-app
-- `cli_session.py` – session utilities
-- `cli_summarise.py` – summaries utilities
+- `cli_session.py` – session utilities (also includes `session merge` and `session summaries`)
+- `cli_summarise.py` – legacy summaries utilities (re-exported under `fix`)
 - `cli_diagnose.py` – diagnostics sub-app (mic/local/cloud)
-- `cli_reconcile.py`, `cli_merge.py`, `cli_init.py` – other commands
+- `cli_reconcile.py`, `cli_init.py` – other commands (merge lives under `cli_session.py`)
 
 ## Examples
 
@@ -55,9 +59,9 @@ uvx healthyselfjournal -- journal web --port 8888 --resume
 uvx healthyselfjournal -- session list --sessions-dir ./sessions --nchars 200
 
 # Summaries
-uvx healthyselfjournal -- summarise list --missing-only
-uvx healthyselfjournal -- summarise backfill --limit 10
-uvx healthyselfjournal -- summarise regenerate 250918_0119.md
+uvx healthyselfjournal -- session summaries --missing-only
+uvx healthyselfjournal -- fix backfill --limit 10
+uvx healthyselfjournal -- fix regenerate 250918_0119.md
 ```
 
 ## See also

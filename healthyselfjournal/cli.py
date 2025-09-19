@@ -12,7 +12,6 @@ from rich.text import Text
 from .config import CONFIG
 from .cli_init import init as init_cmd
 from .cli_init_app import build_app as build_init_app
-from .cli_reconcile import reconcile as reconcile_cmd
 from .cli_journal_cli import build_app as build_journal_app
 from .cli_session import build_app as build_session_app
 from .cli_diagnose import build_app as build_diagnose_app
@@ -90,7 +89,6 @@ app.add_typer(build_diagnose_app(), name="diagnose")
 app.add_typer(build_init_app(), name="init")
 
 # Top-level commands
-app.command()(reconcile_cmd)
 
 try:
     from .cli_desktop import desktop as desktop_command
