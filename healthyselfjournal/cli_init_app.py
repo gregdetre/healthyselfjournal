@@ -25,6 +25,7 @@ def build_app() -> typer.Typer:
     app = typer.Typer(
         add_completion=False,
         no_args_is_help=False,
+        invoke_without_command=True,
         context_settings={"help_option_names": ["-h", "--help"]},
         help="Setup commands (wizard, local LLM)",
     )
@@ -35,6 +36,11 @@ def build_app() -> typer.Typer:
         # without any subcommand (e.g., not when running `init local-llm`).
         if getattr(ctx, "invoked_subcommand", None):
             return
+        run_init_wizard()
+
+    @app.command("wizard")
+    def wizard_command() -> None:
+        """Run the interactive setup wizard."""
         run_init_wizard()
 
     @app.command("local-llm")
