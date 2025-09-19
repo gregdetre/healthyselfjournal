@@ -1,0 +1,12 @@
+{
+  "name": "healthyselfjournal-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "watch": "tsc --project tsconfig.json --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

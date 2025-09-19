@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ES2020",
+    "moduleResolution": "Node",
+    "lib": ["DOM", "ES2020"],
+    "strict": true,
+    "noImplicitOverride": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "sourceMap": false,
+    "rootDir": "healthyselfjournal/static/ts",
+    "outDir": "healthyselfjournal/static/js"
+  },
+  "include": ["healthyselfjournal/static/ts/**/*"],
+  "exclude": ["node_modules"]
+}
