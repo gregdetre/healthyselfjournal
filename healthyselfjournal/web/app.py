@@ -63,7 +63,8 @@ from ..workers import (
     WorkerEvent,
 )
 from gjdutils.strings import jinja_render
-from ..events import log_event
+
+# (duplicate import removed)
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -448,14 +449,23 @@ def build_app(config: WebAppConfig) -> Any:
         pass
     # Configure voice mode and TTS options for this app instance
     # Voice authority: if WebAppConfig.voice_enabled is explicitly set (True/False),
-    # respect it. Otherwise fall back to CONFIG.speak_llm.
-    voice_enabled = (
+    # respect it. Otherwise fall back to CONFIG.speak_llm. Always gate by
+    # tts_enabled and privacy cloud_off to prevent outbound calls.
+    requested_voice = (
         bool(resolved.voice_enabled)
         if isinstance(resolved.voice_enabled, bool)
         else bool(CONFIG.speak_llm)
     )
-    app.state.voice_enabled = voice_enabled
-    if voice_enabled:
+    gated_voice = (
+        requested_voice and bool(CONFIG.tts_enabled) and not bool(CONFIG.llm_cloud_off)
+    )
+    app.state.voice_enabled = gated_voice
+    app.state.voice_disabled_reason = (
+        "privacy"
+        if (requested_voice and CONFIG.llm_cloud_off)
+        else ("disabled" if (requested_voice and not CONFIG.tts_enabled) else None)
+    )
+    if gated_voice:
         overrides = {
             "model": resolved.tts_model,
             "voice": resolved.tts_voice,
@@ -995,9 +1005,6 @@ def build_app(config: WebAppConfig) -> Any:
         from ..desktop import settings as _ds
 
         ds, _ = _ds.load_settings()
-        from ..desktop import settings as _ds
-
-        ds, _ = _ds.load_settings()
         resolved_cfg = getattr(app.state, "config", None)
         current_sessions_dir = str(
             getattr(resolved_cfg, "sessions_dir", Path("sessions"))
@@ -1291,6 +1298,9 @@ def _render_session_page(
 
     # Resolve voice/TTS options for this app instance
     voice_enabled: bool = bool(getattr(app.state, "voice_enabled", False))
+    voice_disabled_reason: str | None = getattr(
+        app.state, "voice_disabled_reason", None
+    )
     tts_opts: TTSOptions | None = getattr(app.state, "tts_options", None)
     tts_format = tts_opts.audio_format if tts_opts else CONFIG.tts_format
 
@@ -1356,6 +1366,7 @@ def _render_session_page(
         total_seconds=total_seconds,
         total_hms=total_hms,
         total_minutes_text=total_minutes_text,
+        voice_disabled_reason=voice_disabled_reason or "",
         server_host=server_host,
         server_port=server_port,
         server_reload=server_reload,
@@ -1549,6 +1560,7 @@ def _render_session_shell(
     total_seconds: float,
     total_hms: str,
     total_minutes_text: str,
+    voice_disabled_reason: str,
     server_host: str,
     server_port: int,
     server_reload: bool,
@@ -1589,6 +1601,7 @@ def _render_session_shell(
             "short_duration": short_duration,
             "short_voiced": short_voiced,
             "voice_attr": voice_attr,
+            "voice_disabled_reason": voice_disabled_reason,
             "tts_mime": tts_mime,
             "total_seconds": round(float(total_seconds or 0.0), 2),
             "total_hms": total_hms,

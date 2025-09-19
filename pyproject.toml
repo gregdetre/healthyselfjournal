@@ -52,3 +52,6 @@ packages = ["healthyselfjournal"]
 "healthyselfjournal/prompts/summary.prompt.md.jinja" = "healthyselfjournal/prompts/summary.prompt.md.jinja"
 "healthyselfjournal/static/css/app.css" = "healthyselfjournal/static/css/app.css"
 "healthyselfjournal/static/js/app.js" = "healthyselfjournal/static/js/app.js"
+"healthyselfjournal/web/templates/session_shell.html.jinja" = "healthyselfjournal/web/templates/session_shell.html.jinja"
+"healthyselfjournal/web/templates/settings.html.jinja" = "healthyselfjournal/web/templates/settings.html.jinja"
+"healthyselfjournal/web/templates/setup.html.jinja" = "healthyselfjournal/web/templates/setup.html.jinja"

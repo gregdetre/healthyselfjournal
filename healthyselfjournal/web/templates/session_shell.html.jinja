@@ -37,12 +37,25 @@
         <h1>Healthy Self Journal</h1>
         <p class="hsj-session-id">Session <a id="reveal-session" href="/session/{{ session_id }}/reveal" title="Reveal in Finder">{{ session_id }}</a></p>
         <p class="hsj-total-duration">Total duration so far: <span id="total-duration">{{ total_minutes_text }}</span></p>
-        <p><a id="reveal-sessions-folder" href="/reveal/sessions" title="Reveal Sessions Folder">Reveal Sessions Folder</a></p>
+        <p>
+          <a id="reveal-sessions-folder" href="/reveal/sessions" title="Reveal Sessions Folder">Reveal Sessions Folder</a>
+          <span style="margin:0 0.5rem; color:#9ca3af;">|</span>
+          <a id="open-preferences" href="/settings" title="Preferences">Preferences…</a>
+        </p>
         <div class="hsj-voice-toggle">
           <label>
-            <input type="checkbox" id="voice-toggle" {% if voice_attr == 'true' %}checked{% endif %} />
+            <input type="checkbox" id="voice-toggle" {% if voice_attr == 'true' %}checked{% endif %} {% if voice_attr != 'true' and voice_disabled_reason %}disabled{% endif %} />
             Voice mode
           </label>
+          {% if voice_attr != 'true' and voice_disabled_reason %}
+          <small style="display:block;color:#6b7280;margin-top:0.25rem;">
+            {% if voice_disabled_reason == 'privacy' %}
+              Disabled in privacy mode.
+            {% else %}
+              Disabled by settings.
+            {% endif %}
+          </small>
+          {% endif %}
         </div>
       </header>
 
