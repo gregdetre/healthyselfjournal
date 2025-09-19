@@ -8,6 +8,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
+from rich.live import Live
 import tempfile
 import shutil
 
@@ -366,6 +367,15 @@ def start_or_resume_session(
     if resume:
         markdown_files = sorted((p for p in sessions_dir.glob("*.md")), reverse=True)
         if not markdown_files:
+            state = manager.start()
+            # Show absolute sessions dir and actual session file before panels
+            abs_dir = str(sessions_dir.expanduser().resolve())
+            console.print(
+                Text(
+                    f"Sessions directory: {abs_dir}\nSession file: {state.markdown_path.resolve()}",
+                    style="dim",
+                )
+            )
             console.print(
                 Panel.fit(
                     "No prior sessions found. Starting a new session.",
@@ -373,11 +383,18 @@ def start_or_resume_session(
                     border_style="magenta",
                 )
             )
-            state = manager.start()
             question = opening_question
         else:
             latest_md = markdown_files[0]
             state = manager.resume(latest_md)
+            # Show absolute sessions dir and actual session file before panels
+            abs_dir = str(sessions_dir.expanduser().resolve())
+            console.print(
+                Text(
+                    f"Sessions directory: {abs_dir}\nSession file: {state.markdown_path.resolve()}",
+                    style="dim",
+                )
+            )
             doc = load_transcript(state.markdown_path)
             if doc.body.strip():
                 try:
@@ -406,6 +423,15 @@ def start_or_resume_session(
                     f"Run [cyan]{cmd}[/] to backfill."
                 )
     else:
+        state = manager.start()
+        # Show absolute sessions dir and actual session file before panels
+        abs_dir = str(sessions_dir.expanduser().resolve())
+        console.print(
+            Text(
+                f"Sessions directory: {abs_dir}\nSession file: {state.markdown_path.resolve()}",
+                style="dim",
+            )
+        )
         console.print(
             Panel.fit(
                 "Voice journaling session starting. Recording starts immediately.\n"
@@ -415,7 +441,6 @@ def start_or_resume_session(
                 border_style="magenta",
             )
         )
-        state = manager.start()
         question = opening_question
         pending = _count_missing_stt(sessions_dir)
         if pending:
