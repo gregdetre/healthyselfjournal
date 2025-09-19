@@ -36,16 +36,21 @@ Motivations:
 - Focus behavior: Continue recording when tab loses focus
 - User model: Single-user, local-only for now; avoid auth/user management
 - Concurrency: Allow simultaneous CLI and web; timestamped session IDs avoid collisions
+- Audio format: Record and upload `audio/webm; codecs=opus` from the browser; no server-side transcoding. STT must accept `webm/opus` directly.
+- JavaScript scope: Keep JS minimal (UI + recording only). All processing remains in Python.
+- Port and bind: Default to `127.0.0.1:8765`.
+- Static assets: Serve at `/static/` path from `healthyselfjournal/static/`.
+- No clip cap: Do not enforce a maximum duration in the browser.
+- No hidden fallbacks: If STT cannot accept `webm/opus`, fail clearly (do not transcode or silently switch providers).
 
 
 ## Open questions and concerns (sounding-board)
 
 Top questions (please decide):
-1) Audio upload format and conversion path: Accept browser-native `webm/opus` and convert to WAV on the server with `ffmpeg`, or implement a client-side WAV encoder (heavier JS, more CPU)? Preference: accept `webm/opus` and convert server-side; fall back to direct `webm` STT if backend supports it. Any constraints with current STT providers?
-2) Project structure for web assets: Keep TypeScript in `healthyselfjournal/web/ts/` compiled to `healthyselfjournal/static/js/`, or use a top-level `web/` folder? Preference: keep under package (`healthyselfjournal/static/`) to simplify packaging and later desktop bundling.
+1) STT backend choice(s) for web path: Confirm we will target STT providers that accept `audio/webm; codecs=opus` end-to-end (e.g., OpenAI Whisper API). Is this acceptable for Web V1 with no transcoding path?
+2) Safari support policy: Is it acceptable to target Chrome primarily and mark Safari as “best effort” (no WAV polyfill or alternate encoder in V1)?
 
 Secondary questions (lower priority):
-- Port binding and URL: default `localhost:8765` or `http://127.0.0.1:8765`? Any conflicts expected?
 - Phosphor icons integration: web font vs SVG sprites vs inline SVG? Minimal first: inline the spinner SVG to avoid extra asset plumbing.
 - Safari support: `MediaRecorder` coverage is newer on Safari; acceptable to require relatively modern Safari, or add a WAV encoder fallback later?
 - Max clip size: enforce a client-side cap (e.g., 10 minutes) to avoid huge uploads? CLI parity suggests keeping soft boundaries.
@@ -59,11 +64,12 @@ Secondary questions (lower priority):
 - [ ] Decide and document default port (e.g., 8765) and `--sessions-dir` CLI flag for the web entrypoint
 - [ ] Create `healthyselfjournal/static/` directories for `js/`, `css/`, and optional icons
 - [ ] Add TypeScript tooling: `tsconfig.json`, `package.json` (scripts: `build`, `watch`) – no separate webserver; assets served statically by FastHTML
-- [ ] Confirm `ffmpeg` availability; if missing, gracefully accept `webm/opus` input and route to an STT backend that supports it or error with guidance
+- [ ] Serve static files at `/static/` mapped to `healthyselfjournal/static/`
+- [ ] Bind to `127.0.0.1:8765` by default; make port configurable
 
 Acceptance criteria:
-- Running `uv run --active healthyselfjournal web` starts a local server and serves a “Hello” page
-- `healthyselfjournal/static/` is served correctly
+- Running `uv run --active healthyselfjournal web` starts a local server and serves a “Hello” page at `http://127.0.0.1:8765`
+- `/static/` serves assets from `healthyselfjournal/static/`
 
 ### Stage: Server skeleton (FastHTML)
 - [ ] Create minimal FastHTML app: index page with record button, level meter container, and placeholder status text
@@ -86,12 +92,11 @@ Acceptance criteria:
 
 ### Stage: Server-side processing integration
 - [ ] Save uploaded audio under `sessions/<timestamp>/browser-<n>.webm` (or mime-based extension)
-- [ ] If needed, convert to WAV with `ffmpeg` for STT parity with CLI
 - [ ] Invoke `transcription.py` with configured backend; persist raw STT `.stt.json` next to audio
 - [ ] Update or create the session markdown (`.md`) with transcript and frontmatter using `session.py`/`storage.py`
 
 Acceptance criteria:
-- Uploading a real recording creates a new session folder with audio, transcript, raw STT JSON, and a markdown file with frontmatter
+- Uploading a real recording creates a new session folder with audio (`.webm`), transcript, raw STT JSON, and a markdown file with frontmatter (no transcoding step)
 
 ### Stage: Dialogue loop and UI feedback
 - [ ] Call `llm.py` to generate next question based on transcript and context rules
@@ -122,7 +127,7 @@ Acceptance criteria:
 
 ### Stage: Documentation and developer ergonomics
 - [ ] Update `docs/reference/COMMAND_LINE_INTERFACE.md` with web entrypoint details
-- [ ] Add `docs/reference/FILE_FORMATS_ORGANISATION.md` note about web-originated audio (`webm/opus` → WAV conversion)
+- [ ] Add `docs/reference/FILE_FORMATS_ORGANISATION.md` note about web-originated audio using `webm/opus` (no conversion)
 - [ ] Add a brief `docs/reference/BACKGROUND_PROCESSING.md` note on web uploads and conversion
 - [ ] Document TypeScript build commands in `docs/reference/SETUP.md`
 
@@ -138,7 +143,7 @@ Acceptance criteria:
 
 ## Risks and mitigations
 
-- Browser audio format mismatch (webm/opus vs WAV): convert server-side with `ffmpeg`; if unavailable, route to STT that accepts `webm` or warn with guidance
+- STT provider format mismatch: Web V1 assumes `webm/opus` is accepted by the configured STT backend. Mitigation: choose/verify provider early and add automated test with a small `webm/opus` sample.
 - Safari/older browsers: `MediaRecorder` support may lag; document minimum browser versions; consider a WAV encoder fallback later if needed
 - Latency and large uploads: begin with simple whole-clip upload; later consider chunking or streaming only if needed
 - Local HTTP exposure: bind to `127.0.0.1` by default; document how to change; avoid auth complexity in single-user mode
@@ -168,5 +173,4 @@ Implementation hints:
 - Name files `browser-001.webm`, `browser-002.webm` within the session to preserve order
 - Level meter: `AnalyserNode.getByteTimeDomainData` mapped to a simple bar is sufficient for V1
 - Consider a simple router path structure: `/` (home), `/upload` (POST), `/session/<id>` (view)
-
 

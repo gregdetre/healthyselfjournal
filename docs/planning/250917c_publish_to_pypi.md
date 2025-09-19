@@ -29,39 +29,35 @@
 ### Stages & actions
 
 #### Stage: Prepare packaging configuration
-- [ ] Add a build backend to `pyproject.toml` (Hatch):
+- [x] Add a build backend to `pyproject.toml` (Hatch):
   - `[build-system] requires = ["hatchling"]`, `build-backend = "hatchling.build"`.
   - `[tool.hatch.build.targets.wheel] packages = ["healthyselfjournal"]`.
   - Ensure non-Python assets are included (see next action).
-- [ ] Ensure prompt templates are included in wheels:
-  - Add Hatch build config to include `healthyselfjournal/prompts/*.jinja` (e.g., `tool.hatch.build.targets.wheel.force-include` mapping, or broader include for the package directory).
-  - Acceptance: fresh wheel contains both `question.prompt.md.jinja` and `summary.prompt.md.jinja` paths under the package.
-- [ ] Review and finalize `project` metadata:
-  - `name`, `version`, `description`, `readme`, `license`, `classifiers`, `urls`.
-  - Keep `requires-python = ">=3.12"`.
-  - Optional extras (if any) to group optional features.
+- [x] Ensure prompt templates are included in wheels:
+  - Added Hatch force-include for `healthyselfjournal/prompts/*.jinja` and web static under `healthyselfjournal/static/{css,js}`.
+  - Acceptance: verified in built wheel.
+- [x] Review and finalize `project` metadata:
+  - `requires-python = ">=3.12"` kept. `gjdutils>=0.6.1` set; added `fastcore>=1.5,<1.6`; constrained `python-fasthtml>=0.3,<0.4`.
 
 #### Stage: Dependencies and local overrides
-- [ ] Ensure `gjdutils` dependency resolves for published artifacts:
-  - Prefer `gjdutils>=X.Y` from PyPI (gjdutils is already on PyPI), keeping `[tool.uv.sources]` for local dev only.
-  - Alternative: PEP 508 VCS URL `gjdutils @ git+https://github.com/gregdetre/gjdutils` if we need unreleased features.
-  - Acceptance: building with `python -m build` does not embed a local path dependency.
+- [x] Ensure `gjdutils` dependency resolves for published artifacts:
+  - Using `gjdutils>=0.6.1` from PyPI; `[tool.uv.sources]` retained for local dev.
+  - Acceptance: `uv build` wheel shows no local path deps.
 
 #### Stage: Build and local validation
-- [ ] Clean builds and produce distributions:
-  - `uv build` (or `python -m build`) → `dist/*.whl`, `dist/*.tar.gz`.
-- [ ] Verify wheel contents include prompts and console script:
-  - Inspect wheel (e.g., `unzip -l dist/*.whl | rg prompts/`), check that entry point `healthyselfjournal` exists in `RECORD`.
-- [ ] Smoke-test from wheel with `uvx --from dist/*.whl healthyselfjournal -- --help`.
-- [ ] Verify runtime prompt load without network/API:
-  - `uvx --from dist/*.whl python -c "import healthyselfjournal.llm as m; print(m._load_prompt('question.prompt.md.jinja')[:40])"` (ensures assets are bundled).
+- [x] Clean builds and produce distributions:
+  - `uv build` → `dist/*.whl`, `dist/*.tar.gz`.
+- [x] Verify wheel contents include prompts and console script:
+  - Inspected wheel; prompts and static present; console script works.
+- [x] Smoke-test from wheel with `uvx --from dist/*.whl healthyselfjournal -- --help`.
+- [x] Verify runtime prompt load without network/API:
+  - Confirmed prompt text loads from installed wheel.
 
 #### Stage: TestPyPI publish and validation
-- [ ] Configure credentials for TestPyPI (`~/.pypirc` or env vars for `twine`).
-- [ ] Upload to TestPyPI: `twine upload -r testpypi dist/*`.
-- [ ] Validate install from TestPyPI in a temp venv:
-  - `python -m venv /tmp/eljournal-testpypi && /tmp/eljournal-testpypi/bin/pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ healthyselfjournal`.
-  - Run `/tmp/.../bin/healthyselfjournal --help` and the prompt asset check above.
+- [x] Configure credentials for TestPyPI (`~/.pypirc` or env vars for `twine`).
+- [x] Upload to TestPyPI: `twine upload -r testpypi dist/*`.
+- [x] Validate install from TestPyPI in a temp venv:
+  - Installed and ran `healthyselfjournal --help`; prompt asset load verified.
 
 #### Stage: PyPI publish and validation
 - [ ] Bump version if needed, ensure git clean, tag workflow (optional).
@@ -70,10 +66,9 @@
 - [ ] Optional: pin run check `uvx healthyselfjournal==<version>`.
 
 #### Stage: Documentation & follow-ups
-- [ ] Update `README.md` with install/run snippets:
-  - `uvx healthyselfjournal`
-  - Notes on Python 3.12, env vars, optional `ffmpeg`.
-- [ ] Update `docs/reference/SETUP.md` and `COMMAND_LINE_INTERFACE.md` with PyPI install notes.
+- [x] Update `README.md` with install/run snippets:
+  - `uvx healthyselfjournal` examples added; PyPI flow documented.
+- [x] Update `docs/reference/SETUP.md` and `COMMAND_LINE_INTERFACE.md` with PyPI install notes.
 - [ ] (Optional) Add CI job for publishing on tag, using trusted publishing or API token.
 - [ ] (Optional) Add `CHANGELOG.md` and release notes workflow.
 

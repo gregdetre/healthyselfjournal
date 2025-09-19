@@ -23,6 +23,7 @@ Non-blocking tasks improve responsiveness by moving work off the interactive loo
 - Summary regeneration is scheduled after each exchange and executed in a background worker
 - Writes are protected by an in-process lock to prevent clobbering
 - The summary may lag briefly behind the latest exchange; resilience preserved
+- Browser uploads share the same scheduling path: each successful clip upload appends to the transcript, then queues summary regeneration while the response is streamed back to the client.
 
 ## Patterns and how-tos
 
@@ -49,5 +50,4 @@ Non-blocking tasks improve responsiveness by moving work off the interactive loo
 
 - Debounced/coalesced scheduling for bursts of updates
 - Optional metrics around background task queueing and latency
-
 

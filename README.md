@@ -82,12 +82,13 @@ Use either pip or uvx:
 ```bash
 # pip
 pip install healthyselfjournal
-healthyselfjournal init
-healthyselfjournal journal
-
-# or uvx (no install needed)
 uvx healthyselfjournal -- init
 uvx healthyselfjournal -- journal
+
+# Or install with pip if you prefer
+pip install healthyselfjournal
+healthyselfjournal init
+healthyselfjournal journal
 ```
 
 To run the dialogue loop fully offline, install Ollama + Gemma (see `docs/reference/OLLAMA_GEMMA_DEPLOYMENT_GUIDE.md`), ensure the daemon is running, then start the CLI with:
@@ -111,7 +112,7 @@ Notes:
    ```
 3. Start a session:
    ```bash
-   uv run healthyselfjournal journal
+   uvx healthyselfjournal -- journal
    ```
 
 Handy flags:

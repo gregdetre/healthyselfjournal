@@ -15,9 +15,9 @@ Session transcripts remain flat, with per-session assets stored in a sibling sub
 Base directory (default `./sessions/`) contains (minute-level session IDs; no seconds):
 - `yyMMdd_HHmm.md` — Transcript and dialogue for the session
 - `yyMMdd_HHmm/` — Folder containing all session assets:
-  - `yyMMdd_HHmm_XX.wav` — Audio segment for response `XX`
-- `yyMMdd_HHmm_XX.mp3` — Optional MP3 sibling when `ffmpeg` is available
-  - `yyMMdd_HHmm_XX.stt.json` — Raw Whisper transcription payload for that segment
+  - CLI captures: `yyMMdd_HHmm_XX.wav` (and optional `yyMMdd_HHmm_XX.mp3` when `ffmpeg` is present)
+  - Web captures: `browser-XXX.webm` (no transcoding; recorded as `audio/webm;codecs=opus`)
+  - `*.stt.json` — Raw transcription payload written beside each clip regardless of source
 
 Note: Extremely short, low‑voiced takes may be auto‑discarded. In those cases no `.wav`, `.mp3`, or `.stt.json` is kept.
 

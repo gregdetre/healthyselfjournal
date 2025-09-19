@@ -68,6 +68,22 @@ uv run python healthyselfjournal.py --duration 3
 ```
 Note: If both an active external venv and a project `.venv` exist, uv prefers the project `.venv` unless you pass `--active`.
 
+## Front-end assets
+The web UI ships with a TypeScript recorder. Install/build assets with `npm` (or your preferred Node package manager):
+
+```bash
+# install dev dependencies (TypeScript compiler)
+npm install
+
+# one-off compile (emits ES modules under healthyselfjournal/static/js/)
+npm run build
+
+# or rebuild on change
+npm run watch
+```
+
+`npm run build` transpiles `healthyselfjournal/static/ts/app.ts` into `healthyselfjournal/static/js/app.js`. The compiled output is committed, but rerun the build after editing the TypeScript sources.
+
 ## Configuration snippet
 `pyproject.toml` excerpt:
 ```toml
@@ -99,4 +115,3 @@ uv run --active python -c "import gjdutils, pathlib; p=pathlib.Path(gjdutils.__f
 ## Maintenance
 - Re-run `uv sync --active` after changing dependencies.
 - Run `uv lock` before sharing or deploying to ensure reproducible environments.
-

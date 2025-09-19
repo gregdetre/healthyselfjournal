@@ -68,6 +68,16 @@ Environment requirements:
 - `journal`: requires `ANTHROPIC_API_KEY` when the LLM provider is `anthropic:*` (default cloud mode). Local `ollama:*` models keep dialogue/summaries offline. `OPENAI_API_KEY` is still needed only when `--stt-backend cloud-openai` is selected.
 - `reconcile`: requires `OPENAI_API_KEY` only when `--stt-backend cloud-openai` is selected. Local backends run fully offline if their dependencies are installed.
 
+### Microphone input handling and sample‑rate fallback
+
+The CLI records via `sounddevice`/PortAudio. If your input device changes mid-session (for example, turning off Bluetooth headphones), the app will now:
+
+- Retry the default input device at the requested sample rate
+- Retry the device’s default sample rate
+- Iterate other available input devices with their default rates
+
+When the input sample rate differs from the requested one (e.g., 48000 Hz rather than 16000 Hz), a brief yellow notice appears: “Input device uses 48000 Hz; adjusting.” The WAV is recorded at the effective rate.
+
 ### Formatting behaviour
 
 Client-side formatting runs only when `--stt-formatting` is `sentences`. The heuristic remains O(n), preserves ellipses, and splits on `.`, `!`, `?` followed by an uppercase/digit. Switching to `--stt-formatting raw` keeps the backend text untouched (aside from `.strip()`).
@@ -87,6 +97,11 @@ Every transcription logs start/success/failure events with backend, model, compu
 - `auto-private` errors immediately when no local backend is available—install `mlx-whisper`, `faster-whisper`, or `whispercpp`.
 - whisper.cpp requires an explicit GGUF path; presets only work for cloud/faster/MLX.
 - To inspect raw backend output, open the `.stt.json` that sits beside each WAV file.
+
+- PortAudio/macOS input device changed (e.g., Bluetooth headset turned off mid-session):
+  - Symptoms: console warnings like `PaMacCore (AUHAL) ... '!obj'`, `err='-10851' Audio Unit: Invalid Property Value`, followed by `sounddevice.PortAudioError: Error opening InputStream: Internal PortAudio error [PaErrorCode -9986]`.
+  - Behaviour: the app automatically retries devices/sample rates. If it recovers, you may see a notice such as “Input device uses 48000 Hz; adjusting.”
+  - If it still fails: fully disconnect the headset or select a working input in System Settings → Sound → Input, then rerun `uv run --active healthyselfjournal journal`. Also close any apps that might be holding the microphone.
 
 ### Next steps
 
