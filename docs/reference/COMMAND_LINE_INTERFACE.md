@@ -155,6 +155,7 @@ See also (details and rationale):
 
 ## See also
 
+- `ARCHITECTURE.md` – CLI interface layer and audio pipeline architecture
 - `RECORDING_CONTROLS.md` – Detailed key mappings and recording flow for capture.
 - `PRODUCT_VISION_FEATURES.md` – How the CLI supports the broader product vision.
 - `PRIVACY.md` – Privacy modes, offline configuration, and what leaves your machine.

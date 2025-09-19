@@ -177,3 +177,26 @@ uvx --python 3.12 healthyselfjournal -- --help
 - [ ] `uvx twine upload dist/*` publishes to PyPI
 - [ ] `uvx healthyselfjournal -- --help` works on a clean machine
 - [ ] Docs updated (`README.md`, `COMMAND_LINE_INTERFACE.md`) if flags/flows changed
+ - [ ] Pin-run check: `uvx healthyselfjournal==<version> -- --help`
+ - [ ] Tag and push: `git tag v<version> && git push origin v<version>`
+ - [ ] Update `CHANGELOG.md` with highlights for this release
+ - [ ] (If enabled) CI Trusted Publishing workflow runs and succeeds
+
+## Quick checklist for a new version
+
+Short, practical steps for routine releases (example bumps 0.2.0 → 0.2.1):
+
+1. Edit `pyproject.toml` → `[project] version = "0.2.1"`
+2. Build: `uv build`
+3. Inspect wheel: `unzip -l dist/*.whl | rg -n "prompts/|static/"`
+4. Local smoke test:
+   - `uvx --from dist/*.whl healthyselfjournal -- --help`
+   - `uvx --from dist/*.whl python -c "import healthyselfjournal.llm as m; print(m._load_prompt('question.prompt.md.jinja')[:40])"`
+5. Upload:
+   - TestPyPI (optional): `uvx twine upload -r testpypi dist/*`
+   - PyPI: `uvx twine upload dist/*`
+6. Validate from PyPI:
+   - `uvx healthyselfjournal==0.2.1 -- --help`
+   - Optional: `uvx --python 3.12 healthyselfjournal==0.2.1 -- --help`
+7. Commit/tag (optional): `git tag v0.2.1` and push
+8. Update docs/changelog if user‑facing changes were made
