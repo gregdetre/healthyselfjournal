@@ -35,7 +35,7 @@ from ..errors import (
     REVEAL_FAILED,
     UNSUPPORTED_PLATFORM,
 )
-from ..events import log_event
+from ..events import log_event, init_event_logger, get_event_log_path
 from ..session import SessionConfig, SessionManager
 from ..storage import load_transcript
 from ..transcription import BackendNotAvailableError, resolve_backend_selection
@@ -152,6 +152,24 @@ def build_app(config: WebAppConfig) -> Any:
     resolved = config.resolved()
     resolved.sessions_dir.mkdir(parents=True, exist_ok=True)
     resolved.static_dir.mkdir(parents=True, exist_ok=True)
+
+    # Ensure the append-only metadata event logger is initialised for the web server
+    try:
+        init_event_logger(resolved.sessions_dir)
+        log_event(
+            "web.server.start",
+            {
+                "ui": "web",
+                "sessions_dir": str(resolved.sessions_dir),
+                "host": resolved.host,
+                "port": resolved.port,
+                "reload": bool(resolved.reload),
+                "events_log": str(get_event_log_path() or ""),
+            },
+        )
+    except Exception:
+        # Defensive: never fail app construction due to logging setup
+        pass
 
     FastHTML = _get_fast_html_class()
     app = FastHTML()

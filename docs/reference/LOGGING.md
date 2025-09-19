@@ -37,7 +37,7 @@ There are two complementary logging streams:
 
 ### Location
 - The event log is created at `<sessions-dir>/events.log`.
-- CLI sessions call `init_event_logger(--sessions-dir)` on startup. This ensures the file exists so external tools can tail it immediately.
+- CLI sessions call `init_event_logger(--sessions-dir)` on startup. The web server initialises the event logger on app construction using the configured `sessions_dir`.
 
 ### Format
 - Each line is a compact JSON object with at least:
@@ -69,7 +69,7 @@ Other protections in `events._sanitize_metadata()` and `_to_json_safe()`:
 ### Typical events
 - CLI lifecycle: `cli.start`, `cli.error`, `cli.end`, `cli.cancelled`
 - Session lifecycle: `session.start`, `session.resume`, `session.exchange.recorded`, `session.summary.updated`, `session.complete`, `session.exchange.discarded_short`
-- Web UI: `web.session.started`, `web.session.resumed`, `web.upload.received`, `web.upload.processed`, `web.static.assets_missing`, `web.session.evicted`, `web.sessions.active`
+- Web UI: `web.server.start`, `web.session.started`, `web.session.resumed`, `web.upload.received`, `web.upload.processed`, `web.static.assets_missing`, `web.session.evicted`, `web.sessions.active`
 - Audio/TTS: `tts.request`, `tts.response`, `tts.error`, `tts.skip`
 
 Example lines (wrapped for readability):
@@ -95,7 +95,7 @@ log_event("my.custom.event", {"status": "ok", "duration_seconds": 1.23})
 
 Notes:
 - If `init_event_logger()` has not been called, `log_event()` is a no‑op.
-- The CLI initialises this automatically; the web server currently does not (see transition notes below).
+- Both the CLI and the web server initialise this automatically.
 
 ### Tail and filter
 - Tail in real time:
@@ -126,22 +126,21 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 ## Documenting systems in transition
 
 Current state
-- CLI: Calls `init_event_logger(--sessions-dir)`; structured events are written to `sessions/events.log`.
-- Web: Emits `log_event(...)` throughout request handlers, but does not currently initialise the event logger. If you run only the web server first, events will be dropped unless an external caller initialises the logger.
+- CLI and Web: Both initialise the event logger on startup and write to `sessions/events.log`. The web server emits a `web.server.start` event at boot with host/port and resolved sessions directory.
 
 Target state
-- Initialise event logging automatically for the web server using the configured `sessions_dir` when the app starts.
+- Same as current. No active migration.
 
 Migration status
-- Pending: Add `init_event_logger(config.sessions_dir)` during web app startup.
+- Completed: The web app initialises logging during app construction.
 
 ## Troubleshooting
 - No `events.log` file appears
-  - Ensure the CLI was run (it initialises the logger), or call `init_event_logger(Path(--sessions-dir))` in your entrypoint.
+  - Ensure the CLI or Web was run (both initialise the logger). On Web, look for a `web.server.start` entry. If missing, verify write permissions for the sessions directory.
 - Seeing `tts.error` entries
   - Confirm `OPENAI_API_KEY` is set when TTS or cloud STT is enabled; see `AUDIO_SPEECH_GENERATION.md`.
 - Web uploads succeed but no events are recorded
-  - See transition note above; initialise the event logger for the web server.
+  - Verify `web.server.start` appears; confirm `sessions_dir` is correct and writable.
 
 ## Quality checklist
 - Cross‑references link to canonical sources (`events.py`, privacy docs, file formats).
