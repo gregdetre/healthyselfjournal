@@ -162,20 +162,37 @@ def record_response(
     status_text = Text("Initializing input…", style="italic yellow")
 
     try:
-        with sf.SoundFile(
-            wav_path,
-            mode="x",
-            samplerate=sample_rate,
-            channels=1,
-            subtype="PCM_16",
-        ) as wav_file:
+        # Open input stream first to determine the effective samplerate/device,
+        # which enables robust fallbacks if the previous device is gone.
+        with create_input_stream(sample_rate, _audio_callback) as stream:
+            effective_sr = int(
+                getattr(stream, "samplerate", sample_rate) or sample_rate
+            )
 
-            with create_input_stream(sample_rate, _audio_callback):
+            if effective_sr != sample_rate:
+                try:
+                    console.print(
+                        Text(
+                            f"Input device uses {effective_sr} Hz; adjusting.",
+                            style="yellow",
+                        )
+                    )
+                except Exception:
+                    pass
+
+            with sf.SoundFile(
+                wav_path,
+                mode="x",
+                samplerate=effective_sr,
+                channels=1,
+                subtype="PCM_16",
+            ) as wav_file:
+
                 with Live(console=console, auto_refresh=False) as live:
                     frames_written, voiced_seconds = run_meter_loop(
                         live=live,
                         wav_file=wav_file,
-                        sample_rate=sample_rate,
+                        sample_rate=effective_sr,
                         frames_queue=frames_queue,
                         level_queue=level_queue,
                         paused_event=paused_event,
@@ -184,7 +201,7 @@ def record_response(
                         max_seconds=max_seconds,
                     )
 
-                duration_sec = max(frames_written / sample_rate, 0.0)
+            duration_sec = max(frames_written / effective_sr, 0.0)
 
     except Exception as exc:  # pragma: no cover - defensive logging
         _LOGGER.exception("Error during audio capture: %s", exc)
@@ -355,14 +372,102 @@ def _rms_above_threshold(rms: float, threshold_dbfs: float) -> bool:
 def create_input_stream(
     sample_rate: int, callback
 ) -> "contextlib.AbstractContextManager[object]":
-    """Context manager wrapper for sd.InputStream to simplify testing and reuse."""
-    with sd.InputStream(
-        samplerate=sample_rate,
-        channels=1,
-        dtype="float32",
-        callback=callback,
-    ) as stream:
-        yield stream
+    """Open an input stream with fallbacks for device changes/sample rate issues.
+
+    Attempts the requested samplerate on the default input device first, then
+    retries with the device's default samplerate, and finally iterates through
+    available input devices with their defaults. This helps recover when a
+    Bluetooth headset is disconnected or a device doesn't support 16 kHz.
+    """
+    # Build ordered attempts: (device_index_or_None, samplerate)
+    attempts: list[tuple[object | None, int]] = []
+
+    # Always try requested rate on default device first
+    attempts.append((None, int(sample_rate)))
+
+    def _safe_query_default_input() -> dict:
+        try:
+            return sd.query_devices(None, "input")  # type: ignore[arg-type]
+        except Exception:
+            return {}
+
+    def _safe_query_all() -> list[dict]:
+        try:
+            all_devices = sd.query_devices()
+            return list(all_devices) if isinstance(all_devices, list) else []
+        except Exception:
+            return []
+
+    default_info = _safe_query_default_input()
+    default_sr = int(default_info.get("default_samplerate") or 0) or None  # type: ignore[assignment]
+    if default_sr and default_sr != sample_rate:
+        attempts.append((None, int(default_sr)))
+
+    # Try each available input device with requested and its default samplerate
+    for idx, info in enumerate(_safe_query_all()):
+        try:
+            max_in = int(info.get("max_input_channels", 0))
+        except Exception:
+            max_in = 0
+        if max_in <= 0:
+            continue
+        # Requested rate on this device
+        attempts.append((idx, int(sample_rate)))
+        # Device default rate
+        try:
+            dev_sr = int(info.get("default_samplerate") or 0)
+        except Exception:
+            dev_sr = 0
+        if dev_sr and dev_sr != sample_rate:
+            attempts.append((idx, int(dev_sr)))
+
+    # De-duplicate attempts while preserving order
+    unique_attempts: list[tuple[object | None, int]] = []
+    seen: set[tuple[object | None, int]] = set()
+    for item in attempts:
+        if item in seen:
+            continue
+        seen.add(item)
+        unique_attempts.append(item)
+
+    last_exc: Exception | None = None
+    for device, sr in unique_attempts:
+        try:
+            with sd.InputStream(
+                samplerate=sr,
+                channels=1,
+                dtype="float32",
+                callback=callback,
+                device=device,
+            ) as stream:
+                try:
+                    if sr != sample_rate or device is not None:
+                        log_event(
+                            "audio.input.fallback",
+                            {
+                                "requested_samplerate": int(sample_rate),
+                                "used_samplerate": int(
+                                    getattr(stream, "samplerate", sr) or sr
+                                ),
+                                "device": (
+                                    device
+                                    if not isinstance(device, dict)
+                                    else device.get("name")
+                                ),
+                            },
+                        )
+                except Exception:
+                    pass
+                yield stream
+                return
+        except Exception as exc:  # pragma: no cover - environment/device dependent
+            last_exc = exc
+            continue
+
+    # If all attempts failed, raise the last error
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Failed to open audio input stream")
 
 
 def run_meter_loop(

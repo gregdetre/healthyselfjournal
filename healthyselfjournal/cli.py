@@ -113,6 +113,26 @@ def web(
         "--reload/--no-reload",
         help="Enable FastHTML/uvicorn autoreload (development only).",
     ),
+    voice_mode: bool = typer.Option(
+        CONFIG.speak_llm,
+        "--voice-mode/--no-voice-mode",
+        help="Speak assistant questions in the browser using server-side TTS.",
+    ),
+    tts_model: str = typer.Option(
+        CONFIG.tts_model,
+        "--tts-model",
+        help="TTS model identifier (server-side synthesis).",
+    ),
+    tts_voice: str = typer.Option(
+        CONFIG.tts_voice,
+        "--tts-voice",
+        help="TTS voice name (server-side synthesis).",
+    ),
+    tts_format: str = typer.Option(
+        CONFIG.tts_format,
+        "--tts-format",
+        help="TTS audio format returned to the browser (e.g., wav, mp3).",
+    ),
 ) -> None:
     """Launch the FastHTML-powered web interface (imports only when invoked)."""
 
@@ -124,6 +144,10 @@ def web(
         host=host,
         port=port,
         reload=reload,
+        voice_enabled=voice_mode,
+        tts_model=tts_model,
+        tts_voice=tts_voice,
+        tts_format=tts_format,
     )
     console.print(
         f"[green]Starting Healthy Self Journal web server on {host}:{port}[/]"
