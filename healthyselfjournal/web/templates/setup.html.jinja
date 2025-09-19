@@ -56,17 +56,7 @@
         </div>
       </form>
     </main>
-    <script>
-      (function(){
-        const pick = document.getElementById('pick-folder');
-        pick?.addEventListener('click', async () => {
-          try {
-            const p = await window.pywebview.api.pick_sessions_dir();
-            if (p) document.getElementById('sessions_dir').value = p;
-          } catch {}
-        });
-      })();
-    </script>
+    <script src="/static/js/setup.js"></script>
   </body>
   </html>
 
