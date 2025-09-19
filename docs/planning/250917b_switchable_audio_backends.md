@@ -8,7 +8,7 @@ Large-v2 is preferred by default for local Whisper because it is reputedly stron
 
 - `healthyselfjournal/transcription.py` — current OpenAI Audio Transcriptions call-site
 - `healthyselfjournal/session.py` — STT invocation and transcript writes
-- `legacy_transcribe_cli.py` — prior MLX/faster-whisper wiring
+  
 - `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md` — legacy local STT guidance (to update)
 - `docs/reference/COMMAND_LINE_INTERFACE.md` — CLI conventions
 
