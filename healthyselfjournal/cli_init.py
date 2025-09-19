@@ -12,8 +12,8 @@ from rich.panel import Panel
 
 from .transcription import (
     resolve_backend_selection,
-    create_transcription_backend,
 )
+from .mic_check import run_interactive_mic_check
 
 
 console = Console()
@@ -136,10 +136,22 @@ def run_init_wizard() -> None:
 
     if bool(run_test):
         try:
-            _smoke_test_setup(sessions_dir, stt_backend_choice)
+            # Resolve selection from wizard choices and run interactive mic check
+            selection = resolve_backend_selection(
+                stt_backend_choice,
+                os.environ.get("STT_MODEL", "default"),
+                os.environ.get("STT_COMPUTE", "auto"),
+            )
+            run_interactive_mic_check(
+                selection,
+                console=console,
+                language="en",
+                stt_formatting=os.environ.get("STT_FORMATTING", "sentences"),
+                seconds=3.0,
+            )
         except Exception as exc:  # pragma: no cover - runtime surface
             console.print(
-                f"[yellow]Smoke test encountered an issue; you can continue:[/] {exc}"
+                f"[yellow]Mic check encountered an issue; you can continue:[/] {exc}"
             )
 
     # Friendly next-step hint
@@ -147,56 +159,10 @@ def run_init_wizard() -> None:
 
 
 def _smoke_test_setup(sessions_dir: Path, stt_backend_value: str) -> None:
-    """Record a short WAV and, for cloud mode, attempt a minimal transcription."""
-
-    wav_path = sessions_dir / "_init_check.wav"
-    try:
-        import sounddevice as sd
-        import soundfile as sf
-        import numpy as np
-    except Exception as exc:  # pragma: no cover - defensive
-        console.print(f"[yellow]Audio libs unavailable; skipping mic test:[/] {exc}")
-        return
-
-    sample_rate = 16_000
-    duration_sec = 1.0
-    try:
-        recording = sd.rec(
-            int(sample_rate * duration_sec),
-            samplerate=sample_rate,
-            channels=1,
-            dtype="float32",
-        )
-        sd.wait()
-        sf.write(wav_path, np.squeeze(recording), sample_rate, subtype="PCM_16")
-        console.print("[green]Microphone test recorded successfully.[/]")
-    except Exception as exc:
-        console.print(f"[yellow]Microphone test failed (continuing without):[/] {exc}")
-        return
-
-    backend_value = (stt_backend_value or "cloud-openai").strip().lower()
-    if backend_value == "cloud-openai":
-        try:
-            selection = resolve_backend_selection(
-                "cloud-openai",
-                os.environ.get("STT_MODEL", "default"),
-                os.environ.get("STT_COMPUTE", "auto"),
-            )
-            backend = create_transcription_backend(selection)
-            result = backend.transcribe(wav_path, language="en")
-            snippet = (result.text or "").strip()
-            console.print(
-                f"[green]Cloud transcription reachable.[/] Text length: {len(snippet)}"
-            )
-        except Exception as exc:
-            console.print(
-                f"[yellow]Transcription test failed (you can still record audio):[/] {exc}"
-            )
-
-    try:
-        wav_path.unlink(missing_ok=True)
-    except Exception:
-        pass
+    """Deprecated: replaced by interactive mic check in the wizard."""
+    console.print(
+        "[yellow]Note:[/] The setup wizard now runs an interactive mic check instead of the old smoke test."
+    )
 
 
 def _update_env_local(env_path: Path, updates: dict[str, str]) -> None:

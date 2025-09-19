@@ -35,7 +35,10 @@ if TYPE_CHECKING:  # pragma: no cover - imported for typing only
 _LOGGER = logging.getLogger(__name__)
 from .events import log_event
 from .utils.time_utils import format_hh_mm_ss
-from .utils.audio_utils import maybe_delete_wav_when_safe
+from .utils.audio_utils import (
+    maybe_delete_wav_when_safe,
+    should_discard_short_answer,
+)
 
 
 @dataclass
@@ -63,11 +66,16 @@ def record_response(
     convert_to_mp3: bool = True,
     max_seconds: float | None = None,
     enforce_short_answer_guard: bool = True,
+    target_wav_path: Path | None = None,
 ) -> AudioCaptureResult:
     """Record audio until a keypress while updating a visual meter."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    wav_path = _next_available_path(output_dir / f"{base_filename}.wav")
+    wav_path = (
+        target_wav_path
+        if target_wav_path is not None
+        else _next_available_path(output_dir / f"{base_filename}.wav")
+    )
     mp3_path: Optional[Path] = None
 
     log_event(
@@ -555,10 +563,7 @@ def apply_short_answer_guard(
     duration_seconds: float, voiced_seconds: float, console: "Console"
 ) -> bool:
     """Return True if capture should be discarded as a very short answer."""
-    if (
-        duration_seconds <= CONFIG.short_answer_duration_seconds
-        and voiced_seconds <= CONFIG.short_answer_voiced_seconds
-    ):
+    if should_discard_short_answer(duration_seconds, voiced_seconds, CONFIG):
         console.print(Text("Very short answer detected; discarded.", style="yellow"))
         log_event(
             "audio.record.discarded_short",

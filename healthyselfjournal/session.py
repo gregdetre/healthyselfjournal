@@ -41,6 +41,11 @@ from .transcription import (
 )
 from .events import log_event
 from .utils.audio_utils import maybe_delete_wav_when_safe
+from .utils.session_layout import (
+    build_segment_path,
+    next_cli_segment_name,
+)
+from .utils.session_utils import get_max_recorded_index
 from .utils.time_utils import format_hh_mm_ss, format_mm_ss
 from rich.text import Text
 
@@ -257,25 +262,17 @@ class SessionManager:
             for entry in audio_entries:
                 try:
                     wav_name = str(entry.get("wav", ""))
-                    # Expect pattern <session_id>_<NN>.wav
-                    stem = Path(wav_name).stem
+                    stem = Path(wav_name).name.split(".", 1)[0]
                     parts = stem.split("_")
                     if len(parts) >= 2 and parts[-1].isdigit():
                         indices.append(int(parts[-1]))
                 except Exception:
                     continue
-            if not indices:
-                # Fallback: inspect filesystem for existing WAVs
-                for wav_path in sorted(
-                    self.state.audio_dir.glob(f"{session_id}_*.wav")
-                ):
-                    try:
-                        stem = wav_path.stem
-                        parts = stem.split("_")
-                        if len(parts) >= 2 and parts[-1].isdigit():
-                            indices.append(int(parts[-1]))
-                    except Exception:
-                        continue
+
+            fs_index = get_max_recorded_index(self.state.audio_dir, session_id)
+            if fs_index:
+                indices.append(fs_index)
+
             self.state.response_index = max(indices) if indices else 0
         except Exception:
             # Defensive: on any error, continue from zero
@@ -296,8 +293,15 @@ class SessionManager:
         if self.state is None:
             raise RuntimeError("Session has not been started")
 
-        self.state.response_index += 1
-        segment_basename = f"{self.state.session_id}_{self.state.response_index:02d}"
+        previous_index = self.state.response_index
+        next_index_hint = previous_index + 1
+        index, segment_basename = next_cli_segment_name(
+            self.state.session_id,
+            self.state.audio_dir,
+            start_index=next_index_hint,
+        )
+        target_wav = build_segment_path(self.state.audio_dir, segment_basename, ".wav")
+        self.state.response_index = index
 
         capture = record_response(
             self.state.audio_dir,
@@ -306,18 +310,19 @@ class SessionManager:
             sample_rate=16_000,
             ffmpeg_path=self.config.ffmpeg_path,
             print_saved_message=False,
+            target_wav_path=target_wav,
         )
 
         if capture.cancelled:
             # Mark disposition for clearer UI messaging
             self.state.last_cancelled = True
             self.state.last_discarded_short = False
-            self.state.response_index -= 1
+            self.state.response_index = previous_index
             return None
 
         if capture.discarded_short_answer:
             # Treat as no exchange; do not transcribe, do not persist any body
-            self.state.response_index -= 1
+            self.state.response_index = previous_index
             self.state.last_cancelled = False
             self.state.last_discarded_short = True
             log_event(
@@ -447,6 +452,7 @@ class SessionManager:
             "quit_after": exchange.audio.quit_after,
             "cancelled": exchange.audio.cancelled,
             "source": source,
+            "ui": source,
         }
         if extra_log_fields:
             log_payload.update(extra_log_fields)

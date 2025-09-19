@@ -474,3 +474,27 @@ def test_thinking_budget_respects_minimum_1024(monkeypatch):
 
     sent = captured.get("payload", {})
     assert sent.get("thinking", {}).get("budget_tokens", 0) >= 1024
+
+def test_resume_counts_browser_segments(tmp_path):
+    base_dir = tmp_path / "sessions"
+    base_dir.mkdir()
+    session_id = "sessionweb"
+    markdown_path = base_dir / f"{session_id}.md"
+    session_dir = base_dir / session_id
+    session_dir.mkdir()
+    (session_dir / "browser-001.webm").write_bytes(b"data")
+
+    write_transcript(
+        markdown_path,
+        TranscriptDocument(frontmatter=Frontmatter(data={}), body=""),
+    )
+
+    config = SessionConfig(
+        base_dir=base_dir,
+        llm_model="anthropic:test",
+        stt_model="whisper-test",
+        opening_question="How are you arriving today?",
+    )
+    manager = SessionManager(config)
+    state = manager.resume(markdown_path)
+    assert state.response_index == 1
