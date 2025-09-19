@@ -259,7 +259,7 @@ Acceptance criteria:
 
 ### Stage: Frontmatter doc vs implementation mismatch (medium impact)
 
-Rationale: `WEB_INTERFACE.md` suggests web entries store `{wav: null}`, but the code stores the actual filename under the `wav` key (and no mp3). Prefer updating docs to reality for simplicity.
+Rationale: Earlier notes suggested web entries store `{wav: null}`, but the code stores the actual filename under the `wav` key (and no mp3). Prefer updating docs to reality for simplicity.
 
 - [ ] Update `WEB_ARCHITECTURE.md` Storage layout section to clarify that the `wav` key contains the audio filename regardless of file type (e.g., `.webm`), and `mp3` is null for web clips.
 - [ ] Optional: Consider renaming to `file` in a future format change; out of scope for this stage.
