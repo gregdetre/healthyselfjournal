@@ -6,7 +6,7 @@ This document describes logging in Healthy Self Journal. It covers the structure
 ## See also
 - `../reference/FILE_FORMATS_ORGANISATION.md` – Where `events.log` lives and the overall session artefacts layout.
 - `../reference/PRIVACY.md` – What metadata is recorded and what is explicitly never logged.
-- `../reference/WEB_INTERFACE.md` – Web upload flow and where web events are emitted.
+- `../reference/WEB_ARCHITECTURE.md` – Web upload flow and where web events are emitted.
 - `../../healthyselfjournal/events.py` – Canonical event logging API and sanitisation logic.
 - `../../healthyselfjournal/cli_journal.py` – Initialises the event logger for CLI sessions.
 - `../../healthyselfjournal/session.py` – Session lifecycle emits `session.*` events.

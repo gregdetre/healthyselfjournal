@@ -4,7 +4,7 @@
 
 - New to the project? Start here: `README.md` and `AGENTS.md`.
 - Setting up development? See: `docs/reference/SETUP_DEV.md` (⭐ START HERE).
-- Running the app? See: `docs/reference/COMMAND_LINE_INTERFACE.md` and `docs/reference/RECORDING_CONTROLS.md`.
+- Running the app? See: `docs/reference/CLI_COMMANDS.md` and `docs/reference/RECORDING_CONTROLS.md`.
 - Understanding the product? See: `docs/reference/PRODUCT_VISION_FEATURES.md`.
 - Data and files? See: `docs/reference/FILE_FORMATS_ORGANISATION.md`.
 - Voice recognition? See: `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md`.
@@ -33,7 +33,7 @@ Conceptual docs, flows, prompts, and product framing.
 ### Development Workflows
 Day-to-day commands and operational guides.
 
-- **CLI** (⭐): `docs/reference/COMMAND_LINE_INTERFACE.md` — Commands to run and manage sessions.
+- **CLI** (⭐): `docs/reference/CLI_COMMANDS.md` — Commands to run and manage sessions.
 - RECORDING CONTROLS: `docs/reference/RECORDING_CONTROLS.md` — Recording UX and control flow.
 
 ### Research Evidence
@@ -72,7 +72,7 @@ Project-level docs at the root.
 
 ## By Persona
 
-- **New Developer**: `docs/reference/SETUP_DEV.md`, `docs/reference/COMMAND_LINE_INTERFACE.md`, `docs/reference/DIALOGUE_FLOW.md`, `docs/reference/FILE_FORMATS_ORGANISATION.md`.
+- **New Developer**: `docs/reference/SETUP_DEV.md`, `docs/reference/CLI_COMMANDS.md`, `docs/reference/DIALOGUE_FLOW.md`, `docs/reference/FILE_FORMATS_ORGANISATION.md`.
 - **AI Agent**: `AGENTS.md`, `docs/reference/LLM_PROMPT_TEMPLATES.md`, `docs/reference/CONVERSATION_SUMMARIES.md`.
 - **Maintainer**: `docs/reference/PRODUCT_VISION_FEATURES.md`, `docs/planning/250917a_voice_journaling_app_v1.md`, `docs/conversations/250917a_journaling_app_ui_technical_decisions.md`.
 

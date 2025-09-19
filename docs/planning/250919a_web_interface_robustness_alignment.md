@@ -28,7 +28,7 @@ This document is a concrete, staged plan to reach parity with the CLI experience
   - `append_exchange_body` and frontmatter layout used by both flows
 - tests/test_web_app.py — Upload/TTS/resume tests using Starlette `TestClient`
   - Stubs backends, validates persistence and next question flow
-- docs/reference/WEB_INTERFACE.md — Architecture and runtime flow for the web UI
+- docs/reference/WEB_ARCHITECTURE.md — Architecture and runtime flow for the web UI
   - Declares intended behavior; some small mismatches with current code
 - docs/diagrams/250919a_cli_ui_flow.mermaid — Baseline CLI flow diagram
   - Aids in mapping parity points for the web flow
@@ -178,7 +178,7 @@ Acceptance criteria:
 
 Rationale: Reinforce the invariant that only `SessionManager` updates frontmatter/body.
 
-- [ ] Add a short note to `WEB_INTERFACE.md` and/or `storage.py` docstrings stating that frontmatter and transcript body are only mutated via `SessionManager` methods.
+- [ ] Add a short note to `WEB_ARCHITECTURE.md` and/or `storage.py` docstrings stating that frontmatter and transcript body are only mutated via `SessionManager` methods.
 - [ ] Quick grep to ensure no direct frontmatter writes in web code paths.
 
 Acceptance criteria:
@@ -239,7 +239,7 @@ Rationale: If a local backend rejects `webm/opus`, errors are generic. Provide a
 
 - [ ] In `upload()` `processing_failed` path, detect known audio-format errors (e.g., exceptions or STDERR signatures if exposed) and return `{error:"audio_format_unsupported", detail:"...", hint:"Try cloud-openai or a backend supporting WEBM/Opus"}` with 415/422.
 - [ ] Log `web.upload.stt_format_error` with backend id and model.
-- [ ] Docs: Add a troubleshooting note in `WEB_INTERFACE.md` about Opus support and suggested remedies.
+- [ ] Docs: Add a troubleshooting note in `WEB_ARCHITECTURE.md` about Opus support and suggested remedies.
 
 Acceptance criteria:
 - Users see specific error reasons and actionable hints; logs capture backend/context.
@@ -261,7 +261,7 @@ Acceptance criteria:
 
 Rationale: `WEB_INTERFACE.md` suggests web entries store `{wav: null}`, but the code stores the actual filename under the `wav` key (and no mp3). Prefer updating docs to reality for simplicity.
 
-- [ ] Update `WEB_INTERFACE.md` Storage layout section to clarify that the `wav` key contains the audio filename regardless of file type (e.g., `.webm`), and `mp3` is null for web clips.
+- [ ] Update `WEB_ARCHITECTURE.md` Storage layout section to clarify that the `wav` key contains the audio filename regardless of file type (e.g., `.webm`), and `mp3` is null for web clips.
 - [ ] Optional: Consider renaming to `file` in a future format change; out of scope for this stage.
 
 Acceptance criteria:
@@ -330,7 +330,7 @@ Acceptance criteria:
 Rationale: `_get_fast_html_class()` monkey-patches `fastcore.xml.ft`. It works but is brittle across versions.
 
 - [ ] Pin tested versions in `pyproject.toml` (e.g., FastHTML >= 0.12) and gate the patch behind version checks.
-- [ ] Note in `WEB_INTERFACE.md` that route handlers should return strings/objects and let FastHTML wrap.
+- [ ] Note in `WEB_ARCHITECTURE.md` that route handlers should return strings/objects and let FastHTML wrap.
 
 Acceptance criteria:
 - Reduced risk of future framework upgrades breaking startup.

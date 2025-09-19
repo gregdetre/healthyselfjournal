@@ -7,7 +7,7 @@ Required external libraries and functionality for the voice journaling app V1.
 ## See also
 
 - `PRODUCT_VISION_FEATURES.md` - Core features requiring these libraries
-- `COMMAND_LINE_INTERFACE.md` - CLI visual requirements
+- `CLI_COMMANDS.md` - CLI visual requirements
 - `../planning/250117a_voice_journaling_app_v1.md` - Implementation plan
 
 ## Audio Recording

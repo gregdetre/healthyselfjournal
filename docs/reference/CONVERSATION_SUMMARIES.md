@@ -6,7 +6,7 @@ Short LLM-generated summaries are stored in markdown frontmatter for each sessio
 
 - `FILE_FORMATS_ORGANISATION.md` – Where summaries are stored and related keys.
 - `LLM_PROMPT_TEMPLATES.md` – Summary prompt template and variables.
-- `COMMAND_LINE_INTERFACE.md` – CLI commands for listing/backfilling summaries.
+- `CLI_COMMANDS.md` – CLI commands for listing/backfilling summaries.
 - `../conversations/250916a_journaling_app_dialogue_design.md` – Why continuity and summaries matter.
 
 ## Summary generation (current state)

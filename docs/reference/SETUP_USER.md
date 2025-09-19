@@ -4,7 +4,7 @@
 This guide helps end users install and run Healthy Self Journal with minimal effort. It focuses on PyPI installation via `uvx` or `pip`, required keys for cloud features, optional local/offline setup, and the most useful commands.
 
 ## See also
-- `COMMAND_LINE_INTERFACE.md` – CLI reference and flags
+- `CLI_COMMANDS.md` – CLI reference and flags
 - `PRIVACY.md` – What data is stored, when network calls occur, and how to stay offline
 - `AUDIO_VOICE_RECOGNITION_WHISPER.md` – STT backends and requirements
 - `OLLAMA_GEMMA_DEPLOYMENT_GUIDE.md` – Local LLM for fully offline text generation
@@ -84,7 +84,7 @@ See `PRIVACY.md` for details about what leaves your machine and how to control i
 - Each response is saved immediately as `.wav` (and `.mp3` when `ffmpeg` is available) and appended to a session `.md` file with YAML frontmatter that stores summaries and metadata
 
 ## Next steps
-- Explore CLI flags in `COMMAND_LINE_INTERFACE.md`
+- Explore CLI flags in `CLI_COMMANDS.md`
 - Read `PRIVACY.md` to understand cloud vs local tradeoffs
 - For a browser UI, see `WEB_RECORDING_INTERFACE.md`
 

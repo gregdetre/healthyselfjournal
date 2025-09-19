@@ -27,7 +27,7 @@ uvx healthyselfjournal -- journal web \
 
 ## Architecture and flow
 
-See `WEB_INTERFACE.md` for a deeper architecture overview. Runtime flow mirrors the CLI: capture → upload → transcribe → append → schedule summary → next question. Keyboard shortcuts and short‑answer gating match the CLI.
+See `WEB_ARCHITECTURE.md` for a deeper architecture overview. Runtime flow mirrors the CLI: capture → upload → transcribe → append → schedule summary → next question. Keyboard shortcuts and short‑answer gating match the CLI.
 
 ## Prerequisites
 
@@ -41,6 +41,6 @@ See `WEB_INTERFACE.md` for a deeper architecture overview. Runtime flow mirrors 
 ## See also
 
 - `CLI_RECORDING_INTERFACE.md` – Terminal-based recording
-- `COMMAND_LINE_INTERFACE.md` – Command index and quick reference
+- `CLI_COMMANDS.md` – Command index and quick reference
 - `FILE_FORMATS_ORGANISATION.md` – Session layout and artefacts
 

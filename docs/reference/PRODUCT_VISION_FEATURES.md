@@ -7,9 +7,10 @@ A command-line journaling app using voice input to lower friction and dialogue-b
 ## See also
 
 - `ARCHITECTURE.md` - System architecture, components, and data flow
-- `COMMAND_LINE_INTERFACE.md` - Recording controls and visual feedback
+- `CLI_COMMANDS.md` - Recording controls and visual feedback
 - `DIALOGUE_FLOW.md` - Question sequencing and session management
 - `FILE_FORMATS_ORGANISATION.md` - Storage structure for audio and transcripts
+- `RESILIENCE.md` - Detect-and-suggest transcription resilience, placeholders, reconcile flow
 - `LLM_PROMPT_TEMPLATES.md` - Jinja templates for adaptive questioning
 - `PRIVACY.md` - Privacy, local-first data handling, and network boundaries
 - `../conversations/250117a_journaling_app_ui_technical_decisions.md` - Technical decisions
@@ -35,6 +36,7 @@ A command-line journaling app using voice input to lower friction and dialogue-b
 - Resume the most recent session with `--resume`
 - Append-only metadata event log at `sessions/events.log`
 - Short accidental takes auto-discarded based on duration and voiced-time thresholds
+- Detect-and-suggest transcription resilience with markdown placeholders, error sentinels, and CLI/web reconcile hints (see `RESILIENCE.md`)
 
 ## Next Steps
 

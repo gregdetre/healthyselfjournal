@@ -4,7 +4,7 @@ This document explains what data the voice‑first journaling app collects, wher
 
 ## See also
 
-- `COMMAND_LINE_INTERFACE.md` – How to run the app, flags that affect privacy (e.g., STT, voice mode).
+- `CLI_COMMANDS.md` – How to run the app, flags that affect privacy (e.g., STT, voice mode).
 - `FILE_FORMATS_ORGANISATION.md` – Exact on‑disk structure for sessions, audio, transcripts, and summaries.
 - `DIALOGUE_FLOW.md` – What conversational context is shared with the LLM and why.
 - `CONVERSATION_SUMMARIES.md` – Summary lifecycle, where summaries are stored in frontmatter.
@@ -66,7 +66,7 @@ Notes:
 - Simple CLI switches to opt into local backends everywhere.
 
 **Migration Status**
-- STT supports multiple local backends today; see `COMMAND_LINE_INTERFACE.md` for flags.
+- STT supports multiple local backends today; see `CLI_COMMANDS.md` for flags.
 - Local LLM path documented in `OLLAMA_GEMMA_DEPLOYMENT_GUIDE.md`.
 - Local TTS evaluation is planned.
 
@@ -81,7 +81,7 @@ Notes:
 
 - Location: sessions are stored under `./sessions/` by default. Use `--sessions-dir PATH` to choose another location (e.g., an encrypted volume).
 - Retention: the app does not auto‑delete your recordings or transcripts. Short accidental takes can be auto‑discarded based on duration/voiced‑time thresholds (see `PRODUCT_VISION_FEATURES.md`).
-- Deletion: remove a session by deleting its Markdown file and the corresponding assets folder. Merges update frontmatter and move assets safely (see `COMMAND_LINE_INTERFACE.md`).
+- Deletion: remove a session by deleting its Markdown file and the corresponding assets folder. Merges update frontmatter and move assets safely (see `CLI_COMMANDS.md`).
 - Portability: session files are plain text and standard audio formats; you can move or back them up with normal file tools.
 
 ## Security considerations
