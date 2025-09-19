@@ -107,10 +107,7 @@ def desktop(
     effective_sessions_dir = sessions_dir
     # Only use Desktop setting for sessions_dir when the CLI arg is at its default
     # and OS env/CONFIG didn't already change it (CONFIG.recordings_dir carries env overrides)
-    if (
-        sessions_dir == CONFIG.recordings_dir
-        and ds.sessions_dir is not None
-    ):
+    if sessions_dir == CONFIG.recordings_dir and ds.sessions_dir is not None:
         effective_sessions_dir = ds.sessions_dir
 
     effective_resume = resume

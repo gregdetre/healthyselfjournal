@@ -27,8 +27,11 @@ def build_app() -> typer.Typer:
     )
 
     @app.callback()
-    def _default() -> None:
-        # If invoked as `healthyselfjournal init` with no subcommand, run wizard
+    def _default(ctx: typer.Context) -> None:
+        # Run the full setup wizard only when invoked as `healthyselfjournal init`
+        # without any subcommand (e.g., not when running `init local-llm`).
+        if getattr(ctx, "invoked_subcommand", None):
+            return
         run_init_wizard()
 
     @app.command("local-llm")

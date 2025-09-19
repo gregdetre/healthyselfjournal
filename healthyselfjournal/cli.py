@@ -16,7 +16,6 @@ from .cli_reconcile import reconcile as reconcile_cmd
 from .cli_journal_cli import build_app as build_journal_app
 from .cli_session import build_app as build_session_app
 from .cli_diagnose import build_app as build_diagnose_app
-from .cli_reconcile import reconcile as reconcile_cmd
 
 app = typer.Typer(
     add_completion=False,
@@ -179,21 +178,17 @@ from .cli_summarise import build_app as build_summaries_app  # type: ignore
 
 _summaries_app = build_summaries_app()
 
+
 @_summaries_app.callback()
 def _summaries_banner() -> None:
     pass
 
 
-# Re-export summaries subcommands under fix
-for cmd_name in ("backfill", "regenerate"):
-    cmd = getattr(_summaries_app, "commands")[cmd_name].callback  # type: ignore[attr-defined]
-    fix_app.command(name=cmd_name)(cmd)
+# Mount summaries app under fix to avoid relying on Typer internals
+fix_app.add_typer(_summaries_app, name="summaries")
 
 
 app.add_typer(fix_app, name="fix")
 
 
 # mic-check is now part of the diagnose subcommands
-
-
- 

@@ -73,8 +73,11 @@ def reconcile(
         "--too-short",
         help="Action for recordings under thresholds: skip, mark, or delete.",
     ),
-) -> None:
-    """Backfill missing transcriptions for saved audio recordings."""
+    ) -> None:
+    """Backfill missing transcriptions for saved audio recordings.
+
+    Deprecated name: this command will be exposed as `fix stt` in the CLI.
+    """
 
     try:
         selection = resolve_backend_selection(stt_backend, stt_model, stt_compute)

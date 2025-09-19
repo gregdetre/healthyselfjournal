@@ -321,12 +321,18 @@ def prepare_runtime_and_backends(
         for warning in selection.warnings:
             console.print(f"[yellow]STT warning:[/] {warning}")
 
-    # Propagate config flags for TTS
+    # Propagate config flags for TTS, respecting privacy mode
     if voice_mode:
         CONFIG.speak_llm = True
-        tts_model = tts_model or "gpt-4o-mini-tts"
-        tts_voice = tts_voice or "shimmer"
-        tts_format = tts_format or "wav"
+        # If privacy mode is active, do not allow cloud TTS
+        if CONFIG.llm_cloud_off:
+            CONFIG.tts_enabled = False
+            CONFIG.speak_llm = False
+        else:
+            CONFIG.tts_enabled = True
+            tts_model = tts_model or "gpt-4o-mini-tts"
+            tts_voice = tts_voice or "shimmer"
+            tts_format = tts_format or "wav"
 
     CONFIG.tts_model = str(tts_model)
     CONFIG.tts_voice = str(tts_voice)
@@ -344,7 +350,7 @@ def prepare_runtime_and_backends(
         _require_env("OPENAI_API_KEY")
 
     # Also require OpenAI key when TTS is enabled (OpenAI backend)
-    if CONFIG.speak_llm:
+    if CONFIG.speak_llm and CONFIG.tts_enabled:
         _require_env("OPENAI_API_KEY")
 
     return selection, stream_llm, tts_model, tts_voice, tts_format
