@@ -972,17 +972,21 @@ def build_app(config: WebAppConfig) -> Any:
                 return _error_response(INACTIVE_SESSION, status_code=409)
 
             md_path = st.markdown_path
-            if sys.platform == "darwin":
-                try:
+            try:
+                if sys.platform == "darwin":
                     subprocess.run(["open", "-R", str(md_path)], check=False)
-                    return JSONResponse({"status": "ok"}, status_code=200)
-                except Exception as exc:  # pragma: no cover - runtime path
-                    _LOGGER.exception("Reveal failed: %s", exc)
-                    return _error_response(
-                        REVEAL_FAILED, status_code=500, detail=str(exc)
-                    )
-            else:
-                return _error_response(UNSUPPORTED_PLATFORM, status_code=501)
+                elif sys.platform.startswith("win"):
+                    # Use explorer to select the file
+                    subprocess.run(["explorer", "/select,", str(md_path)], check=False)
+                else:
+                    # Fallback: open containing folder with xdg-open
+                    subprocess.run(["xdg-open", str(md_path.parent)], check=False)
+                return JSONResponse({"status": "ok"}, status_code=200)
+            except Exception as exc:  # pragma: no cover - runtime path
+                _LOGGER.exception("Reveal failed: %s", exc)
+                return _error_response(
+                    REVEAL_FAILED, status_code=500, detail=str(exc)
+                )
         except Exception as exc:  # pragma: no cover - generic surfacing
             _LOGGER.exception("Reveal endpoint error: %s", exc)
             return _error_response(REVEAL_FAILED, status_code=500, detail=str(exc))
@@ -1228,21 +1232,23 @@ def build_app(config: WebAppConfig) -> Any:
                 if resolved_cfg
                 else Path("sessions")
             )
-            if sys.platform == "darwin":
-                try:
+            try:
+                if sys.platform == "darwin":
                     subprocess.run(["open", str(sessions_dir)], check=False)
-                    try:
-                        log_event("desktop.reveal_sessions", {"dir": str(sessions_dir)})
-                    except Exception:
-                        pass
-                    return JSONResponse({"status": "ok"}, status_code=200)
-                except Exception as exc:  # pragma: no cover - runtime path
-                    _LOGGER.exception("Reveal sessions folder failed: %s", exc)
-                    return _error_response(
-                        REVEAL_FAILED, status_code=500, detail=str(exc)
-                    )
-            else:
-                return _error_response(UNSUPPORTED_PLATFORM, status_code=501)
+                elif sys.platform.startswith("win"):
+                    subprocess.run(["explorer", str(sessions_dir)], check=False)
+                else:
+                    subprocess.run(["xdg-open", str(sessions_dir)], check=False)
+                try:
+                    log_event("desktop.reveal_sessions", {"dir": str(sessions_dir)})
+                except Exception:
+                    pass
+                return JSONResponse({"status": "ok"}, status_code=200)
+            except Exception as exc:  # pragma: no cover - runtime path
+                _LOGGER.exception("Reveal sessions folder failed: %s", exc)
+                return _error_response(
+                    REVEAL_FAILED, status_code=500, detail=str(exc)
+                )
         except Exception as exc:  # pragma: no cover - generic surfacing
             _LOGGER.exception("Reveal sessions directory endpoint error: %s", exc)
             return _error_response(REVEAL_FAILED, status_code=500, detail=str(exc))
