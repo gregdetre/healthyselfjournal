@@ -77,6 +77,27 @@ Notes:
 - TTS: disable voice output by omitting `--voice-mode`, or select a local TTS once available.
 - Offline mode: use only local backends; the app will not attempt cloud calls without the corresponding API keys set.
 
+### Verifying privacy with diagnostics
+
+Use the built-in diagnostics to confirm that local paths are used and cloud calls are blocked when privacy is enabled:
+
+```bash
+# Diagnostics help (groups show help by default when no subcommand)
+uv run --active healthyselfjournal diagnose local
+
+# Individual checks
+uv run --active healthyselfjournal diagnose local stt --no-audio
+uv run --active healthyselfjournal diagnose local llm --fail-on-missing-model
+uv run --active healthyselfjournal diagnose local privacy
+
+# Mic-only (interactive)
+uv run --active healthyselfjournal diagnose mic --seconds 1.0 --stt-backend auto-private
+```
+
+Notes:
+- Diagnostics write `events.log` to a temp sandbox directory by default, not your real sessions.
+- Local LLM requires a `.gguf` model file; see `OLLAMA_GEMMA_DEPLOYMENT_GUIDE.md` or point `[llm].local_model` at your file.
+
 ## On‑disk storage, retention, and deletion
 
 - Location: sessions are stored under `./sessions/` by default. Use `--sessions-dir PATH` to choose another location (e.g., an encrypted volume).
