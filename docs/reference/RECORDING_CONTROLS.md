@@ -23,8 +23,9 @@ Keyboard controls for voice recording and session management.
 
 - **SPACE**: Pause/resume the recording (paused audio is not saved; meter hidden while paused)
 - **Q**: Quit after this response
-  - If pressed before any substantial speech: the take is auto‑discarded and the session ends cleanly
+  - If pressed early (duration < 5s by default): the take is auto‑discarded and the session ends cleanly
   - If pressed after a normal answer: the take is saved/transcribed, then the session ends
+  - Threshold is configurable via `CONFIG.quit_discard_duration_seconds`
 
 ### Known Issue
 

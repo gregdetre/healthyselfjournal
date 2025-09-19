@@ -256,9 +256,33 @@ def record_response(
     _LOGGER.debug("Captured %.2f seconds to %s", duration_sec, wav_path)
 
     # Short-answer auto-discard gating: skip saving/transcribing if likely accidental
-    if enforce_short_answer_guard and apply_short_answer_guard(
+    # 1) If user pressed Q and duration under configured quit-discard threshold, always discard
+    # 2) Otherwise, apply standard short-answer guard based on duration+voiced thresholds
+    should_discard = False
+    if quit_flag.is_set() and duration_sec <= CONFIG.quit_discard_duration_seconds:
+        should_discard = True
+        try:
+            console.print(
+                Text(
+                    f"Quit pressed early (< {CONFIG.quit_discard_duration_seconds:.1f}s); discarded.",
+                    style="yellow",
+                )
+            )
+        except Exception:
+            pass
+        log_event(
+            "audio.record.discarded_quit_short",
+            {
+                "duration_seconds": round(duration_sec, 2),
+                "threshold_duration": CONFIG.quit_discard_duration_seconds,
+            },
+        )
+    elif enforce_short_answer_guard and apply_short_answer_guard(
         duration_sec, voiced_seconds, console
     ):
+        should_discard = True
+
+    if should_discard:
         # Treat as noise/accidental: delete wav and do not convert to mp3
         wav_path.unlink(missing_ok=True)
         return AudioCaptureResult(
