@@ -45,9 +45,10 @@ DEFAULT_SESSION_BREAK_MINUTES = 20
 # Default LLM model string. Supports provider:model:version[:thinking]
 # If LLM_MODEL is set in env, prefer that; otherwise default to Opus 4.1.
 DEFAULT_MODEL_LLM = os.environ.get(
-    # thinking mode is broken at the moment
     "LLM_MODEL",
-    "anthropic:claude-opus-4-1:20250805:thinking",
+    "anthropic:claude-sonnet-4:20250514:thinking",
+    # "LLM_MODEL",
+    # "anthropic:claude-opus-4-1:20250805:thinking",
     # "LLM_MODEL",
     # "anthropic:claude-opus-4-1:20250805",
 )
