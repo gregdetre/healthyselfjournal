@@ -11,10 +11,19 @@ from .config import CONFIG
 from .events import log_event
 from .transcription import (
     BackendNotAvailableError,
-    resolve_backend_selection,
+    apply_transcript_formatting,
     create_transcription_backend,
+    format_transcript_sentences,
+    resolve_backend_selection,
 )
 from .audio import analyze_wav_shortness
+from .storage import clear_pending_flag, replace_pending_exchange
+from .utils.audio_utils import maybe_delete_wav_when_safe
+from .utils.pending import (
+    count_pending_segments,
+    iter_pending_segments,
+    remove_error_sentinel,
+)
 
 
 console = Console()
@@ -65,7 +74,7 @@ def reconcile(
         help="Action for recordings under thresholds: skip, mark, or delete.",
     ),
 ) -> None:
-    """Backfill missing transcriptions for saved WAV files."""
+    """Backfill missing transcriptions for saved audio recordings."""
 
     try:
         selection = resolve_backend_selection(stt_backend, stt_model, stt_compute)
@@ -85,116 +94,191 @@ def reconcile(
         f"[bold]{selection.backend_id}[/] ({selection.model})."
     )
 
-    processed = 0
-    skipped = 0
-    errors = 0
+    pending_segments = list(iter_pending_segments(sessions_dir))
+    initial_pending = len(pending_segments)
 
-    wav_files = sorted(sessions_dir.rglob("*.wav"))
-    if not wav_files:
-        console.print("[yellow]No WAV files found.[/]")
+    log_event(
+        "reconcile.started",
+        {
+            "sessions_dir": str(sessions_dir),
+            "backend": selection.backend_id,
+            "model": selection.model,
+            "initial_pending": initial_pending,
+            "limit": limit,
+        },
+    )
+
+    if not pending_segments:
+        console.print("[yellow]No recordings pending transcription.[/]")
+        log_event(
+            "reconcile.completed",
+            {
+                "sessions_dir": str(sessions_dir),
+                "backend": selection.backend_id,
+                "model": selection.model,
+                "initial_pending": initial_pending,
+                "transcribed": 0,
+                "short_actioned": 0,
+                "errors": 0,
+                "remaining_pending": 0,
+                "placeholders_replaced": 0,
+            },
+        )
         return
 
-    for wav in wav_files:
-        stt_json = wav.with_suffix(".stt.json")
-        if stt_json.exists():
-            skipped += 1
-            continue
-        # Offline preflight: compute duration and voiced seconds; treat <min_duration or short-guard as too short
-        try:
-            duration_s, voiced_s, is_short = analyze_wav_shortness(
-                wav,
-                duration_threshold_seconds=max(
-                    min_duration, CONFIG.short_answer_duration_seconds
-                ),
-            )
-        except Exception as exc:  # pragma: no cover - defensive
-            duration_s, voiced_s, is_short = 0.0, 0.0, True
-        # Also guard against corrupt/zero-length WAVs via stdlib as a fallback
-        if duration_s <= 0.0:
-            with contextlib.suppress(Exception):
-                with wave.open(str(wav), "rb") as wf:
-                    frames = wf.getnframes()
-                    rate = wf.getframerate() or 1
-                    duration_s = frames / float(rate)
-            if duration_s <= 0.0:
-                is_short = True
+    processed = 0
+    transcribed = 0
+    short_actioned = 0
+    errors = 0
+    placeholders_replaced = 0
 
-        if duration_s < min_duration or is_short:
-            action = (too_short_action or "skip").strip().lower()
-            if action not in {"skip", "mark", "delete"}:
-                action = "skip"
-            if action == "delete":
-                with contextlib.suppress(Exception):
-                    wav.unlink(missing_ok=True)
-                console.print(
-                    f"[yellow]Deleted too-short recording:[/] {wav.name} ({duration_s:.3f}s; voiced {voiced_s:.3f}s)"
-                )
-                processed += 1
-                if limit and processed >= limit:
-                    break
-                continue
-            if action == "mark":
-                try:
-                    payload = {
-                        "text": "",
-                        "meta": {
-                            "skipped_reason": "short_duration",
-                            "duration_seconds": round(duration_s, 3),
-                            "voiced_seconds": round(voiced_s, 3),
-                            "backend": selection.backend_id,
-                            "model": selection.model,
-                        },
-                    }
-                    _write_json_atomic(stt_json, payload)
-                    console.print(
-                        f"[yellow]Marked too-short recording (no STT):[/] {wav.name} ({duration_s:.3f}s; voiced {voiced_s:.3f}s)"
-                    )
-                except Exception:
-                    console.print(
-                        f"[yellow]Skipped too-short recording (failed to mark):[/] {wav.name} ({duration_s:.3f}s)"
-                    )
-                processed += 1
-                if limit and processed >= limit:
-                    break
-                continue
-            # Default: skip
-            console.print(
-                f"[yellow]Skipped too-short recording:[/] {wav.name} ({duration_s:.3f}s; voiced {voiced_s:.3f}s)"
-            )
-            processed += 1
-            if limit and processed >= limit:
-                break
-            continue
-        try:
-            result = backend.transcribe(wav, language=language)
-            _write_json_atomic(stt_json, result.raw_response)
-            # Optional cleanup: delete WAV when safe (MP3 + STT present)
+    action_normalized = (too_short_action or "skip").strip().lower()
+
+    for segment in pending_segments:
+        if limit and processed >= limit:
+            break
+
+        audio_path = segment.audio_path
+        stt_json = segment.stt_path
+        suffix = audio_path.suffix.lower()
+
+        duration_s: float | None = None
+        voiced_s: float | None = None
+        is_short = False
+
+        if suffix == ".wav":
             try:
-                if getattr(CONFIG, "delete_wav_when_safe", False):
-                    mp3_path = wav.with_suffix(".mp3")
-                    if mp3_path.exists() and wav.exists():
-                        wav.unlink(missing_ok=True)
-                        log_event(
-                            "audio.wav.deleted",
-                            {
-                                "wav": wav.name,
-                                "reason": "safe_delete_after_mp3_and_stt",
-                            },
-                        )
-            except Exception:
-                pass
+                duration_s, voiced_s, is_short = analyze_wav_shortness(
+                    audio_path,
+                    duration_threshold_seconds=max(
+                        min_duration, CONFIG.short_answer_duration_seconds
+                    ),
+                )
+            except Exception:  # pragma: no cover - defensive
+                duration_s, voiced_s, is_short = 0.0, 0.0, True
 
-            console.print(f"[green]Transcribed:[/] {wav.name}")
+            if duration_s <= 0.0:
+                with contextlib.suppress(Exception):
+                    with wave.open(str(audio_path), "rb") as wf:
+                        frames = wf.getnframes()
+                        rate = wf.getframerate() or 1
+                        duration_s = frames / float(rate)
+                if duration_s is not None and duration_s <= 0.0:
+                    is_short = True
+
+        if suffix == ".wav" and (is_short or (duration_s is not None and duration_s < min_duration)):
+            action_choice = action_normalized if action_normalized in {"skip", "mark", "delete"} else "skip"
+            duration_text = f"{duration_s:.3f}s" if duration_s is not None else "unknown"
+            voiced_text = f"{voiced_s:.3f}s" if voiced_s is not None else "unknown"
+
+            if action_choice == "delete":
+                with contextlib.suppress(Exception):
+                    audio_path.unlink(missing_ok=True)
+                remove_error_sentinel(audio_path)
+                console.print(
+                    f"[yellow]Deleted too-short recording:[/] {audio_path.name} ({duration_text}; voiced {voiced_text})"
+                )
+            elif action_choice == "mark":
+                payload = {
+                    "text": "",
+                    "meta": {
+                        "skipped_reason": "short_duration",
+                        "duration_seconds": round((duration_s or 0.0), 3),
+                        "voiced_seconds": round((voiced_s or 0.0), 3),
+                        "backend": selection.backend_id,
+                        "model": selection.model,
+                    },
+                }
+                try:
+                    _write_json_atomic(stt_json, payload)
+                    remove_error_sentinel(audio_path)
+                    console.print(
+                        f"[yellow]Marked too-short recording (no STT):[/] {audio_path.name} ({duration_text}; voiced {voiced_text})"
+                    )
+                except Exception as exc:  # pragma: no cover - defensive surface
+                    console.print(
+                        f"[yellow]Failed to mark short recording:[/] {audio_path.name} ({exc})"
+                    )
+            else:
+                console.print(
+                    f"[yellow]Skipped too-short recording:[/] {audio_path.name} ({duration_text}; voiced {voiced_text})"
+                )
+
             processed += 1
-            if limit and processed >= limit:
-                break
+            short_actioned += 1
+            continue
+
+        try:
+            result = backend.transcribe(audio_path, language=language)
         except Exception as exc:  # pragma: no cover - defensive surface
             errors += 1
-            log_event("reconcile.error", {"wav": wav.name, "error": str(exc)})
-            console.print(f"[red]Failed to transcribe {wav.name}:[/] {exc}")
+            processed += 1
+            log_event(
+                "reconcile.error",
+                {
+                    "segment": audio_path.name,
+                    "session_id": segment.session_id,
+                    "error_type": exc.__class__.__name__,
+                    "error": str(exc),
+                },
+            )
+            console.print(f"[red]Failed to transcribe {audio_path.name}:[/] {exc}")
+            continue
 
+        _write_json_atomic(stt_json, result.raw_response)
+        remove_error_sentinel(audio_path)
+
+        try:
+            formatted_text = apply_transcript_formatting(
+                result.text,
+                CONFIG.stt_formatting,
+            )
+        except ValueError:
+            formatted_text = format_transcript_sentences(result.text)
+
+        markdown_path = sessions_dir / f"{segment.session_id}.md"
+        if markdown_path.exists():
+            if replace_pending_exchange(
+                markdown_path, segment.segment_label, formatted_text
+            ):
+                clear_pending_flag(markdown_path, segment.segment_label)
+                placeholders_replaced += 1
+                log_event(
+                    "reconcile.placeholder_replaced",
+                    {
+                        "session_id": segment.session_id,
+                        "segment": segment.segment_label,
+                    },
+                )
+
+        if suffix == ".wav" and getattr(CONFIG, "delete_wav_when_safe", False):
+            maybe_delete_wav_when_safe(audio_path)
+
+        console.print(
+            f"[green]Transcribed:[/] {segment.session_id}/{audio_path.name}"
+        )
+        transcribed += 1
+        processed += 1
+
+    remaining = count_pending_segments(sessions_dir)
     console.print(
-        f"Completed. Processed {processed}; skipped {skipped} existing; errors {errors}."
+        f"Completed. Transcribed {transcribed}; short-action {short_actioned}; "
+        f"errors {errors}; placeholders updated {placeholders_replaced}; "
+        f"remaining pending {remaining}."
+    )
+    log_event(
+        "reconcile.completed",
+        {
+            "sessions_dir": str(sessions_dir),
+            "backend": selection.backend_id,
+            "model": selection.model,
+            "initial_pending": initial_pending,
+            "transcribed": transcribed,
+            "short_actioned": short_actioned,
+            "errors": errors,
+            "remaining_pending": remaining,
+            "placeholders_replaced": placeholders_replaced,
+        },
     )
 
 

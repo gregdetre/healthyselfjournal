@@ -96,6 +96,14 @@ app.command()(reconcile_cmd)
 app.command()(init_cmd)
 app.command()(merge_cmd)
 
+try:
+    from .cli_desktop import desktop as desktop_command
+
+    app.command()(desktop_command)
+except Exception:
+    # Desktop shell requires optional dependencies (pywebview).
+    pass
+
 # Session utilities group (moved from `journal list` → `session list`)
 session_app = typer.Typer(
     add_completion=False,
