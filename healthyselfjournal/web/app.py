@@ -92,7 +92,9 @@ def _apply_security_headers(response: Response) -> Response:
     headers.setdefault("Referrer-Policy", "no-referrer")
     headers.setdefault("X-Frame-Options", "DENY")
     headers.setdefault("X-Content-Type-Options", "nosniff")
-    headers.setdefault("Permissions-Policy", "camera=(), geolocation=(), microphone=(self)")
+    headers.setdefault(
+        "Permissions-Policy", "camera=(), geolocation=(), microphone=(self)"
+    )
     return response
 
 
@@ -449,9 +451,7 @@ def build_app(config: WebAppConfig) -> Any:
         except PendingTranscriptionError as exc:
             _LOGGER.exception("STT pending; placeholder recorded")
             command = reconcile_command_for_dir(state.manager.config.base_dir)
-            detail = (
-                f"{exc.error}. Audio saved; run {command} to backfill."
-            )
+            detail = f"{exc.error}. Audio saved; run {command} to backfill."
             return _error_response(
                 PROCESSING_FAILED,
                 status_code=503,
