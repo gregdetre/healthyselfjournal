@@ -1,6 +1,8 @@
-# Potential Research Areas for Evidence-Based Journaling
+# Research Topics for Evidence-Based Journaling
 
-see also: docs/reference/SCIENTIFIC_RESEARCH_EVIDENCE.md
+see also:
+- `docs/reference/SCIENTIFIC_RESEARCH_EVIDENCE.md`
+- `../../healthyselfjournal/prompts/question.prompt.md.jinja`
 
 ## Research Agent Instructions
 
@@ -11,7 +13,7 @@ When researching topics from this list:
 3. **Write evergreen documentation** following `@gjdutils/docs/instructions/WRITE_EVERGREEN_DOC.md` structure
 4. **Save to** `docs/research/TOPIC_NAME.md` with descriptive filenames
 5. **Emphasize practical application** for:
-   - LLM prompt design for dialogue generation
+   - LLM prompt design for dialogue generation (see `../../healthyselfjournal/prompts/question.prompt.md.jinja` for implementation)
    - Voice-based CLI implementation
    - Safety features and risk mitigation
 6. **Include extensive references** with URLs for all claims

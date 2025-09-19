@@ -1,7 +1,7 @@
 # Scientific research & evidence principles
 
 see also:
-- `docs/research/POTENTIAL_RESEARCH_TOPICS.md` - master list of research areas
+- `docs/research/RESEARCH_TOPICS.md` - master list of research areas
 - `docs/research/` - completed research documentation
 - `docs/conversations/250917b_evidence_based_journaling_research_planning.md` - initial research planning
 
@@ -56,14 +56,14 @@ Prefer practices that have scientific evidence supporting them, prioritised best
 When initiating new research:
 
 1. **Review existing research** in `docs/research/` to avoid duplication
-2. **Check POTENTIAL_RESEARCH_TOPICS.md** for categorization and priority
+2. **Check RESEARCH_TOPICS.md** for categorization and priority
 3. **Create detailed research prompts** including:
    - Specific research questions
    - Key researchers to investigate
    - Types of evidence to prioritize
    - Implementation focus areas
 4. **Launch parallel agents** for efficiency
-5. **Update tracking** in POTENTIAL_RESEARCH_TOPICS.md upon completion
+5. **Update tracking** in RESEARCH_TOPICS.md upon completion
 6. **Cross-reference** new docs with existing research
 7. **Probably** store the new doc in `docs/research/`, unless instructed otherwise, and if it makes sense to do so.
 
@@ -94,7 +94,7 @@ Based on completed research, focus on finding:
 
 ## Documentation maintenance
 
-- Mark completed topics in POTENTIAL_RESEARCH_TOPICS.md
+- Mark completed topics in RESEARCH_TOPICS.md
 - Add cross-references to related docs
 - Update this principles doc when new patterns emerge
 - Capture significant research conversations in `docs/conversations/`

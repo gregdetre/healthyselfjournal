@@ -4,7 +4,7 @@ Distinguishing adaptive reflection from destructive rumination is critical for s
 
 ## See also
 
-- `POTENTIAL_RESEARCH_TOPICS.md` - identifies this as Tier 1 priority research for core safety features
+- `RESEARCH_TOPICS.md` - identifies this as Tier 1 priority research for core safety features
 - `MINDFUL_REFLECTION_PLUM_VILLAGE.md` - contemplative practices that promote healthy reflection over rumination
 - `BEGINNING_ANEW_PRACTICE.md` - structured practice for processing difficult emotions without rumination
 - `COGNITIVE_EMOTIONAL_INTEGRATION.md` - frameworks for balanced processing that avoids rumination traps

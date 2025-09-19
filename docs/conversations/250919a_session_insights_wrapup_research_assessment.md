@@ -3,7 +3,7 @@ Date: 2025-09-19
 Duration: ~30 minutes
 Type: Research Review
 Status: Active
-Related Docs: docs/research/POTENTIAL_RESEARCH_TOPICS.md, healthyselfjournal/prompts/summary.prompt.md.jinja
+Related Docs: docs/research/RESEARCH_TOPICS.md, healthyselfjournal/prompts/summary.prompt.md.jinja
 ---
 
 # Session Insights and Wrap-Up Research Assessment - 2025-09-19
@@ -159,7 +159,7 @@ Recommendation to start with "minimal viable wrap-up" - leverage existing consol
 
 - Current summary implementation: `healthyselfjournal/prompts/summary.prompt.md.jinja`
 - Closure questions in: `healthyselfjournal/prompts/question.prompt.md.jinja`
-- Research priorities: `docs/research/POTENTIAL_RESEARCH_TOPICS.md`
+- Research priorities: `docs/research/RESEARCH_TOPICS.md`
 
 ---
 

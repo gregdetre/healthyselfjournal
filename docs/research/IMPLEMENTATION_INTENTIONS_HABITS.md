@@ -4,7 +4,7 @@ This document synthesizes research-backed strategies for establishing and mainta
 
 ## See also
 
-- `POTENTIAL_RESEARCH_TOPICS.md` - comprehensive research priorities for evidence-based journaling features
+- `RESEARCH_TOPICS.md` - comprehensive research priorities for evidence-based journaling features
 - `docs/reference/SCIENTIFIC_RESEARCH_EVIDENCE.md` - broader research foundation for journaling benefits
 - `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md` - technical implementation of voice-based journaling interface
 - `healthyselfjournal/` - CLI application implementing these behavioral strategies

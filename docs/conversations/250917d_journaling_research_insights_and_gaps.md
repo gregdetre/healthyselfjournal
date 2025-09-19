@@ -50,4 +50,4 @@ Would you like me to pursue any of these areas?
 
 - Research completed: `docs/research/` (11 technique documents)
 - Research planning: `docs/conversations/250917b_evidence_based_journaling_research_planning.md`
-- Topics list: `docs/research/POTENTIAL_RESEARCH_TOPICS.md`
+- Topics list: `docs/research/RESEARCH_TOPICS.md`

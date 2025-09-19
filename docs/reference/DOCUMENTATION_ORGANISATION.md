@@ -51,7 +51,7 @@ Key evidence-based references informing design. See more in `docs/research/`.
 - HABITS & INTENTIONS: `docs/research/IMPLEMENTATION_INTENTIONS_HABITS.md` — Habit scaffolding.
 - MINDFUL REFLECTION: `docs/research/MINDFUL_REFLECTION_PLUM_VILLAGE.md` — Thich Nhat Hanh's contemplative practices for journaling.
 - BEGINNING ANEW: `docs/research/BEGINNING_ANEW_PRACTICE.md` — Plum Village conflict resolution and relationship healing practice.
-- TOPICS INDEX: `docs/research/POTENTIAL_RESEARCH_TOPICS.md` — Future research map.
+- TOPICS INDEX: `docs/research/RESEARCH_TOPICS.md` — Future research map.
 - DEEP OVERVIEW: `docs/research/deep_research_overview/JOURNALLING_SCIENTIFIC_EVIDENCE_RESEARCH.md` — Literature overview.
 
 ### Decisions & Planning

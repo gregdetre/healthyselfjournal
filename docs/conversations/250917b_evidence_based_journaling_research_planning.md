@@ -176,7 +176,7 @@ Each research document follows a standardized structure:
 ## Related Work
 
 ### Documentation Created
-- `docs/research/deep_research_overview/POTENTIAL_RESEARCH_TOPICS.md` - Master list and prioritization
+- `docs/research/RESEARCH_TOPICS.md` - Master list and prioritization
 - `docs/research/deep_research_overview/structured_reflection_prompts.md`
 - `docs/research/deep_research_overview/gratitude_journaling_interventions.md`
 - `docs/research/deep_research_overview/emotion_regulation_expressive_writing.md`
