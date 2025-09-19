@@ -88,6 +88,12 @@ def synthesize_text(text: str, opts: TTSOptions) -> bytes:
     """
     if not text.strip():
         return b""
+    # Respect global privacy/feature flags
+    if not CONFIG.tts_enabled:
+        raise TTSError("TTS disabled by settings (tts.enabled=false)")
+    if CONFIG.llm_cloud_off and opts.backend != "local":
+        # Current implementation only supports cloud OpenAI; block under privacy mode
+        raise TTSError("Cloud TTS disabled in privacy mode (cloud_off)")
     if opts.backend == "openai":
         return _synthesize_openai(
             text, model=opts.model, voice=opts.voice, audio_format=opts.audio_format

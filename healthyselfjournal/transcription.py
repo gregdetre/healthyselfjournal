@@ -310,30 +310,87 @@ class FasterWhisperBackend(TranscriptionBackend):
         suggested_device = device or manager.suggest_faster_whisper_device()
         cpu_threads_value = cpu_threads or 0
 
+        def _instantiate(device_name: str, compute_candidates: list[str]):
+            last_exc: Exception | None = None
+            for ct in compute_candidates:
+                try:
+                    model_obj = WhisperModel(
+                        model,
+                        device=device_name,
+                        compute_type=ct,
+                        cpu_threads=cpu_threads_value,
+                        download_root=str(download_root),
+                    )
+                    return model_obj, ct
+                except Exception as e:  # pragma: no cover - best-effort fallback
+                    last_exc = e
+                    _LOGGER.warning(
+                        "faster-whisper init failed (device=%s, compute=%s): %s",
+                        device_name,
+                        ct,
+                        e,
+                    )
+            assert last_exc is not None
+            raise last_exc
+
         try:
-            self._model = WhisperModel(
-                model,
-                device=suggested_device,
-                compute_type=compute_type,
-                cpu_threads=cpu_threads_value,
-                download_root=str(download_root),
-            )
+            model_obj, used_compute = _instantiate(suggested_device, [compute_type])
+            self._model = model_obj
             self._device = suggested_device
+            if used_compute != self.compute:
+                self.compute = used_compute
         except Exception as exc:
+            # If Metal is available, try to keep GPU by falling back to GPU-friendly compute types
             if suggested_device == "metal":
                 _LOGGER.warning(
-                    "Metal initialisation failed (%s); retrying with CPU backend.", exc
+                    "Metal init failed with compute=%s (%s); retrying on Metal with float16/float32.",
+                    compute_type,
+                    exc,
                 )
-                self._model = WhisperModel(
-                    model,
-                    device="cpu",
-                    compute_type=compute_type,
-                    cpu_threads=cpu_threads_value,
-                    download_root=str(download_root),
-                )
-                self._device = "cpu"
+                try:
+                    metal_candidates: list[str] = []
+                    for ct in ("float16", "float32"):
+                        if ct not in metal_candidates and ct != compute_type:
+                            metal_candidates.append(ct)
+                    model_obj, used_compute = _instantiate("metal", metal_candidates)
+                    self._model = model_obj
+                    self._device = "metal"
+                    if used_compute != self.compute:
+                        self.compute = used_compute
+                except Exception as metal_exc:
+                    _LOGGER.warning(
+                        "Metal fallback with alternate compute types failed (%s); switching to CPU.",
+                        metal_exc,
+                    )
+                    cpu_candidates: list[str] = []
+                    # Try requested compute first, then progressively safer CPU fallbacks.
+                    if compute_type not in cpu_candidates:
+                        cpu_candidates.append(compute_type)
+                    for ct in ("int8", "float32"):
+                        if ct not in cpu_candidates:
+                            cpu_candidates.append(ct)
+                    model_obj, used_compute = _instantiate("cpu", cpu_candidates)
+                    self._model = model_obj
+                    self._device = "cpu"
+                    if used_compute != self.compute:
+                        self.compute = used_compute
             else:
-                raise
+                _LOGGER.warning(
+                    "Initial init failed on device=%s (%s); retrying on CPU with safer compute types.",
+                    suggested_device,
+                    exc,
+                )
+                cpu_candidates = []  # type: list[str]
+                if compute_type not in cpu_candidates:
+                    cpu_candidates.append(compute_type)
+                for ct in ("int8", "float32"):
+                    if ct not in cpu_candidates:
+                        cpu_candidates.append(ct)
+                model_obj, used_compute = _instantiate("cpu", cpu_candidates)
+                self._model = model_obj
+                self._device = "cpu"
+                if used_compute != self.compute:
+                    self.compute = used_compute
 
         try:
             manager.record_faster_whisper_model(model)
