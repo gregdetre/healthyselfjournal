@@ -83,9 +83,12 @@ DEFAULT_LOCAL_LLM_MODEL_SHA256 = os.environ.get("LLM_LOCAL_MODEL_SHA256")
 DEFAULT_LOCAL_LLM_CONTEXT = _env_int("LLM_LOCAL_CONTEXT", 4096)
 DEFAULT_LOCAL_LLM_GPU_LAYERS = _env_int("LLM_LOCAL_GPU_LAYERS", 0)
 DEFAULT_LOCAL_LLM_THREADS = _env_int("LLM_LOCAL_THREADS", 0)
-DEFAULT_LLM_CLOUD_OFF = (
-    os.environ.get("LLM_CLOUD_OFF", "0").strip().lower() in {"1", "true", "yes", "on"}
-)
+DEFAULT_LLM_CLOUD_OFF = os.environ.get("LLM_CLOUD_OFF", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 # Text-to-speech defaults (OpenAI backend)
 DEFAULT_SPEAK_LLM = os.environ.get("SPEAK_LLM", "0").strip().lower() in {
@@ -97,6 +100,12 @@ DEFAULT_SPEAK_LLM = os.environ.get("SPEAK_LLM", "0").strip().lower() in {
 DEFAULT_TTS_MODEL = os.environ.get("TTS_MODEL", "gpt-4o-mini-tts")
 DEFAULT_TTS_VOICE = os.environ.get("TTS_VOICE", "shimmer")
 DEFAULT_TTS_FORMAT = os.environ.get("TTS_FORMAT", "wav")
+DEFAULT_TTS_ENABLED = os.environ.get("TTS_ENABLED", "1").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 DEFAULT_WEB_UPLOAD_MAX_BYTES = _env_int("WEB_UPLOAD_MAX_BYTES", 50_000_000)
 
 
@@ -145,6 +154,7 @@ class AppConfig:
     llm_local_threads: int = DEFAULT_LOCAL_LLM_THREADS
     llm_cloud_off: bool = DEFAULT_LLM_CLOUD_OFF
     # Optional TTS of LLM questions
+    tts_enabled: bool = DEFAULT_TTS_ENABLED
     speak_llm: bool = DEFAULT_SPEAK_LLM
     tts_model: str = DEFAULT_TTS_MODEL
     tts_voice: str = DEFAULT_TTS_VOICE
@@ -258,6 +268,15 @@ def _load_user_config() -> Tuple[List[str], Path | None]:
         cloud_off = llm_cfg.get("cloud_off")
         if isinstance(cloud_off, bool):
             CONFIG.llm_cloud_off = cloud_off
+    except Exception:
+        pass
+
+    # Apply optional TTS configuration overrides
+    try:
+        tts_cfg = data.get("tts") or {}
+        enabled = tts_cfg.get("enabled")
+        if isinstance(enabled, bool):
+            CONFIG.tts_enabled = enabled
     except Exception:
         pass
 

@@ -702,7 +702,8 @@ function bootstrap(): void {
     shortDurationMs: shortDurationSeconds * 1000,
     shortVoicedMs: shortVoicedSeconds * 1000,
     voiceRmsDbfsThreshold,
-    voiceEnabled,
+    // If voice toggle is disabled in DOM (privacy), force voice off client-side
+    voiceEnabled: voiceEnabled && !(document.getElementById('voice-toggle') as HTMLInputElement | null)?.disabled,
     ttsEndpoint,
     ttsMime,
     revealEndpoint,
