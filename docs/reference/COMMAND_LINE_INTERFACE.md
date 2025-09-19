@@ -47,6 +47,7 @@ uvx healthyselfjournal -- web \
   [--port PORT] \
   [--reload/--no-reload] \
   [--kill-existing] \
+  [--open-browser/--no-open-browser] \
   [--voice-mode/--no-voice-mode] [--tts-model SPEC] [--tts-voice NAME] [--tts-format FORMAT]
 ```
 
@@ -54,6 +55,7 @@ uvx healthyselfjournal -- web \
 - `--sessions-dir` shares the same storage layout as the CLI; recordings appear under `./sessions/<session-id>/browser-*.webm`.
 - `--resume` resumes the most recent existing session instead of starting a new one (mirrors CLI behaviour).
 - `--reload` enables autoreload for static assets and server changes during development.
+- `--open-browser` is enabled by default; it opens your default browser after the server becomes ready. Disable with `--no-open-browser`.
 - `--kill-existing` attempts to free the chosen port by terminating existing listeners before starting (best-effort; uses `lsof`/`fuser` when available).
 - The web UI streams audio from the browser, uploads `webm/opus` clips, and reuses the same transcription/LLM pipeline as the CLI. When `--voice-mode` is enabled, the server synthesises the next question and the browser plays it.
 - Architecture and troubleshooting details live in `WEB_INTERFACE.md`.

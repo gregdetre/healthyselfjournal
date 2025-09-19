@@ -29,7 +29,8 @@ The web interface brings the Healthy Self Journal experience into the browser wh
 - Application builder: `healthyselfjournal/web/app.py` constructs a FastHTML app on demand, mounts `/static/`, and maintains per-session state (`WebSessionState`).
 - Compatibility shim: `_get_fast_html_class()` patches `fastcore.xml.ft` when necessary so FastHTML initialises correctly with current `fastcore` releases. With FastHTML 0.12+, routes should return plain strings/objects and FastHTML wraps responses; avoid manually returning `HTMLResponse` from handlers.
 - Routes:
-- `GET /` – Starts a new session via `SessionManager.start()` and renders the UI shell with initial question/context. In 0.12+, this handler returns a string (HTML) and FastHTML packages it into an `HTMLResponse`.
+- `GET /` – Starts or resumes a session then redirects to the pretty URL `GET /journal/{sessions_dir_basename}/{session_id}/`.
+  - `GET /journal/{sessions_dir}/{session_id}/` – Renders the main recording page (UI shell) for that session.
   - `POST /session/{id}/upload` – Accepts `FormData` (`audio`, `mime`, `duration_ms`, `voiced_ms`, `question`), persists the blob as `browser-XXX.webm`, and funnels processing through `SessionManager.process_uploaded_exchange()`.
   - `POST /session/{id}/tts` – When voice mode is enabled, synthesises speech for the provided text (`{"text": "..."}`) and returns `audio/*` bytes.
 - Processing steps (reuse existing modules):
@@ -60,7 +61,7 @@ The web interface brings the Healthy Self Journal experience into the browser wh
 
 ## Runtime flow
 1. User runs `uv run healthyselfjournal web [options]` (see next section). If `--resume` is provided, the server resumes the most recent session instead of starting a new one.
-2. The root page loads and initialises a new session, showing the opening question.
+2. The root page loads and initialises or resumes a session, then redirects to `/journal/{sessions_dir_basename}/{session_id}/` which shows the opening question.
 3. On “Start recording”, the client captures audio, visualises levels, and tracks voiced time.
 4. When recording stops, the clip is discarded if it fails the short-answer thresholds; otherwise it uploads to `/session/{id}/upload`.
 5. The server transcribes, updates storage, schedules summarisation, and generates the next question.
@@ -121,7 +122,8 @@ The web interface brings the Healthy Self Journal experience into the browser wh
   - Ensure `static/js/app.js` is built from `static/ts/app.ts` (`npm run build`)
 
 - **HTTP endpoints**
-  - `GET /` → starts a session and serves the HTML shell
+  - `GET /` → starts or resumes a session, then 307-redirects to the pretty URL
+  - `GET /journal/{sessions_dir}/{session_id}/` → serves the HTML shell for a specific session
   - `POST /session/{id}/upload` → accepts `FormData` fields: `audio`, `mime`, `duration_ms`, `voiced_ms`, `question`
 
 - **Logs and artefacts**
@@ -143,12 +145,13 @@ The web interface brings the Healthy Self Journal experience into the browser wh
     [--port 8765] \
     [--reload/--no-reload] \
     [--kill-existing] \
+    [--open-browser/--no-open-browser] \
     [--voice-mode/--no-voice-mode] \
     [--tts-model MODEL] \
     [--tts-voice VOICE] \
     [--tts-format FORMAT]
   ```
-- **Access**: open `http://127.0.0.1:8765` in a Chromium-based browser (Safari works on recent versions but lacks explicit optimiser testing).
+- **Access**: open `http://127.0.0.1:8765` in a Chromium-based browser (Safari works on recent versions but lacks explicit optimiser testing). The CLI opens your default browser automatically once the server is ready; disable with `--no-open-browser`.
 - **Shared storage**: running CLI and web simultaneously is supported; both operate on timestamped filenames to avoid collisions.
 - **Static assets**: `/static/css/app.css` and `/static/js/app.js` are served directly from the package; ensure the JS build artefact is up to date before packaging.
 - **FastHTML 0.12 return types**: Return strings/objects or element trees from route handlers; avoid explicitly constructing `HTMLResponse`/`JSONResponse` for typical cases to prevent double-wrapping errors.

@@ -65,6 +65,11 @@ def web(
         "--kill-existing",
         help="If set, attempt to free the port by killing existing listeners before start.",
     ),
+    open_browser: bool = typer.Option(
+        True,
+        "--open-browser/--no-open-browser",
+        help="Open the default browser to the server URL when ready.",
+    ),
 ) -> None:
     """Launch the FastHTML-powered web interface."""
 
@@ -94,6 +99,76 @@ def web(
         except Exception:
             # Best-effort; continue to let server start or show usual bind error
             pass
+
+    # Optionally open the user's browser once the server is ready to accept connections
+    if open_browser:
+
+        def _open_when_ready(host: str, port: int) -> None:
+            import socket
+            import time
+            import webbrowser
+
+            # Map wildcard hosts to a sensible local address for browsers
+            browser_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+            # Bracket IPv6 literal for URLs
+            display_host = (
+                f"[{browser_host}]"
+                if ":" in browser_host and not browser_host.startswith("[")
+                else browser_host
+            )
+            url = f"http://{display_host}:{port}/"
+
+            console.print(
+                f"[cyan]Will open browser at {url} when the server is ready...[/]"
+            )
+
+            deadline = time.time() + 60.0
+            # Poll for TCP accept on any resolved address
+            while time.time() < deadline:
+                try:
+                    infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+                except Exception:
+                    infos = []
+                connected = False
+                for family, socktype, proto, _canon, sockaddr in infos:
+                    s = None
+                    try:
+                        s = socket.socket(family, socktype, proto)
+                        s.settimeout(0.5)
+                        s.connect(sockaddr)
+                        connected = True
+                        break
+                    except Exception:
+                        pass
+                    finally:
+                        try:
+                            s and s.close()
+                        except Exception:
+                            pass
+                if connected:
+                    # Give the server a brief moment before launching the browser
+                    time.sleep(0.2)
+                    try:
+                        webbrowser.open(url, new=2)
+                        console.print(f"[green]Opened browser:[/] {url}")
+                    except Exception:
+                        console.print(f"[yellow]Please open your browser at:[/] {url}")
+                    return
+                time.sleep(0.25)
+            # Timed out waiting; print the URL for manual navigation
+            console.print(
+                f"[yellow]Server didn't become ready within 60s. Open:[/] {url}"
+            )
+
+        import threading
+
+        t = threading.Thread(
+            target=_open_when_ready,
+            args=(host, port),
+            name="hsj-open-browser",
+            daemon=True,
+        )
+        t.start()
 
     try:
         run_app(config)
