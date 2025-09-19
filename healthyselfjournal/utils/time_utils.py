@@ -39,3 +39,23 @@ def format_mm_ss(total_seconds: float) -> str:
     seconds = _round_half_up(max(0.0, float(total_seconds)))
     minutes, secs = divmod(seconds, 60)
     return f"{minutes}:{secs:02d}"
+
+
+def format_minutes_text(total_seconds: float) -> str:
+    """Return a human-friendly minutes-only label.
+
+    Examples:
+    - <60s → "<1 minute"
+    - 61s → "1 minute"
+    - 7m 42s → "7 minutes"
+
+    Seconds are ignored (floored). Negative inputs clamp to zero.
+    """
+
+    seconds = max(0.0, float(total_seconds))
+    whole_minutes = int(seconds // 60)
+    if whole_minutes <= 0:
+        return "<1 minute"
+    if whole_minutes == 1:
+        return "1 minute"
+    return f"{whole_minutes} minutes"

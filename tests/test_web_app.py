@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("starlette")
+pytest.importorskip("fasthtml")
+pytest.importorskip("fastcore")
 
 from starlette.testclient import TestClient
 
@@ -70,7 +72,7 @@ def web_app(monkeypatch, tmp_path: Path):
 
 
 def test_tts_endpoint_disabled_returns_error(tmp_path: Path, web_app):
-    client = TestClient(web_app)
+    client = TestClient(web_app, follow_redirects=True)
     # Create a session first
     response = client.get("/")
     assert response.status_code == 200
@@ -102,7 +104,7 @@ def test_tts_endpoint_ok_when_enabled(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("healthyselfjournal.web.app.synthesize_text", _stub_synth)
 
     app = build_app(config)
-    client = TestClient(app)
+    client = TestClient(app, follow_redirects=True)
     # Open session
     response = client.get("/")
     assert response.status_code == 200
@@ -117,7 +119,7 @@ def test_tts_endpoint_ok_when_enabled(tmp_path: Path, monkeypatch):
 
 
 def test_upload_creates_session_artifacts(tmp_path: Path, web_app):
-    client = TestClient(web_app)
+    client = TestClient(web_app, follow_redirects=True)
 
     # Landing page should create a new session and expose metadata
     response = client.get("/")
@@ -125,6 +127,9 @@ def test_upload_creates_session_artifacts(tmp_path: Path, web_app):
     match = re.search(r"data-session-id=\"([^\"]+)\"", response.text)
     assert match, "session id not found in HTML"
     session_id = match.group(1)
+    # Total duration should be present in HTML dataset and element
+    assert 'data-total-hms="' in response.text
+    assert 'id="total-duration"' in response.text
 
     upload_path = f"/session/{session_id}/upload"
     payload = {
@@ -143,6 +148,9 @@ def test_upload_creates_session_artifacts(tmp_path: Path, web_app):
     assert data["session_id"] == session_id
     assert data["next_question"] == "Stub follow-up?"
     assert data["segment_label"].startswith("browser-")
+    # Server should report cumulative totals
+    assert data["total_duration_seconds"] == 1.5
+    assert data["total_duration_hms"] == "0:02"
 
     session_dir = tmp_path / session_id
     markdown_path = tmp_path / f"{session_id}.md"
@@ -195,7 +203,7 @@ def test_resume_latest_session_when_enabled(tmp_path: Path, monkeypatch):
     app1 = build_app(
         WebAppConfig(sessions_dir=tmp_path, static_dir=tmp_path / "static")
     )
-    client1 = TestClient(app1)
+    client1 = TestClient(app1, follow_redirects=True)
     resp1 = client1.get("/")
     assert resp1.status_code == 200
     sid_match = re.search(r"data-session-id=\"([^\"]+)\"", resp1.text)
@@ -210,7 +218,7 @@ def test_resume_latest_session_when_enabled(tmp_path: Path, monkeypatch):
             resume=True,
         )
     )
-    client2 = TestClient(app2)
+    client2 = TestClient(app2, follow_redirects=True)
     resp2 = client2.get("/")
     assert resp2.status_code == 200
     sid_match2 = re.search(r"data-session-id=\"([^\"]+)\"", resp2.text)

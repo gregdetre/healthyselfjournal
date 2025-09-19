@@ -10,9 +10,13 @@ from typing import Any
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+import sys
+import subprocess
 from starlette.staticfiles import StaticFiles
 
 from ..audio import AudioCaptureResult
+from ..storage import load_transcript
+from ..utils.time_utils import format_hh_mm_ss, format_minutes_text
 from ..config import CONFIG
 from ..events import log_event
 from ..session import SessionConfig, SessionManager
@@ -144,7 +148,7 @@ def build_app(config: WebAppConfig) -> Any:
 
     @app.route("/")
     def index():
-        """Landing page that boots a brand-new session."""
+        """Landing page that boots or resumes a session and redirects to pretty URL."""
 
         try:
             if bool(getattr(app.state, "resume", False)):
@@ -169,15 +173,46 @@ def build_app(config: WebAppConfig) -> Any:
                 </html>
                 """
 
-        # Resolve voice/TTS options for this app instance
-        voice_enabled: bool = bool(getattr(app.state, "voice_enabled", False))
-        tts_opts: TTSOptions | None = getattr(app.state, "tts_options", None)
-        tts_format = tts_opts.audio_format if tts_opts else CONFIG.tts_format
-
-        body = _render_session_shell(
-            state, voice_enabled=voice_enabled, tts_format=str(tts_format)
+        # Redirect to pretty session URL: /journal/<sessions_dir_name>/<session_id>/
+        resolved_cfg = getattr(app.state, "config", None)
+        sessions_dir_path = (
+            getattr(resolved_cfg, "sessions_dir", Path("sessions")) if resolved_cfg else Path("sessions")
         )
-        return body
+        sessions_dir_name = Path(str(sessions_dir_path)).name
+        location = f"/journal/{sessions_dir_name}/{state.session_id}/"
+        return Response(status_code=307, headers={"Location": location})
+
+    @app.get("/journal/{sessions_dir}/{session_id}/")  # type: ignore[attr-defined]
+    def journal_page(sessions_dir: str, session_id: str):
+        """Render the main recording UI for a specific session id.
+
+        - If the session is active in-memory, render immediately.
+        - If not, and a matching markdown exists on disk, resume it.
+        - If sessions_dir doesn't match current config's basename, redirect.
+        """
+
+        # Ensure sessions_dir in URL matches configured one; redirect if not
+        resolved_cfg = getattr(app.state, "config", None)
+        configured_sessions_dir = (
+            getattr(resolved_cfg, "sessions_dir", Path("sessions")) if resolved_cfg else Path("sessions")
+        )
+        configured_name = Path(str(configured_sessions_dir)).name
+        if sessions_dir != configured_name:
+            return Response(
+                status_code=307,
+                headers={"Location": f"/journal/{configured_name}/{session_id}/"},
+            )
+
+        # Obtain or resume the requested session
+        state: WebSessionState | None = app.state.sessions.get(session_id)
+        if state is None:
+            state = _resume_specific_session(app, session_id)
+            if state is None:
+                return JSONResponse(
+                    {"status": "error", "error": "unknown_session"}, status_code=404
+                )
+
+        return _render_session_page(app, state)
 
     @app.post("/session/{session_id}/upload")  # type: ignore[attr-defined]
     async def upload(session_id: str, request: Request):
@@ -322,11 +357,23 @@ def build_app(config: WebAppConfig) -> Any:
             },
         )
 
+        # Compute new cumulative total duration across exchanges
+        st = state.manager.state
+        try:
+            total_seconds = (
+                sum(e.audio.duration_seconds for e in st.exchanges) if st else 0.0
+            )
+        except Exception:
+            total_seconds = 0.0
+
         response_payload = {
             "status": "ok",
             "session_id": session_id,
             "segment_label": target_path.name,
             "duration_seconds": round(exchange.audio.duration_seconds, 2),
+            "total_duration_seconds": round(total_seconds, 2),
+            "total_duration_hms": format_hh_mm_ss(total_seconds),
+            "total_duration_minutes_text": format_minutes_text(total_seconds),
             "transcript": exchange.transcript,
             "next_question": state.current_question,
             "llm_model": getattr(next_question, "model", None),
@@ -423,6 +470,58 @@ def build_app(config: WebAppConfig) -> Any:
                 status_code=500,
             )
 
+    @app.post("/session/{session_id}/reveal")  # type: ignore[attr-defined]
+    async def reveal(session_id: str):
+        """Reveal the session's markdown file in the OS file manager.
+
+        - macOS: uses `open -R`
+        - Others: returns a 501 to indicate unsupported platform for now
+        """
+
+        state = app.state.sessions.get(session_id)
+        if state is None:
+            return JSONResponse(
+                {"status": "error", "error": "unknown_session"}, status_code=404
+            )
+
+        try:
+            st = state.manager.state
+            if st is None:
+                return JSONResponse(
+                    {"status": "error", "error": "inactive_session"}, status_code=409
+                )
+
+            md_path = st.markdown_path
+            if sys.platform == "darwin":
+                try:
+                    subprocess.run(["open", "-R", str(md_path)], check=False)
+                    return JSONResponse({"status": "ok"}, status_code=200)
+                except Exception as exc:  # pragma: no cover - runtime path
+                    _LOGGER.exception("Reveal failed: %s", exc)
+                    return JSONResponse(
+                        {
+                            "status": "error",
+                            "error": "reveal_failed",
+                            "detail": str(exc),
+                        },
+                        status_code=500,
+                    )
+            else:
+                return JSONResponse(
+                    {"status": "error", "error": "unsupported_platform"},
+                    status_code=501,
+                )
+        except Exception as exc:  # pragma: no cover - generic surfacing
+            _LOGGER.exception("Reveal endpoint error: %s", exc)
+            return JSONResponse(
+                {"status": "error", "error": "reveal_error", "detail": str(exc)},
+                status_code=500,
+            )
+
+    @app.get("/session/{session_id}/reveal")  # type: ignore[attr-defined]
+    async def reveal_get(session_id: str):
+        return await reveal(session_id)
+
     return app
 
 
@@ -469,6 +568,110 @@ def _build_session_manager(app: Any) -> SessionManager:
 
     manager = SessionManager(session_cfg)
     return manager
+
+
+def _render_session_page(app: Any, state: WebSessionState) -> str:
+    """Render the HTML shell for the given session state."""
+
+    # Resolve voice/TTS options for this app instance
+    voice_enabled: bool = bool(getattr(app.state, "voice_enabled", False))
+    tts_opts: TTSOptions | None = getattr(app.state, "tts_options", None)
+    tts_format = tts_opts.audio_format if tts_opts else CONFIG.tts_format
+
+    # Compute current total duration for display (frontmatter authoritative)
+    try:
+        doc = load_transcript(state.manager.state.markdown_path)  # type: ignore[arg-type]
+        total_seconds = float(doc.frontmatter.data.get("duration_seconds", 0.0))
+    except Exception:  # pragma: no cover - defensive fallback
+        st = getattr(state.manager, "state", None)
+        total_seconds = (
+            sum(e.audio.duration_seconds for e in st.exchanges) if st else 0.0
+        )
+    total_hms = format_hh_mm_ss(total_seconds)
+    total_minutes_text = format_minutes_text(total_seconds)
+
+    # Server/runtime context for debug panel
+    resolved_cfg = getattr(app.state, "config", None)
+    server_host = (
+        getattr(resolved_cfg, "host", "127.0.0.1") if resolved_cfg else "127.0.0.1"
+    )
+    server_port = getattr(resolved_cfg, "port", 8765) if resolved_cfg else 8765
+    server_reload = (
+        bool(getattr(resolved_cfg, "reload", False)) if resolved_cfg else False
+    )
+    server_resume = bool(getattr(app.state, "resume", False))
+    sessions_dir = (
+        str(getattr(resolved_cfg, "sessions_dir", "sessions"))
+        if resolved_cfg
+        else "sessions"
+    )
+
+    # Session/LLM/STT context for debug panel
+    app_version = state.manager.config.app_version
+    llm_model = state.manager.config.llm_model
+    stt_backend = state.manager.config.stt_backend
+    stt_model = state.manager.config.stt_model
+    stt_compute = state.manager.config.stt_compute or ""
+    stt_formatting = state.manager.config.stt_formatting
+    stt_auto_reason = state.manager.config.stt_auto_private_reason or ""
+    stt_warnings = list(state.manager.config.stt_warnings or [])
+    voice_rms_dbfs_threshold = CONFIG.voice_rms_dbfs_threshold
+
+    body = _render_session_shell(
+        state,
+        voice_enabled=voice_enabled,
+        tts_format=str(tts_format),
+        total_seconds=total_seconds,
+        total_hms=total_hms,
+        total_minutes_text=total_minutes_text,
+        server_host=server_host,
+        server_port=server_port,
+        server_reload=server_reload,
+        server_resume=server_resume,
+        sessions_dir=sessions_dir,
+        app_version=app_version,
+        llm_model=llm_model,
+        stt_backend=stt_backend,
+        stt_model=stt_model,
+        stt_compute=stt_compute,
+        stt_formatting=stt_formatting,
+        stt_auto_reason=stt_auto_reason,
+        stt_warnings=stt_warnings,
+        voice_rms_dbfs_threshold=voice_rms_dbfs_threshold,
+    )
+    return body
+
+
+def _resume_specific_session(app: Any, session_id: str) -> WebSessionState | None:
+    """Resume a specific session by id if its markdown exists on disk."""
+
+    manager = _build_session_manager(app)
+    base_dir = manager.config.base_dir
+    md_path = base_dir / f"{session_id}.md"
+    if not md_path.exists():
+        return None
+
+    state = manager.resume(md_path)
+
+    # Determine initial question: try to generate from existing body, else use opener
+    try:
+        from ..storage import load_transcript
+
+        doc = load_transcript(state.markdown_path)
+        if doc.body.strip():
+            try:
+                next_q = manager.generate_next_question(doc.body)
+                current_question = next_q.question
+            except Exception:
+                current_question = manager.config.opening_question
+        else:
+            current_question = manager.config.opening_question
+    except Exception:
+        current_question = manager.config.opening_question
+
+    web_state = WebSessionState(manager=manager, current_question=current_question)
+    app.state.sessions[state.session_id] = web_state
+    return web_state
 
 
 def _start_session(app: Any) -> WebSessionState:
@@ -556,7 +759,27 @@ def _extension_for_mime(mime: str, filename: str | None) -> str:
 
 
 def _render_session_shell(
-    state: WebSessionState, *, voice_enabled: bool, tts_format: str
+    state: WebSessionState,
+    *,
+    voice_enabled: bool,
+    tts_format: str,
+    total_seconds: float,
+    total_hms: str,
+    total_minutes_text: str,
+    server_host: str,
+    server_port: int,
+    server_reload: bool,
+    server_resume: bool,
+    sessions_dir: str,
+    app_version: str,
+    llm_model: str,
+    stt_backend: str,
+    stt_model: str,
+    stt_compute: str,
+    stt_formatting: str,
+    stt_auto_reason: str,
+    stt_warnings: list[str],
+    voice_rms_dbfs_threshold: float,
 ) -> str:
     """Return the base HTML shell; dynamic behaviour handled client-side."""
 
@@ -597,6 +820,23 @@ def _render_session_shell(
             "short_voiced": short_voiced,
             "voice_attr": voice_attr,
             "tts_mime": tts_mime,
+            "total_seconds": round(float(total_seconds or 0.0), 2),
+            "total_hms": total_hms,
+            "total_minutes_text": total_minutes_text,
+            "server_host": server_host,
+            "server_port": server_port,
+            "server_reload": server_reload,
+            "server_resume": server_resume,
+            "sessions_dir": sessions_dir,
+            "app_version": app_version,
+            "llm_model": llm_model,
+            "stt_backend": stt_backend,
+            "stt_model": stt_model,
+            "stt_compute": stt_compute,
+            "stt_formatting": stt_formatting,
+            "stt_auto_reason": stt_auto_reason,
+            "stt_warnings": stt_warnings,
+            "voice_rms_dbfs_threshold": voice_rms_dbfs_threshold,
         },
         filesystem_loader=template_path.parent,
     )
