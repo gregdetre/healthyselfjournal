@@ -109,9 +109,9 @@ flowchart TD
   %% ==== Adjacent CLI utilities (pointers) ====
   subgraph Utilities[Other CLI commands]
     direction TB
-    ListCmd[[journal list - panels of summaries]]:::ui
+    ListCmd[[session list - panels of summaries]]:::ui
     ReconcileCmd[[reconcile - transcribe pending WAVs]]:::stt
-    SummariesCmd[[summaries list/backfill/regenerate]]:::llm
+    SummariesCmd[[summarise list/backfill/regenerate]]:::llm
     MergeCmd[[merge - move assets, append Q and A, regenerate summary]]:::storage
     WebCmd[[web - start FastHTML app browser UI]]:::ui
   end

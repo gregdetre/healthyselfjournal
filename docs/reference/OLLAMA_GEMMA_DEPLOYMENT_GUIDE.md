@@ -316,7 +316,7 @@ response = client.chat(
 
 - Run the journaling loop with the local model:
   ```bash
-  healthyselfjournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M
+  healthyselfjournal journal cli --llm-model ollama:gemma3:27b-instruct-q4_K_M
   ```
 - Override the Ollama host/port if it differs from the default:
   ```bash
@@ -335,7 +335,7 @@ ollama pull gemma3:27b-instruct-q4_K_M
 ollama run gemma3:27b-instruct-q4_K_M "Hello"
 
 # 3) Run the app locally with the Ollama model
-healthyselfjournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M
+healthyselfjournal journal cli --llm-model ollama:gemma3:27b-instruct-q4_K_M
 
 # (Optional) If Ollama is not on the default host/port
 export OLLAMA_BASE_URL=http://localhost:11434
@@ -504,7 +504,7 @@ I reviewed the guide alongside our code and current Ollama usage. Here are conci
 - Officially supported env for our app:
   - We read only `OLLAMA_BASE_URL`, `OLLAMA_NUM_CTX`, `OLLAMA_TIMEOUT_SECONDS`. The other env vars in the guide won’t affect our app’s behavior.
 - CLI usage in our app is correct as documented:
-  - `healthyselfjournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M`
+  - `healthyselfjournal journal cli --llm-model ollama:gemma3:27b-instruct-q4_K_M`
   - To switch hosts, set `OLLAMA_BASE_URL` (defaults to `http://localhost:11434`).
 - Provider capabilities:
   - “Thinking” mode is not supported for `ollama:*` in our code. Add a note: only Anthropic supports the `:thinking` suffix; using it with Ollama will error.

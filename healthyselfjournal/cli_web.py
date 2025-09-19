@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Typer command that launches the FastHTML web server."""
+"""Typer command that launches the FastHTML web server (kept for import reuse)."""
 
 from pathlib import Path
 
@@ -8,7 +8,6 @@ import typer
 from rich.console import Console
 
 from .config import CONFIG
-from .web.app import WebAppConfig, run_app
 
 
 console = Console()
@@ -72,6 +71,9 @@ def web(
     ),
 ) -> None:
     """Launch the FastHTML-powered web interface."""
+
+    # Lazy import to avoid importing FastHTML at CLI startup
+    from .web.app import WebAppConfig, run_app
 
     config = WebAppConfig(
         sessions_dir=sessions_dir,

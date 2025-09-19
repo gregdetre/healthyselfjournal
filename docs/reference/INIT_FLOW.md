@@ -2,14 +2,14 @@
 
 ### Introduction
 
-This document describes the initialization flow for non‑technical users. The `init` wizard collects API keys, lets users choose between Cloud and Privacy modes, configures the sessions directory, optionally runs a smoke test, and persists configuration so `healthyselfjournal journal` works out of the box.
+This document describes the initialization flow for non‑technical users. The `init` wizard collects API keys, lets users choose between Cloud and Privacy modes, configures the sessions directory, optionally runs a smoke test, and persists configuration so `healthyselfjournal journal cli` works out of the box.
 
 ### See also
 
-- `../reference/COMMAND_LINE_INTERFACE.md` – how to run commands (`journal`, `reconcile`, `summaries/*`).
+- `../reference/CLI_COMMANDS.md` – how to run commands (`journal cli`, `journal web`, `reconcile`, `summarise/*`).
 - `../reference/SETUP.md` – development/venv setup; context for env variables and uv workflow.
 - `../reference/libraries/QUESTIONARY.md` – prompt library usage patterns and tips.
-- `../../healthyselfjournal/cli.py` – Typer CLI including `init` and auto‑init in `journal`.
+- `../../healthyselfjournal/cli.py` – Typer CLI including `init` and auto‑init in `journal cli`.
 - `../../healthyselfjournal/__init__.py` – `.env`/`.env.local` autoloading at import time.
 - `../../healthyselfjournal/config.py` – defaults and env‑driven configuration (e.g., `SESSIONS_DIR`, `STT_*`).
 - `../../healthyselfjournal/transcription.py` – STT backends and selection logic.
@@ -28,13 +28,13 @@ This document describes the initialization flow for non‑technical users. The `
 ### Current state
 
 - `healthyselfjournal init` launches an interactive Questionary wizard.
-- `healthyselfjournal journal` auto‑runs the wizard if critical prerequisites are missing.
+- `healthyselfjournal journal cli` auto‑runs the wizard if critical prerequisites are missing.
 - Configuration is written to `.env.local` in the current working directory and applied to the current process immediately.
 - Optional smoke test records a 1‑second WAV and, in Cloud mode, attempts a tiny transcription call.
 
 ### Auto‑init detection
 
-Auto‑init triggers at the start of `journal` when running in a TTY if either condition holds:
+Auto‑init triggers at the start of `journal cli` when running in a TTY if either condition holds:
 
 - `ANTHROPIC_API_KEY` is missing (required for the default Anthropic LLM), or
 - STT backend resolves to `cloud-openai` and `OPENAI_API_KEY` is missing.
@@ -52,7 +52,7 @@ Notes:
    - Privacy mode (experimental): attempts on‑device STT (`auto-private`).
 
 2) Keys
-   - Anthropic API key (required for Cloud mode; optional if you intend to use a local `ollama:*` model): the wizard opens `https://console.anthropic.com/settings/api-keys` in your browser; after you create a key and copy it, press Enter. It will try to read your clipboard automatically; if not present, you can paste into a masked prompt. The key is validated via a lightweight models listing call.
+   - Anthropic API key (required for Cloud mode; optional if you intend to use a local `ollama:*` model): the wizard opens `https://console.anthropic.com/settings/keys` in your browser; after you create a key and copy it, press Enter. It will try to read your clipboard automatically; if not present, you can paste into a masked prompt. The key is validated via a lightweight models listing call.
    - OpenAI API key (required for Cloud mode; optional/unused for Privacy mode): similarly, the wizard opens `https://platform.openai.com/api-keys`, attempts clipboard capture, falls back to masked paste, and validates with a lightweight models listing call.
 
 3) Sessions directory
@@ -86,7 +86,7 @@ Notes:
 
 - Privacy mode (experimental)
   - Tries local backends via `auto-private` (prefers `mlx-whisper` on Apple Silicon, then `faster-whisper`, then `whispercpp`).
-  - If no local backend is available, running `journal` with `auto-private` will raise a helpful error; users can switch to Cloud mode or install local extras.
+  - If no local backend is available, running `journal cli` with `auto-private` will raise a helpful error; users can switch to Cloud mode or install local extras.
   - Combine with `--llm-model ollama:...` (and a running Ollama daemon) to keep dialogue offline.
 
 ### Smoke test details
@@ -96,13 +96,13 @@ Notes:
 
 ### Common flows
 
-- First run via `uvx healthyselfjournal` → auto‑init launches → user selects Cloud → keys entered → sessions at `./sessions` → optional smoke test → run `journal`.
+- First run via `uvx healthyselfjournal` → auto‑init launches → user selects Cloud → keys entered → sessions at `./sessions` → optional smoke test → run `journal cli`.
 - Switching to Privacy mode later: edit `.env.local` (`STT_BACKEND=auto-private`) or re‑run `healthyselfjournal init` and choose Privacy.
-- No keys yet: run `init`, skip Cloud, select Privacy; if no local backends present, users can still record audio with `journal`, then backfill later after enabling Cloud or installing local STT.
+- No keys yet: run `init`, skip Cloud, select Privacy; if no local backends present, users can still record audio with `journal cli`, then backfill later after enabling Cloud or installing local STT.
 
 ### Troubleshooting
 
-- “Environment variable X is required”: run `healthyselfjournal init` or export the variable before running `journal`.
+- “Environment variable X is required”: run `healthyselfjournal init` or export the variable before running `journal cli`.
 - macOS microphone permissions: grant access in System Settings → Privacy & Security → Microphone.
 - `.env.local` not picked up: ensure you’re running commands from the directory containing `.env.local`, or export variables in your shell profile.
 - Local STT unavailable in Privacy mode: install `mlx-whisper` (Apple Silicon), or `faster-whisper`, or switch to Cloud.

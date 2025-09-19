@@ -1,4 +1,4 @@
-# Recording Controls
+# Recording Controls (shared CLI/Web)
 
 ## Overview
 
@@ -6,7 +6,8 @@ Keyboard controls for voice recording and session management.
 
 ## See also
 
-- `COMMAND_LINE_INTERFACE.md` - Visual feedback during recording
+- `CLI_RECORDING_INTERFACE.md` - CLI flags and display modes
+- `WEB_RECORDING_INTERFACE.md` - Web run instructions
 - `DIALOGUE_FLOW.md` - Session flow after recording
 - `FILE_FORMATS_ORGANISATION.md` - What gets saved when
 

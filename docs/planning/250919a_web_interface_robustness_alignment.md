@@ -343,7 +343,7 @@ Acceptance criteria:
 - Tests (offline):
   - Minimal: `pytest tests/test_storage.py`
   - Web: `PYTHONPATH=. pytest tests/test_web_app.py`
-- Run web during dev: `uv run --active healthyselfjournal web --reload --open-browser`
+- Run web during dev: `uv run --active healthyselfjournal journal web --reload --open-browser`
 
 
 ## Rollout and regression strategy

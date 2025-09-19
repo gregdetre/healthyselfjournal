@@ -23,7 +23,7 @@ Core feature set (implemented today):
 ## Snapshot: What it feels like
 
 ```text
-(experim__healthyselfjournal) experim/healthyselfjournal git:(main) ✗  uv run --active healthyselfjournal journal --resume
+(experim__healthyselfjournal) experim/healthyselfjournal git:(main) ✗  uv run --active healthyselfjournal journal cli --resume
 ╭───────────────────────────────── Healthy Self Journal ──────────────────────────────────╮
 │ Recording starts immediately.                                                            │
 │ Press any key to stop. ESC cancels the current take; Q saves then ends after this entry. │
@@ -83,18 +83,18 @@ Use either pip or uvx:
 # pip
 pip install healthyselfjournal
 uvx healthyselfjournal -- init
-uvx healthyselfjournal -- journal
+uvx healthyselfjournal -- journal cli
 
 # Or install with pip if you prefer
 pip install healthyselfjournal
 healthyselfjournal init
-healthyselfjournal journal
+healthyselfjournal journal cli
 ```
 
 To run the dialogue loop fully offline, install Ollama + Gemma (see `docs/reference/OLLAMA_GEMMA_DEPLOYMENT_GUIDE.md`), ensure the daemon is running, then start the CLI with:
 
 ```bash
-healthyselfjournal journal --llm-model ollama:gemma3:27b-instruct-q4_K_M
+healthyselfjournal journal cli --llm-model ollama:gemma3:27b-instruct-q4_K_M
 ```
 
 Notes:
@@ -112,7 +112,7 @@ Notes:
    ```
 3. Start a session:
    ```bash
-   uvx healthyselfjournal -- journal
+   uvx healthyselfjournal -- journal cli
    ```
 
 Handy flags:
@@ -166,7 +166,7 @@ Running the full suite requires valid API keys exported in the environment.
 
 ## See also
 
-- CLI usage and controls: `docs/reference/COMMAND_LINE_INTERFACE.md`
+- CLI usage and controls: `docs/reference/CLI_COMMANDS.md`
 - Dialogue flow: `docs/reference/DIALOGUE_FLOW.md`
 - Prompt templates: `docs/reference/LLM_PROMPT_TEMPLATES.md`
 - Product vision & features: `docs/reference/PRODUCT_VISION_FEATURES.md`

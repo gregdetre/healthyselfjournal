@@ -17,7 +17,7 @@ Model presets (`default`, `accuracy`, `fast`) resolve differently per backend. F
 ### CLI usage
 
 ```
-uv run --active healthyselfjournal journal \
+uv run --active healthyselfjournal journal cli \
   --stt-backend cloud-openai \
   --stt-model default \
   --stt-formatting sentences
@@ -101,7 +101,7 @@ Every transcription logs start/success/failure events with backend, model, compu
 - PortAudio/macOS input device changed (e.g., Bluetooth headset turned off mid-session):
   - Symptoms: console warnings like `PaMacCore (AUHAL) ... '!obj'`, `err='-10851' Audio Unit: Invalid Property Value`, followed by `sounddevice.PortAudioError: Error opening InputStream: Internal PortAudio error [PaErrorCode -9986]`.
   - Behaviour: the app automatically retries devices/sample rates. If it recovers, you may see a notice such as “Input device uses 48000 Hz; adjusting.”
-  - If it still fails: fully disconnect the headset or select a working input in System Settings → Sound → Input, then rerun `uv run --active healthyselfjournal journal`. Also close any apps that might be holding the microphone.
+  - If it still fails: fully disconnect the headset or select a working input in System Settings → Sound → Input, then rerun `uv run --active healthyselfjournal journal cli`. Also close any apps that might be holding the microphone.
 
 ### Next steps
 

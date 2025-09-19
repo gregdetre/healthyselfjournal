@@ -6,7 +6,6 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.live import Live
 from rich.panel import Panel
 from rich.text import Text
 import tempfile
@@ -23,9 +22,9 @@ from .storage import load_transcript, write_transcript
 from .transcription import (
     BackendNotAvailableError,
     apply_transcript_formatting,
-    create_transcription_backend,
     resolve_backend_selection,
 )
+from .mic_check import run_interactive_mic_check
 from .tts import TTSOptions, speak_text
 
 
@@ -223,7 +222,13 @@ def journal(
     # Optional mic check before starting or resuming a session
     if mic_check:
         try:
-            _run_mic_check(selection, language=language, stt_formatting=stt_formatting)
+            run_interactive_mic_check(
+                selection,
+                console=console,
+                language=language,
+                stt_formatting=stt_formatting,
+                seconds=3.0,
+            )
         except typer.Exit:
             raise
         except Exception as exc:
@@ -266,127 +271,6 @@ def _count_missing_stt(audio_root: Path) -> int:
         if not stt.exists():
             missing += 1
     return missing
-
-
-def _run_mic_check(selection, *, language: str, stt_formatting: str) -> None:
-    """Run a 3-second mic check loop until user accepts or quits.
-
-    - Records to a temporary directory
-    - Disables MP3 conversion and short-answer discard
-    - Deletes all artifacts after display
-    - ENTER continues; ESC retries; q quits the app
-    """
-    # Lazy imports to keep test deps light
-    try:
-        import readchar  # type: ignore
-    except Exception:
-        readchar = None  # type: ignore
-
-    # Construct a transcription backend matching current selection
-    backend = create_transcription_backend(selection)
-
-    while True:
-        console.print(
-            Panel.fit(
-                "Mic check: speak a few words. We'll record for 3 seconds and show the transcript.\n"
-                "Press ENTER to continue, ESC to try again, or q to quit.",
-                title="Mic Check",
-                border_style="magenta",
-            )
-        )
-
-        tmp_dir = Path(tempfile.mkdtemp(prefix="elj_miccheck_"))
-        try:
-            # Reuse audio capture with fixed duration and no persistence side-effects
-            from .audio import record_response
-
-            capture = record_response(
-                tmp_dir,
-                base_filename="miccheck",
-                console=console,
-                sample_rate=16_000,
-                ffmpeg_path=None,
-                print_saved_message=False,
-                convert_to_mp3=False,
-                max_seconds=3.0,
-                enforce_short_answer_guard=False,
-            )
-
-            if capture.cancelled:
-                # If user pressed ESC during capture, just retry automatically
-                continue
-
-            # Transcribe and show formatted transcript without persisting
-            transcription = backend.transcribe(capture.wav_path, language=language)
-            try:
-                formatted = apply_transcript_formatting(
-                    transcription.text, stt_formatting
-                )
-            except Exception:
-                formatted = transcription.text.strip()
-
-            console.print()
-            console.print(
-                Panel.fit(
-                    formatted or "(no speech detected)",
-                    title="Mic Check Transcript",
-                    border_style="green",
-                )
-            )
-            console.print(
-                Text(
-                    f"Backend: {selection.backend_id}  Model: {selection.model}",
-                    style="dim",
-                )
-            )
-        finally:
-            # Remove artifacts regardless of outcome
-            try:
-                shutil.rmtree(tmp_dir, ignore_errors=True)
-            except Exception:
-                pass
-
-        # Await user decision
-        console.print(
-            Text(
-                "Press ENTER to continue, ESC to try again, or q to quit…",
-                style="cyan",
-            )
-        )
-        # Use shared key normalization utility
-        try:
-            from .utils.keys import read_one_key_normalized
-        except Exception:
-            read_one_key_normalized = None  # type: ignore
-
-        if readchar is None or read_one_key_normalized is None:
-            # Fallback: on raw input, treat non-empty as retry, 'q' to quit
-            try:
-                response = input()
-            except KeyboardInterrupt:
-                raise typer.Exit(code=0)
-            if response.strip().lower() == "q":
-                console.print("[cyan]Quit requested. Exiting before session starts.[/]")
-                raise typer.Exit(code=0)
-            if response.strip():
-                continue
-            return
-        else:
-            try:
-                key_name = read_one_key_normalized()
-                if key_name == "ENTER":
-                    return
-                if key_name == "ESC":
-                    continue
-                if key_name == "Q":
-                    console.print(
-                        "[cyan]Quit requested. Exiting before session starts.[/]"
-                    )
-                    raise typer.Exit(code=0)
-                # Any other key: accept and proceed
-                return
-            except KeyboardInterrupt:
-                raise typer.Exit(code=0)
 
 
 def prepare_runtime_and_backends(
@@ -773,67 +657,32 @@ def finalize_or_cleanup(*, manager: SessionManager, state, sessions_dir: Path) -
 
 
 def build_app() -> typer.Typer:
-    """Build the Typer sub-app for `journal` with subcommands.
+    """Build the Typer sub-app for `journal` with explicit subcommands.
 
-    Invoking `healthyselfjournal journal` with no subcommand runs the interactive
-    journaling loop (default). `healthyselfjournal journal list` lists sessions.
+    New structure:
+      - `healthyselfjournal journal cli` → run the interactive journaling loop
+      - `healthyselfjournal journal web` → launch the local web interface (added elsewhere)
     """
 
     app = typer.Typer(
         add_completion=False,
-        no_args_is_help=False,
+        no_args_is_help=True,
         context_settings={"help_option_names": ["-h", "--help"]},
-        help="Voice journaling and related utilities.",
+        help="Journaling interfaces (CLI and web).",
     )
 
-    # Default behavior: when no subcommand is provided, run the journaling loop
-    app.callback(invoke_without_command=True)(journal)
+    # Explicit subcommand for the interactive CLI loop
+    app.command("cli")(journal)
 
-    @app.command("list")
-    def list_sessions(
-        sessions_dir: Path = typer.Option(
-            CONFIG.recordings_dir,
-            "--sessions-dir",
-            help="Directory where session markdown/audio files are stored.",
-        ),
-        nchars: int | None = typer.Option(
-            None,
-            "--nchars",
-            help="Limit summary snippet to N characters (None = full summary).",
-        ),
-    ) -> None:
-        """List sessions by filename stem with the first 200 chars of the summary."""
+    # Subcommand to launch the web interface
+    try:
+        from .cli_web import (
+            web as web_command,
+        )  # Lazy-heavy imports are inside the function
 
-        markdown_files = sorted((p for p in sessions_dir.glob("*.md")))
-        if not markdown_files:
-            console.print("[yellow]No session markdown files found.[/]")
-            return
-
-        for path in markdown_files:
-            try:
-                doc = load_transcript(path)
-                summary_raw = doc.frontmatter.data.get("summary")
-                summary_text = summary_raw if isinstance(summary_raw, str) else ""
-                normalized = " ".join(summary_text.split())
-                if nchars is not None and nchars > 0:
-                    snippet = normalized[:nchars]
-                else:
-                    snippet = normalized
-                body = Text(snippet) if snippet else Text("(no summary)", style="dim")
-                console.print(
-                    Panel.fit(
-                        body,
-                        title=path.stem,
-                        border_style="cyan",
-                    )
-                )
-            except Exception as exc:  # pragma: no cover - defensive surface
-                console.print(
-                    Panel.fit(
-                        Text(f"error reading - {exc}", style="red"),
-                        title=path.name,
-                        border_style="red",
-                    )
-                )
+        app.command("web")(web_command)
+    except Exception:
+        # If import fails at build time (e.g., optional deps), we still allow CLI usage.
+        pass
 
     return app

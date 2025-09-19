@@ -6,7 +6,7 @@ This document covers design principles, configuration, architecture, how‑tos, 
 
 ## See also
 
-- `COMMAND_LINE_INTERFACE.md` – CLI flags (`--voice-mode`, `--tts-voice`, `--tts-model`, `--tts-format`) and environment requirements.
+- `CLI_RECORDING_INTERFACE.md` – CLI flags (`--voice-mode`, `--tts-voice`, `--tts-model`, `--tts-format`) and environment requirements.
 - `DIALOGUE_FLOW.md` – Where the assistant question is generated within the session loop.
 - `AUDIO_VOICE_RECOGNITION_WHISPER.md` – STT capture/processing; ensures we don’t record while TTS is playing.
 - `BACKGROUND_PROCESSING.md` – Summary regeneration is scheduled in the background; TTS runs in the foreground just before the next capture.
@@ -57,7 +57,7 @@ The microphone is not active during playback; recording starts after playback co
 
 - Enable speech:
 ```bash
-uv run --active healthyselfjournal journal --voice-mode
+uv run --active healthyselfjournal journal cli --voice-mode
 ```
 
 - Environment:
@@ -70,7 +70,7 @@ uv run --active healthyselfjournal journal --voice-mode
 ## Troubleshooting
 
 - “attempted relative import with no known parent package” when launching:
-  - Prefer running the package as a module: `uv run --active python -m healthyselfjournal journal ...`.
+  - Prefer running the package as a module: `uv run --active python -m healthyselfjournal journal cli ...`.
   - Or ensure the package is run via its CLI entrypoint once defined.
 
 - “No audio player found (tried afplay, ffplay)”:

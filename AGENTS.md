@@ -31,7 +31,7 @@ See: `docs/reference/PRODUCT_VISION_FEATURES.md`
 
 - Activate venv, then:
   - `uv sync --active`
-  - `uv run --active healthyselfjournal journal [--sessions-dir PATH]`
+  - `uv run --active healthyselfjournal journal cli [--sessions-dir PATH]`
 
 ## Tests
 
@@ -53,6 +53,7 @@ See: `docs/reference/PRODUCT_VISION_FEATURES.md`
 
 ## Key reference docs
 
+- Architecture: `docs/reference/ARCHITECTURE.md`
 - CLI usage: `docs/reference/COMMAND_LINE_INTERFACE.md`
 - Recording controls: `docs/reference/RECORDING_CONTROLS.md`
 - Dialogue flow: `docs/reference/DIALOGUE_FLOW.md`

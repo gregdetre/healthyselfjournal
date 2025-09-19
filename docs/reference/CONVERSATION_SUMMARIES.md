@@ -33,16 +33,16 @@ Use the CLI to list and (re)generate summaries for existing session markdown fil
 
 ```bash
 # Show sessions missing summaries (default)
-uv run healthyselfjournal summaries list --sessions-dir ./sessions
+uv run healthyselfjournal summarise list --sessions-dir ./sessions
 
 # Show all sessions with status
-uv run healthyselfjournal summaries list --sessions-dir ./sessions --all
+uv run healthyselfjournal summarise list --sessions-dir ./sessions --all
 
 # Backfill only missing summaries (default)
-uv run healthyselfjournal summaries backfill --sessions-dir ./sessions
+uv run healthyselfjournal summarise backfill --sessions-dir ./sessions
 
 # Regenerate all summaries (overwrite existing)
-uv run healthyselfjournal summaries backfill --sessions-dir ./sessions --all
+uv run healthyselfjournal summarise backfill --sessions-dir ./sessions --all
 ```
 
 Notes:

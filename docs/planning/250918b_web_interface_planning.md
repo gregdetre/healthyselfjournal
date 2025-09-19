@@ -68,7 +68,7 @@ Secondary questions (lower priority):
 - [ ] Bind to `127.0.0.1:8765` by default; make port configurable
 
 Acceptance criteria:
-- Running `uv run --active healthyselfjournal web` starts a local server and serves a “Hello” page at `http://127.0.0.1:8765`
+- Running `uv run --active healthyselfjournal journal web` starts a local server and serves a “Hello” page at `http://127.0.0.1:8765`
 - `/static/` serves assets from `healthyselfjournal/static/`
 
 ### Stage: Server skeleton (FastHTML)
@@ -152,7 +152,7 @@ Acceptance criteria:
 
 ## Definition of Done (Web V1)
 
-- Start server via `uv run --active healthyselfjournal web [--sessions-dir PATH]`
+- Start server via `uv run --active healthyselfjournal journal web [--sessions-dir PATH]`
 - Record in browser; stop; upload; server transcribes and writes markdown with frontmatter
 - Show simple loading states and render the next AI question
 - Mirror CLI cancel/discard behavior and session summary updates

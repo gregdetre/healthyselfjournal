@@ -1,11 +1,12 @@
-# Web Interface
+# Web Interface (architecture)
 
 ## Introduction
-The web interface brings the Healthy Self Journal experience into the browser while reusing the CLI pipeline for transcription, dialogue, and storage. This document covers the architecture, runtime flow, and operational guidance for the FastHTML-powered implementation.
+This document covers the architecture, runtime flow, and operational guidance for the FastHTML-powered implementation. For how to run the web interface, see `WEB_RECORDING_INTERFACE.md`.
 
 ## See also
+- `ARCHITECTURE.md` – Web interface architecture and shared session pipeline
 - `docs/planning/250918b_web_interface_planning.md` – Original implementation stages and acceptance criteria that guided this build.
-- `docs/reference/COMMAND_LINE_INTERFACE.md` – CLI usage reference, including the web entry command and shared options.
+- `docs/reference/CLI_COMMANDS.md` – CLI usage reference, including the web entry command and shared options.
 - `docs/reference/FILE_FORMATS_ORGANISATION.md` – Canonical description of session artefacts (`browser-XXX.webm`, frontmatter updates, `.stt.json`).
 - `docs/reference/BACKGROUND_PROCESSING.md` – How transcript summaries are scheduled; the web upload path uses the same executor model.
 - `docs/reference/SETUP.md` – Environment and asset build steps (`npm run build`) required before running the server.
@@ -17,21 +18,21 @@ The web interface brings the Healthy Self Journal experience into the browser wh
 - **FastHTML first**: HTML is rendered server-side via FastHTML/Starlette; JavaScript is limited to recording and minimal UI state.
 - **Opus uploads**: Client audio remains `audio/webm;codecs=opus`; if a backend cannot accept Opus, the error surface is explicit rather than silently transcoding.
 - **Local-first**: Server binds to `127.0.0.1:8765` by default and writes into the same `--sessions-dir` tree as the CLI, enabling hybrid usage.
-- **UX parity**: The TypeScript recorder mirrors CLI behaviours—level meter, SPACE pause/resume, ESC cancel, short/quiet auto-discard, sequential questioning.
+- **UX parity**: The TypeScript recorder mirrors CLI behaviours—level meter, SPACE pause/resume, ESC cancel, short/quiet auto-discard, sequential questioning. Voiced detection uses the same dBFS threshold as the CLI.
 - **Optional voice mode**: When enabled, the server synthesises the next question using the existing TTS machinery and the browser plays it back.
 - **Incremental enhancements**: Advanced feedback (SSE progress, device pickers) are deferred to keep V1 lightweight and maintainable.
 
 ## Architecture overview
 
 ### Server layer (Python)
-- Entry point: `healthyselfjournal/cli_web.py` exposes `uv run healthyselfjournal web` with `--sessions-dir`, `--host`, `--port`, `--reload` and optional voice/TTS options.
-- Entry point: `healthyselfjournal/cli_web.py` exposes `uv run healthyselfjournal web` with `--sessions-dir`, `--resume`, `--host`, `--port`, `--reload` and optional voice/TTS options.
+- Entry point: `healthyselfjournal/cli_journal.py` registers `journal web` with `--sessions-dir`, `--host`, `--port`, `--reload` and optional voice/TTS options.
+- Entry point: `healthyselfjournal/cli_journal.py` registers `journal web` with `--sessions-dir`, `--resume`, `--host`, `--port`, `--reload` and optional voice/TTS options.
 - Application builder: `healthyselfjournal/web/app.py` constructs a FastHTML app on demand, mounts `/static/`, and maintains per-session state (`WebSessionState`).
 - Compatibility shim: `_get_fast_html_class()` patches `fastcore.xml.ft` when necessary so FastHTML initialises correctly with current `fastcore` releases. With FastHTML 0.12+, routes should return plain strings/objects and FastHTML wraps responses; avoid manually returning `HTMLResponse` from handlers.
 - Routes:
 - `GET /` – Starts or resumes a session then redirects to the pretty URL `GET /journal/{sessions_dir_basename}/{session_id}/`.
   - `GET /journal/{sessions_dir}/{session_id}/` – Renders the main recording page (UI shell) for that session.
-  - `POST /session/{id}/upload` – Accepts `FormData` (`audio`, `mime`, `duration_ms`, `voiced_ms`, `question`), persists the blob as `browser-XXX.webm`, and funnels processing through `SessionManager.process_uploaded_exchange()`.
+  - `POST /session/{id}/upload` – Accepts `FormData` (`audio`, `mime`, `duration_ms`, `voiced_ms`, optional `quit_after` flag), persists the blob as `browser-XXX.webm`, and funnels processing through `SessionManager.process_uploaded_exchange()` after enforcing the short-answer guard.
   - `POST /session/{id}/tts` – When voice mode is enabled, synthesises speech for the provided text (`{"text": "..."}`) and returns `audio/*` bytes.
 - Processing steps (reuse existing modules):
   1. Persist upload to session audio directory.
@@ -47,23 +48,23 @@ The web interface brings the Healthy Self Journal experience into the browser wh
 - Responsibilities:
   - Request microphone permission, manage a single `MediaRecorder`, and keep recordings running across tab focus changes.
   - Render a lightweight RMS bar using an `AnalyserNode`; update CSS custom property `--meter-level`.
-  - Mirror CLI affordances: click-to-start/stop, SPACE pause/resume, ESC cancel, auto-discard segments shorter than `CONFIG.short_answer_duration_seconds` or with low voiced time.
+  - Mirror CLI affordances: click-to-start/stop, SPACE pause/resume, ESC cancel, auto-discard segments when BOTH duration ≤ `CONFIG.short_answer_duration_seconds` AND voiced time ≤ `CONFIG.short_answer_voiced_seconds` (voiced computed via dBFS threshold).
   - Submit uploads with metadata; display spinner text while awaiting the server.
   - Render incremental history (question/answer pairs) and update the displayed next question without a full page reload.
   - If voice mode is active, request TTS audio for the next question and play it via an `HTMLAudioElement`.
-- Build/watch: `npm run build` performs a one-off compile; `npm run watch` keeps the TS compiler live during development.
+  - Build/watch: `npm run build` performs a one-off compile; `npm run watch` keeps the TS compiler live during development.
 
 ### Storage and session layout
 - Sessions are created in the configured `--sessions-dir`; filenames follow the CLI convention (`yyMMdd_HHmm.md` plus `yyMMdd_HHmm/`).
 - Browser clips are stored as `browser-XXX.webm`; each has a companion `browser-XXX.stt.json` with raw transcription payload.
-- Frontmatter updates mirror CLI fields: `audio_file` entries gain `{wav: null, mp3: null, duration_seconds: <float>}` for web segments, and total duration is recomputed after every exchange.
+- Frontmatter updates mirror CLI fields: `audio_file` entries store the persisted filename under `wav` (even for `.webm` uploads); `mp3` remains `null` for browser captures, and total duration is recomputed after every exchange.
 - Historic questions, transcripts, and summaries remain in the markdown body/frontmatter; no web-specific divergence.
 
 ## Runtime flow
-1. User runs `uv run healthyselfjournal web [options]` (see next section). If `--resume` is provided, the server resumes the most recent session instead of starting a new one.
+1. User runs `uv run healthyselfjournal journal web [options]` (see next section). If `--resume` is provided, the server resumes the most recent session instead of starting a new one.
 2. The root page loads and initialises or resumes a session, then redirects to `/journal/{sessions_dir_basename}/{session_id}/` which shows the opening question.
 3. On “Start recording”, the client captures audio, visualises levels, and tracks voiced time.
-4. When recording stops, the clip is discarded if it fails the short-answer thresholds; otherwise it uploads to `/session/{id}/upload`.
+4. When recording stops, the client discards obvious short/quiet takes, then uploads to `/session/{id}/upload` where the server re-applies the guard before transcription.
 5. The server transcribes, updates storage, schedules summarisation, and generates the next question.
 6. The client receives the response, renders transcript+metadata in the history list, and updates the question prompt. If voice mode is enabled, the client fetches `POST /session/{id}/tts` for the new question and plays the audio.
 7. After the question is displayed (and any TTS playback has finished), recording auto-starts to mirror the CLI flow.
@@ -93,7 +94,9 @@ The web interface brings the Healthy Self Journal experience into the browser wh
 - **Short-answer gating (client + server)**
   - **CONFIG.short_answer_duration_seconds**: `1.2` seconds
   - **CONFIG.short_answer_voiced_seconds**: `0.6` seconds
-  - **CONFIG.voice_rms_dbfs_threshold**: `-40.0` dBFS
+  - **CONFIG.voice_rms_dbfs_threshold**: `-40.0` dBFS (applied client-side by converting RMS→dBFS)
+- **Upload guardrails**
+  - **CONFIG.web_upload_max_bytes**: `50_000_000` bytes (default) before rejecting with `upload_too_large`
 
 - **Transcription (STT)**
   - **STT_BACKEND**: default `cloud-openai` (also supports `local-mlx`, `local-faster`, `local-whispercpp`, `auto-private`)
@@ -123,8 +126,9 @@ The web interface brings the Healthy Self Journal experience into the browser wh
 
 - **HTTP endpoints**
   - `GET /` → starts or resumes a session, then 307-redirects to the pretty URL
-  - `GET /journal/{sessions_dir}/{session_id}/` → serves the HTML shell for a specific session
-  - `POST /session/{id}/upload` → accepts `FormData` fields: `audio`, `mime`, `duration_ms`, `voiced_ms`, `question`
+  - `GET /journal/{sessions_dir}/{session_id}/` → serves the HTML shell for a specific session, including a debug banner if `static/js/app.js` is missing.
+  - `POST /session/{id}/upload` → accepts `FormData` fields: `audio`, `mime`, `duration_ms`, `voiced_ms`, optional `quit_after`; rejects oversized payloads or unsupported MIME types before transcription.
+  - JSON error payloads reuse the identifiers defined in `healthyselfjournal.errors` (`short_answer_discarded`, `audio_format_unsupported`, `upload_too_large`, etc.).
 
 - **Logs and artefacts**
   - Event log: `sessions/events.log`
@@ -133,29 +137,7 @@ The web interface brings the Healthy Self Journal experience into the browser wh
 </details>
 
 ## Running the web server
-- **Prerequisites**:
-  - Python deps: `uv sync --active` (after updating `pyproject.toml`).
-  - Front-end tooling: `npm install` (installs TypeScript) and `npm run build` after modifying `static/ts` sources.
-- **Command**:
-  ```bash
-  uv run healthyselfjournal web \
-    [--sessions-dir PATH] \
-    [--resume] \
-    [--host 127.0.0.1] \
-    [--port 8765] \
-    [--reload/--no-reload] \
-    [--kill-existing] \
-    [--open-browser/--no-open-browser] \
-    [--voice-mode/--no-voice-mode] \
-    [--tts-model MODEL] \
-    [--tts-voice VOICE] \
-    [--tts-format FORMAT]
-  ```
-- **Access**: open `http://127.0.0.1:8765` in a Chromium-based browser (Safari works on recent versions but lacks explicit optimiser testing). The CLI opens your default browser automatically once the server is ready; disable with `--no-open-browser`.
-- **Shared storage**: running CLI and web simultaneously is supported; both operate on timestamped filenames to avoid collisions.
-- **Static assets**: `/static/css/app.css` and `/static/js/app.js` are served directly from the package; ensure the JS build artefact is up to date before packaging.
-- **FastHTML 0.12 return types**: Return strings/objects or element trees from route handlers; avoid explicitly constructing `HTMLResponse`/`JSONResponse` for typical cases to prevent double-wrapping errors.
-- **Voice mode**: When `--voice-mode` is enabled, the server synthesises the next question on demand and the browser plays it. Requires `OPENAI_API_KEY` for the default OpenAI TTS backend; see `AUDIO_SPEECH_GENERATION.md`.
+For end-user run instructions and flags, see `WEB_RECORDING_INTERFACE.md`.
 
 ## Testing
 - Unit/integration coverage: `tests/test_web_app.py` uses `starlette.testclient` with stubbed transcription/LLM backends to exercise upload->persist->response flow. TTS is tested via a stubbed synthesiser.

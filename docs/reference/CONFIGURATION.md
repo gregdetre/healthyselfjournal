@@ -6,11 +6,12 @@ This document explains how configuration is loaded, what can be customized via e
 
 ## See also
 
+- `ARCHITECTURE.md` – Configuration system hierarchy and dependency management
 - `DOCUMENTATION_ORGANISATION.md` – where to find related docs
-- `COMMAND_LINE_INTERFACE.md` – all CLI flags and commands
+- `CLI_COMMANDS.md` – all CLI flags and commands
 - `INIT_FLOW.md` – first-run setup wizard and persistence
 - `AUDIO_VOICE_RECOGNITION_WHISPER.md` – STT backends and tuning
-- `WEB_INTERFACE.md` – server options that mirror CLI
+- `WEB_RECORDING_INTERFACE.md` – server options that mirror CLI
 - `../../healthyselfjournal/config.py` – config defaults and loader
 - `../../healthyselfjournal/transcription.py` – STT backends and vocabulary integration
 
@@ -30,6 +31,7 @@ Relevant environment variables include:
 
 - Sessions and paths
   - `SESSIONS_DIR` or `RECORDINGS_DIR` – default sessions directory
+  - `WEB_UPLOAD_MAX_BYTES` – maximum accepted upload size (bytes) for the web interface
 - STT (speech-to-text)
   - `STT_BACKEND` – `cloud-openai`, `local-mlx`, `local-faster`, `local-whispercpp`, or `auto-private`
   - `STT_MODEL` – preset or explicit model id/path
@@ -108,4 +110,4 @@ SESSIONS_DIR=./sessions
 ## Maintenance
 
 - Update this doc when adding new configuration keys or locations
-- Cross-reference new options from `COMMAND_LINE_INTERFACE.md` and `INIT_FLOW.md`
+- Cross-reference new options from `CLI_COMMANDS.md` and `INIT_FLOW.md`
