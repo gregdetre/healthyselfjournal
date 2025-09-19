@@ -30,6 +30,7 @@ def _extract_session_id(html: str) -> str:
     assert match, "session id not found in HTML"
     return match.group(1)
 
+
 @pytest.fixture()
 def web_app(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(
@@ -75,7 +76,9 @@ def test_tts_endpoint_disabled_returns_error(tmp_path: Path, web_app):
     "tts_format, expected_type",
     [("wav", "audio/wav"), ("mp3", "audio/mpeg")],
 )
-def test_tts_endpoint_ok_when_enabled(tmp_path: Path, monkeypatch, tts_format: str, expected_type: str):
+def test_tts_endpoint_ok_when_enabled(
+    tmp_path: Path, monkeypatch, tts_format: str, expected_type: str
+):
     config = WebAppConfig(
         sessions_dir=tmp_path,
         static_dir=tmp_path / "static",
@@ -98,11 +101,13 @@ def test_tts_endpoint_ok_when_enabled(tmp_path: Path, monkeypatch, tts_format: s
 def test_landing_page_warns_when_static_assets_missing(web_app):
     client = TestClient(web_app, follow_redirects=True)
     response = client.get("/")
-    assert 'Static assets missing.' in response.text
+    assert "Static assets missing." in response.text
     assert 'data-voice-rms-dbfs-threshold="' in response.text
 
 
-def test_upload_creates_session_artifacts_and_logs_ui(tmp_path: Path, monkeypatch, web_app):
+def test_upload_creates_session_artifacts_and_logs_ui(
+    tmp_path: Path, monkeypatch, web_app
+):
     captured: list[tuple[str, dict]] = []
 
     def _capture(name: str, payload: dict) -> None:
@@ -137,7 +142,9 @@ def test_upload_creates_session_artifacts_and_logs_ui(tmp_path: Path, monkeypatc
     markdown_path = tmp_path / f"{session_id}.md"
     assert audio_path.exists()
     assert markdown_path.exists()
-    stt_payload = json.loads(audio_path.with_suffix(".stt.json").read_text(encoding="utf-8"))
+    stt_payload = json.loads(
+        audio_path.with_suffix(".stt.json").read_text(encoding="utf-8")
+    )
     assert stt_payload["text"] == "stub transcript"
 
     recorded = [evt for evt in captured if evt[0] == "session.exchange.recorded"]
@@ -202,7 +209,9 @@ def test_reveal_endpoint_get_matches_post(tmp_path: Path, monkeypatch):
     config = WebAppConfig(sessions_dir=tmp_path, static_dir=tmp_path / "static")
     monkeypatch.setattr(
         "healthyselfjournal.web.app.resolve_backend_selection",
-        lambda *_, **__: BackendSelection(backend_id="stub", model="stub-model", compute=None),
+        lambda *_, **__: BackendSelection(
+            backend_id="stub", model="stub-model", compute=None
+        ),
     )
     monkeypatch.setattr(
         "healthyselfjournal.session.create_transcription_backend",
@@ -212,7 +221,9 @@ def test_reveal_endpoint_get_matches_post(tmp_path: Path, monkeypatch):
         "healthyselfjournal.session.generate_followup_question",
         lambda _: stub_followup_question(),
     )
-    monkeypatch.setattr("healthyselfjournal.web.app.sys.platform", "darwin", raising=False)
+    monkeypatch.setattr(
+        "healthyselfjournal.web.app.sys.platform", "darwin", raising=False
+    )
     called: list[list[str]] = []
     monkeypatch.setattr(
         "healthyselfjournal.web.app.subprocess.run",
@@ -225,7 +236,12 @@ def test_reveal_endpoint_get_matches_post(tmp_path: Path, monkeypatch):
 
     payload = {"duration_ms": "1000", "voiced_ms": "800"}
     files = {"audio": ("clip.webm", b"faux-data", "audio/webm")}
-    assert client.post(f"/session/{session_id}/upload", data=payload, files=files).status_code == 201
+    assert (
+        client.post(
+            f"/session/{session_id}/upload", data=payload, files=files
+        ).status_code
+        == 201
+    )
 
     assert client.post(f"/session/{session_id}/reveal").status_code == 200
     assert client.get(f"/session/{session_id}/reveal").status_code == 200
@@ -235,7 +251,9 @@ def test_reveal_endpoint_get_matches_post(tmp_path: Path, monkeypatch):
 def test_resume_latest_session_when_enabled(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
         "healthyselfjournal.web.app.resolve_backend_selection",
-        lambda *_, **__: BackendSelection(backend_id="stub", model="stub-model", compute=None),
+        lambda *_, **__: BackendSelection(
+            backend_id="stub", model="stub-model", compute=None
+        ),
     )
     monkeypatch.setattr(
         SessionManager, "schedule_summary_regeneration", lambda self: None
