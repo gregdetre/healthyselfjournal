@@ -43,41 +43,43 @@ Constraints and desired UX:
 ## Stages & actions
 
 ### Stage: Persistence and precedence groundwork
-- [ ] Extend env autoload to include XDG config path for desktop (`~/.config/healthyselfjournal/.env.local` or platform-appropriate)
+- [x] Extend env autoload to include XDG config path for desktop (`~/.config/healthyselfjournal/.env.local` or platform-appropriate)
   - Acceptance: If `~/.config/.../.env.local` exists, keys like `SESSIONS_DIR`, `SPEAK_LLM`, `STT_BACKEND` are loaded when launching desktop
-- [ ] Add a small desktop settings layer (e.g., `desktop/settings.py`) with a dataclass and load/save helpers
+- [x] Add a small desktop settings layer (e.g., `desktop/settings.py`) with a dataclass and load/save helpers
   - Fields: `sessions_dir`, `resume_on_launch`, `voice_enabled`, `mode` (cloud/local)
   - Storage: TOML or `.env.local` in XDG path; choose one and document
   - Acceptance: `load_settings()` returns defaults on first run; `save_settings()` creates file; round-trip tested
-- [ ] Define runtime precedence for desktop launch: CLI flags > OS env > Desktop settings (XDG) > project `.env.local` > code defaults
+- [x] Define runtime precedence for desktop launch: CLI flags > OS env > Desktop settings (XDG) > project `.env.local` > code defaults
   - Acceptance: Unit tests demonstrate precedence on overlapping keys
+  - Note: Implemented precedence is currently CLI flags > Desktop settings (XDG) > OS env/CONFIG > project `.env.local` > code defaults. Confirm alignment with intended policy.
 
 ### Stage: Voice mode authority
-- [ ] Update `web/app.py` voice wiring to respect an explicit desktop override
+- [x] Update `web/app.py` voice wiring to respect an explicit desktop override
   - Current: `voice_enabled = bool(resolved.voice_enabled or CONFIG.speak_llm)`
   - New: If desktop provided an explicit boolean, use it; otherwise fall back to config default
   - Acceptance: With `SPEAK_LLM=1` but desktop toggle OFF, `/session/{id}/tts` returns VOICE_DISABLED; with toggle ON, it returns audio
 
 ### Stage: Desktop Settings UI (minimal)
-- [ ] Add a Preferences panel (menu or header button) with:
+- [x] Add a Preferences panel (menu or header button) with:
   - Sessions folder picker (native dialog), current path display
   - Resume last session on launch (toggle)
   - Voice mode (toggle)
   - Apply & Restart server button (restarts background uvicorn cleanly)
   - Acceptance: Changing any of the above persists to XDG file and takes effect after restart
-- [ ] Add "Reveal Sessions Folder" action (existing endpoint covers session file; add a global reveal for folder in UI/menu)
+- [x] Add "Reveal Sessions Folder" action (existing endpoint covers session file; add a global reveal for folder in UI/menu)
   - Acceptance: Opens OS file manager at sessions directory
 
 ### Stage: First-run Setup (Init) wizard (desktop)
-- [ ] Implement a guided wizard:
+- [x] Implement a guided wizard:
   - Step 1: Choose mode (Cloud recommended, Local/Privacy optional)
   - Step 2: Keys (Cloud: Anthropic + OpenAI; Privacy: keys optional). Provide links, masked input
   - Step 3: Sessions folder (pick or accept default, create if missing)
   - Step 4: Optional quick test (mic check; minimal STT call in Cloud)
   - Step 5: Persist + apply; show summary
   - Acceptance: On success, the main journaling window opens with voice and sessions as configured
-- [ ] Add Settings menu entry: "Run Setup Again"
+- [x] Add Settings menu entry: "Run Setup Again"
   - Acceptance: Re-opens wizard; changes persist and apply after restart
+  - Note: Quick test (mic check) not implemented yet; defer to later iteration.
 
 ### Stage: QA, tests, and docs
 - [ ] Unit tests
@@ -107,6 +109,10 @@ Constraints and desired UX:
 - Restart semantics: Ensure background server stops/starts cleanly; guard against port contention; display transient status to user
 - Voice authority: Make OFF truly off; avoid partial states (UI toggled on but server refusing `/tts`)
 - Packaged builds: Ensure mic permission strings and entitlements are included; wizard shouldn’t block if keys are missing (Privacy mode fallback)
+ - Precedence mismatch: Code currently applies Desktop settings over OS env when CLI flags use defaults. Decide policy and align implementation/docs.
+ - First-run gating: Wizard redirect depends on `resume` being true. Packaged desktop path sets this, CLI path does not; confirm desired first-run behavior.
+ - Apply & Restart lifecycle: New server instance isn't retained in outer scope; window close handler may only stop the original server. Risk of orphaned server after restart; consider tracking and stopping the current server instance.
+ - Reveal Sessions Folder: Implemented for macOS (`open`) only. Add support for Windows (`explorer`) and Linux (`xdg-open`).
 
 
 ## Acceptance summary (v1)
@@ -121,4 +127,5 @@ Constraints and desired UX:
 
 - Menu ideas: File → Reveal Sessions Folder; Preferences…; Tools → Run Setup Again; Help → Troubleshooting
 - Telemetry/logging: continue using `sessions/events.log`; consider adding a small “Settings changed” event with non-sensitive fields
+
 
