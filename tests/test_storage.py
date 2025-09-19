@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from healthyselfjournal.history import load_recent_summaries
-from healthyselfjournal.storage import Frontmatter, TranscriptDocument, append_exchange_body, load_transcript, write_transcript
+from healthyselfjournal.storage import (
+    Frontmatter,
+    TranscriptDocument,
+    append_exchange_body,
+    load_transcript,
+    write_transcript,
+)
 
 
 def test_transcript_round_trip(tmp_path):
@@ -13,7 +19,11 @@ def test_transcript_round_trip(tmp_path):
     append_exchange_body(path, "What is on your mind?", "Testing response")
     loaded = load_transcript(path)
 
-    assert loaded.body.strip().startswith("## AI Q: What is on your mind?")
+    body = loaded.body.strip()
+    assert body.startswith("## AI Q")
+    # Ensure fenced llm-question block exists with the question text
+    assert "```llm-question" in body
+    assert "What is on your mind?" in body
     assert loaded.frontmatter.data["created_at"] == "2025-01-01T12:00:00Z"
     assert loaded.frontmatter.data["transcript_file"] == path.name
 

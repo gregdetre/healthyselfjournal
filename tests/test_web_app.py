@@ -158,3 +158,65 @@ def test_upload_creates_session_artifacts(tmp_path: Path, web_app):
 
     stt_payload = json.loads(stt_json.read_text(encoding="utf-8"))
     assert stt_payload["text"] == "stub transcript"
+
+
+def test_resume_latest_session_when_enabled(tmp_path: Path, monkeypatch):
+    # Force deterministic backend selection
+    monkeypatch.setattr(
+        "healthyselfjournal.web.app.resolve_backend_selection",
+        lambda *_, **__: BackendSelection(
+            backend_id="stub",
+            model="stub-model",
+            compute=None,
+        ),
+    )
+
+    monkeypatch.setattr(
+        SessionManager, "schedule_summary_regeneration", lambda self: None
+    )
+
+    class _StubBackend:
+        backend_id = "stub"
+
+        def transcribe(self, wav_path: Path, *, language: str | None = None):
+            return TranscriptionResult(
+                text="stub transcript",
+                raw_response={"text": "stub transcript"},
+                model="stub-model",
+                backend="stub-backend",
+            )
+
+    monkeypatch.setattr(
+        "healthyselfjournal.session.create_transcription_backend",
+        lambda *args, **kwargs: _StubBackend(),
+    )
+
+    # First app without resume: create an initial session
+    app1 = build_app(
+        WebAppConfig(sessions_dir=tmp_path, static_dir=tmp_path / "static")
+    )
+    client1 = TestClient(app1)
+    resp1 = client1.get("/")
+    assert resp1.status_code == 200
+    sid_match = re.search(r"data-session-id=\"([^\"]+)\"", resp1.text)
+    assert sid_match
+    first_sid = sid_match.group(1)
+
+    # Create a second app with resume enabled; it should pick up the first session id
+    app2 = build_app(
+        WebAppConfig(
+            sessions_dir=tmp_path,
+            static_dir=tmp_path / "static",
+            resume=True,
+        )
+    )
+    client2 = TestClient(app2)
+    resp2 = client2.get("/")
+    assert resp2.status_code == 200
+    sid_match2 = re.search(r"data-session-id=\"([^\"]+)\"", resp2.text)
+    assert sid_match2
+    resumed_sid = sid_match2.group(1)
+
+    assert (
+        resumed_sid == first_sid
+    ), "Expected web app with --resume to reuse latest session"

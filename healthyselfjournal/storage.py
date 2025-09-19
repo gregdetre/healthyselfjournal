@@ -110,7 +110,8 @@ def append_exchange_body(
     transcript_text: str,
 ) -> None:
     doc = load_transcript(markdown_path)
-    heading = f"## AI Q: {question.strip()}".rstrip()
+    # New format: Heading followed by fenced llm-question block
+    heading = "## AI Q"
     response = transcript_text.strip()
 
     blocks: list[str] = []
@@ -120,6 +121,10 @@ def append_exchange_body(
         blocks.append("")
         blocks.append("")
     blocks.append(heading)
+    blocks.append("")
+    blocks.append("```llm-question")
+    blocks.append(question.strip())
+    blocks.append("```")
     blocks.append("")
     blocks.append(response)
 

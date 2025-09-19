@@ -69,6 +69,8 @@ class WebAppConfig:
     host: str = "127.0.0.1"
     port: int = 8765
     reload: bool = False
+    # When enabled, GET / will resume the latest existing session if present
+    resume: bool = False
     # Optional voice mode (browser playback of assistant questions)
     voice_enabled: bool = False
     tts_model: str | None = None
@@ -84,6 +86,7 @@ class WebAppConfig:
             host=self.host,
             port=self.port,
             reload=self.reload,
+            resume=self.resume,
             voice_enabled=self.voice_enabled,
             tts_model=self.tts_model,
             tts_voice=self.tts_voice,
@@ -117,6 +120,7 @@ def build_app(config: WebAppConfig) -> Any:
     app = FastHTML()
     app.state.config = resolved
     app.state.sessions = {}
+    app.state.resume = bool(resolved.resume)
     # Configure voice mode and TTS options for this app instance
     voice_enabled = bool(resolved.voice_enabled or CONFIG.speak_llm)
     app.state.voice_enabled = voice_enabled
@@ -143,7 +147,10 @@ def build_app(config: WebAppConfig) -> Any:
         """Landing page that boots a brand-new session."""
 
         try:
-            state = _start_session(app)
+            if bool(getattr(app.state, "resume", False)):
+                state = _start_or_resume_session(app)
+            else:
+                state = _start_session(app)
         except Exception as exc:  # pragma: no cover - surface to browser
             _LOGGER.exception("Failed to start web session")
             return """
@@ -429,8 +436,8 @@ def run_app(config: WebAppConfig) -> None:
     uvicorn.run(app, host=config.host, port=config.port, reload=config.reload)
 
 
-def _start_session(app: Any) -> WebSessionState:
-    """Initialise a new journaling session for the web client."""
+def _build_session_manager(app: Any) -> SessionManager:
+    """Create a SessionManager using current config and resolved STT backend."""
 
     resolved: WebAppConfig = app.state.config
 
@@ -461,14 +468,64 @@ def _start_session(app: Any) -> WebSessionState:
     )
 
     manager = SessionManager(session_cfg)
+    return manager
+
+
+def _start_session(app: Any) -> WebSessionState:
+    """Initialise a new journaling session for the web client."""
+
+    manager = _build_session_manager(app)
     state = manager.start()
-    current_question = session_cfg.opening_question
+    current_question = manager.config.opening_question
 
     web_state = WebSessionState(manager=manager, current_question=current_question)
     app.state.sessions[state.session_id] = web_state
 
     log_event(
         "web.session.started",
+        {
+            "session_id": state.session_id,
+            "markdown_path": state.markdown_path.name,
+            "audio_dir": str(state.audio_dir),
+        },
+    )
+    return web_state
+
+
+def _start_or_resume_session(app: Any) -> WebSessionState:
+    """Start a new session or resume the most recent existing session."""
+
+    manager = _build_session_manager(app)
+    base_dir = manager.config.base_dir
+    markdown_files = sorted((p for p in base_dir.glob("*.md")), reverse=True)
+
+    if not markdown_files:
+        return _start_session(app)
+
+    latest_md = markdown_files[0]
+    state = manager.resume(latest_md)
+
+    # Determine initial question: try to generate from existing body, else use opener
+    try:
+        from ..storage import load_transcript
+
+        doc = load_transcript(state.markdown_path)
+        if doc.body.strip():
+            try:
+                next_q = manager.generate_next_question(doc.body)
+                current_question = next_q.question
+            except Exception:
+                current_question = manager.config.opening_question
+        else:
+            current_question = manager.config.opening_question
+    except Exception:
+        current_question = manager.config.opening_question
+
+    web_state = WebSessionState(manager=manager, current_question=current_question)
+    app.state.sessions[state.session_id] = web_state
+
+    log_event(
+        "web.session.resumed",
         {
             "session_id": state.session_id,
             "markdown_path": state.markdown_path.name,

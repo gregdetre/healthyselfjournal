@@ -20,6 +20,11 @@ def web(
         "--sessions-dir",
         help="Directory where session markdown and audio artifacts are stored.",
     ),
+    resume: bool = typer.Option(
+        False,
+        "--resume",
+        help="Resume the most recent session instead of starting a new one.",
+    ),
     host: str = typer.Option(
         "127.0.0.1",
         "--host",
@@ -55,11 +60,17 @@ def web(
         "--tts-format",
         help="TTS audio format returned to the browser (e.g., wav, mp3).",
     ),
+    kill_existing: bool = typer.Option(
+        False,
+        "--kill-existing",
+        help="If set, attempt to free the port by killing existing listeners before start.",
+    ),
 ) -> None:
     """Launch the FastHTML-powered web interface."""
 
     config = WebAppConfig(
         sessions_dir=sessions_dir,
+        resume=resume,
         host=host,
         port=port,
         reload=reload,
@@ -72,6 +83,17 @@ def web(
         f"[green]Starting Healthy Self Journal web server on {host}:{port}[/]"
     )
     console.print(f"Sessions directory: [cyan]{config.sessions_dir.expanduser()}[/]")
+
+    # Optionally free the port before starting
+    if kill_existing:
+        try:
+            from gjdutils.ports import free_port_if_in_use
+
+            free_port_if_in_use(port, verbose=1)
+            console.print(f"[yellow]Ensured port {port} is free before startup.[/]")
+        except Exception:
+            # Best-effort; continue to let server start or show usual bind error
+            pass
 
     try:
         run_app(config)
