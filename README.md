@@ -176,7 +176,7 @@ For an overview of all 30+ research areas and methodologies, see `docs/research/
 
 ### Desktop app
 ```bash
-healthyselfjournal desktop --voice-mode
+healthyselfjournal journal desktop --voice-mode
 ```
 
 ### Different AI models

@@ -90,14 +90,6 @@ app.add_typer(build_init_app(), name="init")
 
 # Top-level commands
 
-try:
-    from .cli_desktop import desktop as desktop_command
-
-    app.command()(desktop_command)
-except Exception:
-    # Desktop shell requires optional dependencies (pywebview).
-    pass
-
 # Session utilities group (moved out to cli_session.py)
 app.add_typer(build_session_app(), name="session")
 

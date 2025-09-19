@@ -4,7 +4,7 @@
 
 The journaling flow keeps audio safe even when speech-to-text (STT) fails. Instead of blocking the user or silently retrying forever, the app records the failure, stores enough breadcrumbs to recover later, and surfaces the exact `reconcile` command everywhere (CLI banner, web banner, error prompts).
 
-See this document alongside `FILE_FORMATS_ORGANISATION.md`, `CLI_COMMANDS.md`, and `WEB_ARCHITECTURE.md` for end-to-end context.
+See this document alongside `FILE_FORMATS_ORGANISATION.md`, `CLI_COMMANDS.md`, and `WEB_RECORDING_INTERFACE.md` for end-to-end context.
 
 ## Failure handling (CLI & web)
 
@@ -73,6 +73,6 @@ Key events involved in resilience:
 ## Related documents
 
 - `FILE_FORMATS_ORGANISATION.md` – Markdown placeholder format, audio metadata, sentinel details.
-- `CLI_COMMANDS.md` – `journal list --pending` and `reconcile` options.
+- `CLI_COMMANDS.md` – `reconcile` options.
 - `WEB_ARCHITECTURE.md` – Pending banner and web error messaging.
 - `AUDIO_VOICE_RECOGNITION_WHISPER.md` – Backend configuration, atomic write notes.

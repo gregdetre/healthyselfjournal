@@ -28,8 +28,8 @@ Runtime precedence (highest to lowest):
 5. `.env`
 6. Code defaults (`healthyselfjournal/config.py`)
 
-Notes:
-- Desktop app (`healthyselfjournal desktop`) applies a small set of user preferences from XDG `settings.toml` (sessions folder, resume, voice) when the corresponding CLI options are left at their defaults. Explicit CLI flags and OS env still take precedence.
+- Notes:
+- Desktop app (`healthyselfjournal journal desktop`) applies a small set of user preferences from XDG `settings.toml` (sessions folder, resume, voice) when the corresponding CLI options are left at their defaults. Explicit CLI flags and OS env still take precedence.
 - `.env.local` can exist in the project, CWD, or XDG config directory for desktop users; OS env variables always win over file-based values.
 
 Relevant environment variables include:

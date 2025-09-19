@@ -16,7 +16,7 @@ This document describes the Desktop PyWebView app: what it does, how it is struc
 - `FILE_FORMATS_ORGANISATION.md` – Where sessions, audio, and summaries are stored on disk.
 - `AUDIO_VOICE_RECOGNITION_WHISPER.md` – STT backends and performance guidance.
 - `../../healthyselfjournal/desktop/app.py` – Desktop runtime: window creation, background server, JS bridge, Apply & Restart.
-- `../../healthyselfjournal/cli_desktop.py` – Typer command that launches the desktop experience.
+- `../../healthyselfjournal/cli_journal_desktop.py` – Typer command that launches the desktop experience.
 - `../../healthyselfjournal/web/app.py` – FastHTML app with strict security headers for desktop and web.
 - `../../healthyselfjournal/desktop/settings.py` – Desktop settings persistence (XDG TOML) used by Preferences and Setup.
 
@@ -33,7 +33,7 @@ This document describes the Desktop PyWebView app: what it does, how it is struc
 
 High‑level flow:
 
-1) CLI entrypoint (`healthyselfjournal desktop`) builds a FastHTML app and starts a background `uvicorn` server on `127.0.0.1:<port>`.
+1) CLI entrypoint (`healthyselfjournal journal desktop`) builds a FastHTML app and starts a background `uvicorn` server on `127.0.0.1:<port>`.
 2) PyWebView creates a window pointing at the loopback URL. `webview.settings.enable_media_stream = True` enables mic capture in WKWebView.
 3) A tiny JS bridge exposes `quit()`, `toggle_devtools()` (when enabled), `pick_sessions_dir()` (native folder picker), and `apply_and_restart()` to restart the background server after saving settings. No arbitrary Python invocation is allowed.
 4) The FastHTML app serves the journaling UI and endpoints:
@@ -55,7 +55,7 @@ Worker processes:
 
 ```bash
 uv sync --active
-uv run --active healthyselfjournal desktop \
+uv run --active healthyselfjournal journal desktop \
   --sessions-dir ./sessions \
   --port 0 \
   --host 127.0.0.1 \
@@ -106,7 +106,7 @@ Current state (implemented):
 - Desktop runner (`desktop/app.py`) that starts the FastHTML server and embeds PyWebView.
 - Microphone streams enabled; strict security headers applied.
 - JS bridge with `quit()` and optional `toggle_devtools()`.
-- CLI command `healthyselfjournal desktop` with window/server options.
+- CLI command `healthyselfjournal journal desktop` with window/server options.
 
 - Desktop settings persistence in XDG config (`~/.config/healthyselfjournal/settings.toml`) with: sessions folder, resume on launch, voice mode, and mode (cloud/local). Precedence: CLI flags > OS env > Desktop settings > project `.env.local` > defaults.
 - Preferences UI (`/settings`) with Sessions folder picker, Resume on launch, Voice mode; Apply & Restart restarts the background server to apply changes.
@@ -150,7 +150,7 @@ Migration status:
    - Optional: set a temp sessions dir for testing, e.g. `./experim_sessions`.
 
 2) Launch desktop (dev)
-   - Run: `uv run --active healthyselfjournal desktop --sessions-dir ./experim_sessions --port 0 --voice-mode --debug`.
+   - Run: `uv run --active healthyselfjournal journal desktop --sessions-dir ./experim_sessions --port 0 --voice-mode --debug`.
    - Expect: a window appears, console shows selected port, CSP headers applied, and no external network requests.
 
 3) Microphone + recording

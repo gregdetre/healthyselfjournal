@@ -47,7 +47,7 @@
   - [x] Expose only needed JS bridge functions (quit + devtools) and set `enable_media_stream=True` (`healthyselfjournal/desktop/app.py`).
   - [x] Configure a strict CSP and disable remote URLs via middleware (`healthyselfjournal/web/app.py`).
   - Acceptance: A window opens and serves the current FastHTML UI.
-  - Progress: Desktop shell exposed via `healthyselfjournal desktop`; manual WKWebView mic verification still pending.
+  - Progress: Desktop shell exposed via `healthyselfjournal journal desktop`; manual WKWebView mic verification still pending.
 - [ ] Verify `getUserMedia` + `MediaRecorder` inside WKWebView
   - [x] Add Info.plist entries: `NSMicrophoneUsageDescription` (and if needed `NSSpeechRecognitionUsageDescription`).
   - [ ] Confirm permission prompt appears and recording meter updates in real time.

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import sys
-from collections import Counter
 from pathlib import Path
 
 import typer
@@ -700,64 +699,6 @@ def build_app() -> typer.Typer:
     # Explicit subcommand for the interactive CLI loop
     app.command("cli")(journal)
 
-    @app.command("list")
-    def journal_list(
-        sessions_dir: Path = typer.Option(
-            CONFIG.recordings_dir,
-            "--sessions-dir",
-            help="Directory where session markdown/audio files are stored.",
-        ),
-        pending: bool = typer.Option(
-            False,
-            "--pending",
-            help="Show sessions with outstanding transcription segments.",
-        ),
-    ) -> None:
-        if not pending:
-            console.print(
-                "[cyan]Use --pending to list sessions with unfinished transcriptions.[/]"
-            )
-            return
-
-        grouped = pending_segments_by_session(sessions_dir)
-        if not grouped:
-            console.print("[green]No pending transcription work found.[/]")
-            return
-
-        cmd = reconcile_command_for_dir(sessions_dir)
-        for session_id in sorted(grouped):
-            segments = grouped[session_id]
-            ext_counts = Counter(
-                seg.audio_path.suffix.lower().lstrip(".") or "audio" for seg in segments
-            )
-            errors = sum(1 for seg in segments if seg.has_error)
-            ext_parts = [f"{count} {ext}" for ext, count in sorted(ext_counts.items())]
-            lines = [
-                f"{len(segments)} pending segment{'s' if len(segments) != 1 else ''}",
-            ]
-            if ext_parts:
-                lines.append(f"Types: {', '.join(ext_parts)}")
-            if errors:
-                lines.append(
-                    f"{errors} segment{'s' if errors != 1 else ''} flagged with errors"
-                )
-            sample_names = ", ".join(seg.segment_label for seg in segments[:3])
-            if sample_names:
-                lines.append(f"Examples: {sample_names}")
-                if len(segments) > 3:
-                    lines[-1] += " …"
-            lines.append(f"Run {cmd}")
-
-            body = Text("\n".join(lines))
-            border = "red" if errors else "yellow"
-            console.print(
-                Panel.fit(
-                    body,
-                    title=session_id,
-                    border_style=border,
-                )
-            )
-
     # Subcommand to launch the web interface
     try:
         from .cli_journal_web import (
@@ -767,6 +708,17 @@ def build_app() -> typer.Typer:
         app.command("web")(web_command)
     except Exception:
         # If import fails at build time (e.g., optional deps), we still allow CLI usage.
+        pass
+
+    # Subcommand to launch the desktop app (PyWebView shell)
+    try:
+        from .cli_journal_desktop import (
+            desktop as desktop_command,
+        )  # Lazy-heavy imports are inside the function
+
+        app.command("desktop")(desktop_command)
+    except Exception:
+        # Optional dependency (pywebview); if missing, omit the subcommand.
         pass
 
     return app

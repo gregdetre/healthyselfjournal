@@ -18,7 +18,7 @@ Constraints and desired UX:
 
 - `docs/reference/DESKTOP_APP_PYWEBVIEW.md` – Desktop shell flow, security posture, CLI flags, endpoints
 - `docs/reference/INIT_FLOW.md` – Current CLI init wizard; steps and persistence expectations
-- `healthyselfjournal/cli_desktop.py` – Desktop CLI flags we will mirror in the UI
+- `healthyselfjournal/cli_journal_desktop.py` – Desktop CLI flags we will mirror in the UI
 - `healthyselfjournal/desktop/app.py` – Background server lifecycle, window creation, bridge
 - `healthyselfjournal/web/app.py` – `WebAppConfig`, voice/TTS wiring (`voice_enabled`), upload/tts/reveal endpoints
 - `healthyselfjournal/config.py` – Runtime defaults and env-driven configuration (LLM/STT/TTS, thresholds)

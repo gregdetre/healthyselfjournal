@@ -7,7 +7,8 @@ Single source for command discovery. See linked pages for detailed flags.
 
 - `journal cli` – Terminal-based recording. See `CLI_RECORDING_INTERFACE.md`.
 - `journal web` – Launch local browser interface. See `WEB_RECORDING_INTERFACE.md`.
-- `journal list --pending` – Show sessions with outstanding transcription segments and the fix hint.
+- `journal desktop` – Launch PyWebView desktop shell. See `DESKTOP_APP_PYWEBVIEW.md`.
+- `session list` – Show sessions with summary snippets. See `SESSIONS.md`.
 - `session list` – Show sessions with summary snippets. See `SESSIONS.md`.
 - `session summaries` – Show which sessions are missing summaries (moved from summarise list).
 - `fix stt` – Backfill missing STT for saved WAV/webm/ogg files, replace markdown placeholders, and remove error sentinels.
@@ -53,6 +54,7 @@ Related:
 Each command lives in its own `cli_*.py` module for clarity:
 - `cli_journal_cli.py` – journaling CLI sub-app
 - `cli_journal_web.py` – journaling web sub-app
+- `cli_journal_desktop.py` – journaling desktop sub-app (PyWebView)
 - `cli_session.py` – session utilities (also includes `session merge` and `session summaries`)
 - `cli_summarise.py` – legacy summaries utilities (re-exported under `fix`)
 - `cli_diagnose.py` – diagnostics sub-app (mic/local/cloud)
