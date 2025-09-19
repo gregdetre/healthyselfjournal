@@ -6,7 +6,7 @@ This document describes the initialization flow for non‑technical users. The `
 
 ### See also
 
-- `../reference/COMMAND_LINE_INTERFACE.md` – how to run commands (`journal cli`, `journal web`, `reconcile`, `summarise/*`).
+- `../reference/CLI_COMMANDS.md` – how to run commands (`journal cli`, `journal web`, `reconcile`, `summarise/*`).
 - `../reference/SETUP_DEV.md` – development/venv setup; context for env variables and uv workflow.
 - `../reference/libraries/QUESTIONARY.md` – prompt library usage patterns and tips.
 - `../../healthyselfjournal/cli.py` – Typer CLI including `init` and auto‑init in `journal cli`.

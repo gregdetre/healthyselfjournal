@@ -7,9 +7,10 @@ Single source for command discovery. See linked pages for detailed flags.
 
 - `journal cli` – Terminal-based recording. See `CLI_RECORDING_INTERFACE.md`.
 - `journal web` – Launch local browser interface. See `WEB_RECORDING_INTERFACE.md`.
+- `journal list --pending` – Show sessions with outstanding transcription segments and the reconcile hint.
 - `session list` – Show sessions with summary snippets. See `SESSIONS.md`.
 - `summarise ...` – List/backfill/regenerate summaries.
-- `reconcile` – Backfill missing STT for saved WAV/webm files.
+- `reconcile` – Backfill missing STT for saved WAV/webm/ogg files, replace markdown placeholders, and remove error sentinels.
 - `merge` – Merge two sessions into the earlier one.
 - `init` – Setup wizard for first-time configuration.
 
@@ -36,4 +37,3 @@ uvx healthyselfjournal -- summarise regenerate 250918_0119.md
 - `CLI_RECORDING_INTERFACE.md`
 - `WEB_RECORDING_INTERFACE.md`
 - `SESSIONS.md`
-
