@@ -36,8 +36,12 @@ See: `docs/reference/PRODUCT_VISION_FEATURES.md`
 
 ## Tests
 
-- Minimal, offline: `pytest tests/test_storage.py`
-- Full suite requires API keys in env
+- Minimal, offline: `uv run --active pytest -q tests/test_*.py`
+  - Use explicit file patterns to avoid site-packages `tests` shadowing
+- Single test example: `uv run --active pytest -q tests/test_session.py::test_session_complete_updates_frontmatter -q -s -vv`
+- Full suite with API keys:
+  - `set -a; [ -f .env.local ] && source .env.local; set +a`
+  - `uv run --active pytest -q tests/test_*.py`
 - Tests live in `tests/`
 
 ## Logs & saved files
