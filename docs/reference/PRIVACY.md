@@ -46,6 +46,8 @@ Nothing leaves your machine unless you enable a cloud provider for a specific fe
   - Cloud (current default): prompts and recent context are sent to Anthropic (Claude) for question generation and to generate summaries.
   - Local (optional): configure a local LLM (e.g., via Ollama) to keep all text processing on‑device. See `OLLAMA_GEMMA_DEPLOYMENT_GUIDE.md`.
 
+Note on local LLM model setup: when you choose the CLI option to resolve a model from Hugging Face, the app makes a metadata request to the Hugging Face API to obtain a file’s SHA‑256 (LFS OID) and a stable download URL. This request does not include your recordings, transcripts, or prompts—only model metadata is fetched to verify file integrity.
+
 - Text‑to‑Speech (TTS) for voice mode
   - Cloud: enabling `--voice-mode` uses OpenAI TTS to synthesize the assistant’s question audio from text.
   - Local: if/when a local TTS backend is configured, no text is sent to a cloud provider.
