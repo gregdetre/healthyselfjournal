@@ -85,7 +85,7 @@ def reconcile_command_for_dir(sessions_dir: Path) -> str:
     """Return the canonical reconcile command string for display to users."""
 
     return (
-        "uv run --active healthyselfjournal reconcile --sessions-dir "
+        "uv run --active healthyselfjournal fix stt --sessions-dir "
         f"'{sessions_dir}'"
     )
 

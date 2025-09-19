@@ -35,7 +35,7 @@ def test_iter_pending_segments_detects_multiple_media_types(tmp_path):
     assert count_pending_for_session(sessions_dir, "250101_1400") == 2
 
     command = reconcile_command_for_dir(sessions_dir)
-    assert "healthyselfjournal reconcile" in command
+    assert "healthyselfjournal fix stt" in command
 
     remove_error_sentinel(wav)
     assert not wav.with_suffix(".stt.error.txt").exists()
