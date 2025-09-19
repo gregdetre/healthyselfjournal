@@ -107,6 +107,50 @@
   - [ ] Document storage locations and export policy in UI.
   - Acceptance: With cloud off, no outbound requests are made (verified via proxy or logs).
 
+#### Stage: Desktop networking & ATS for localhost (macOS)
+- [ ] Add App Sandbox network entitlements for local server usage
+  - [ ] Add `com.apple.security.network.client` to allow WKWebView to fetch `http://127.0.0.1:<port>`.
+  - [ ] Add `com.apple.security.network.server` if the sandboxed app binds the loopback HTTP server itself.
+  - [ ] For early dev, consider disabling sandbox (entitlement off) to simplify mic testing; re-enable before signing.
+  - Acceptance: Packaged app loads the localhost UI without sandbox denials; recording and uploads work.
+- [ ] Configure ATS to allow localhost
+  - [ ] In `Info.plist`, add `NSAppTransportSecurity` with `NSAllowsLocalNetworking = true` (or equivalent ATS exceptions) so WKWebView can load `http://127.0.0.1`.
+  - Acceptance: No ATS warnings; UI loads and operates over HTTP localhost in packaged builds.
+
+#### Stage: Align cloud_off with TTS behavior
+- [ ] Gate TTS on privacy mode
+  - [ ] When `llm.cloud_off = true`, auto-disable server-side TTS (or require a local TTS backend) to ensure no outbound requests.
+  - [ ] Add a `tts.enabled` config switch and disable the UI toggle when cloud_off is active.
+  - Acceptance: With cloud_off set, no network calls occur for LLM or TTS; UI communicates why voice mode is unavailable.
+
+#### Stage: Job lifecycle cleanup & adaptive polling
+- [ ] Cap job memory usage on the server
+  - [ ] Add expiry/cleanup for completed/failed transcription jobs older than a threshold (e.g., 10 minutes) to bound memory.
+  - Acceptance: Long-running sessions do not accumulate unbounded job state.
+- [ ] Reduce client polling overhead
+  - [ ] Make the poll interval adaptive (e.g., faster while `processing`, slower when `queued`/idle; stop after `completed`/`failed`).
+  - [ ] Expose poll interval via a server-provided hint (optional) or config.
+  - [ ] Document an SSE upgrade path for later (not required for POC).
+  - Acceptance: Fewer network calls without losing responsiveness for long clips.
+
+#### Stage: Packaged app multiprocessing validation
+- [ ] Validate worker spawn in frozen build
+  - [ ] In the packaged `.app`, record/upload and confirm the transcription worker process starts and completes successfully.
+  - [ ] Watch for `freeze_support`/spawn issues specific to PyInstaller.
+  - Acceptance: End-to-end transcription works in the packaged app without process errors.
+
+#### Stage: Binary dependency validation on a second machine (macOS)
+- [ ] Smoke-test on another Apple Silicon Mac
+  - [ ] Launch the packaged app, record, and transcribe locally.
+  - [ ] Confirm ctranslate2 / faster-whisper binaries load (no missing symbol errors) and performance is acceptable.
+  - Acceptance: The app functions on a clean second machine without development toolchain.
+
+#### Stage: UI messaging for single in-flight job
+- [ ] Improve UX while processing
+  - [ ] Ensure the record button disabled state and status text clearly indicate "Processing…" during active transcription.
+  - [ ] On 409 responses (job already processing), surface a friendly message guiding the user to wait.
+  - Acceptance: Users understand why recording is blocked until processing completes.
+
 #### Stage: Distribution and updates (macOS first)
 - [ ] Package distribution as DMG/ZIP with branding
   - Acceptance: App mounts/installs and runs.
