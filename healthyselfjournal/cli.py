@@ -11,11 +11,12 @@ from rich.text import Text
 
 from .config import CONFIG
 from .cli_init import init as init_cmd
+from .cli_init_app import build_app as build_init_app
 from .cli_reconcile import reconcile as reconcile_cmd
 from .cli_summarise import build_app as build_summaries_app
 from .cli_journal_cli import build_app as build_journal_app
 from .cli_session import build_app as build_session_app
-from .cli_mic_check import mic_check as mic_check_cmd
+from .cli_diagnose import build_app as build_diagnose_app
 from .cli_merge import merge as merge_cmd
 
 app = typer.Typer(
@@ -89,10 +90,11 @@ j_summaries_app = build_summaries_app()
 journal_app = build_journal_app()
 app.add_typer(j_summaries_app, name="summarise")
 app.add_typer(journal_app, name="journal")
+app.add_typer(build_diagnose_app(), name="diagnose")
+app.add_typer(build_init_app(), name="init")
 
 # Top-level commands
 app.command()(reconcile_cmd)
-app.command()(init_cmd)
 app.command()(merge_cmd)
 
 try:
@@ -107,7 +109,7 @@ except Exception:
 app.add_typer(build_session_app(), name="session")
 
 
-app.command()(mic_check_cmd)
+# mic-check is now part of the diagnose subcommands
 
 
 @app.command()

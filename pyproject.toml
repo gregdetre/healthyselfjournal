@@ -24,6 +24,7 @@ dependencies = [
     "platformdirs>=4.3.0",
     "faster-whisper>=1.0.1",
     "typer>=0.9.0",
+    "tqdm>=4.66.0",
 ]
 
 [project.scripts]

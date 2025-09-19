@@ -13,6 +13,7 @@ from typing import Any, Dict
 
 import httpx
 from platformdirs import user_data_dir
+from tqdm import tqdm
 
 _METADATA_VERSION = 1
 
@@ -228,10 +229,23 @@ class ModelManager:
         destination.parent.mkdir(parents=True, exist_ok=True)
         with httpx.stream("GET", url, follow_redirects=True, timeout=120.0) as response:
             response.raise_for_status()
-            with destination.open("wb") as fh:
-                for chunk in response.iter_bytes(8192):
-                    if chunk:
-                        fh.write(chunk)
+            total = int(response.headers.get("content-length") or 0)
+            with destination.open("wb") as fh, tqdm(
+                total=total if total > 0 else None,
+                unit="B",
+                unit_scale=True,
+                unit_divisor=1024,
+                desc=destination.name,
+                leave=True,
+            ) as bar:
+                for chunk in response.iter_bytes(1024 * 128):
+                    if not chunk:
+                        continue
+                    fh.write(chunk)
+                    try:
+                        bar.update(len(chunk))
+                    except Exception:
+                        pass
         if sha256 and not self._verify_file_hash(destination, sha256):
             destination.unlink(missing_ok=True)
             raise ValueError(
