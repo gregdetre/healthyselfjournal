@@ -17,6 +17,7 @@ from starlette.responses import JSONResponse, Response
 import sys
 import subprocess
 from starlette.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..audio import AudioCaptureResult
 from ..config import CONFIG
@@ -111,6 +112,12 @@ def _apply_security_headers(response: Response) -> Response:
         "Permissions-Policy", "camera=(), geolocation=(), microphone=(self)"
     )
     return response
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        return _apply_security_headers(response)
 
 
 @lru_cache(maxsize=1)
@@ -475,10 +482,7 @@ def build_app(config: WebAppConfig) -> Any:
     else:
         app.state.tts_options = None
 
-    @app.middleware("http")  # type: ignore[attr-defined]
-    async def _security_middleware(request: Request, call_next):
-        response = await call_next(request)
-        return _apply_security_headers(response)
+    app.add_middleware(SecurityHeadersMiddleware)
 
     # Serve static files (JS, CSS, media) under /static/
     app.mount(
