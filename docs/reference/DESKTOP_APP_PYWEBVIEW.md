@@ -224,3 +224,29 @@ References:
 - pywebview Packaging guide – pywebview.org
 
 Post‑package, repeat the manual testing steps to verify parity with dev.
+
+## Desktop app release checklist (copy/paste)
+
+End-to-end steps to publish a new desktop app version alongside a PyPI release.
+
+- [ ] Ensure web static assets are built and present
+  - Run: `npm run build` (or `pnpm build`/`yarn build` as appropriate)
+  - Verify: `healthyselfjournal/static/js/app.js` and `healthyselfjournal/static/css/app.css` exist
+- [ ] Bump version in `pyproject.toml` and commit
+- [ ] Build CLI wheel/sdist: `uv build`
+- [ ] Smoke test wheel via `uvx` as in PyPI guide
+- [ ] Package desktop app locally
+  - `uv run --active pyinstaller packaging/HealthySelfJournal.spec`
+  - Artifacts under `./dist/` (per-spec)
+- [ ] Manual QA of packaged app
+  - Launch app; window opens < 3s; mic prompt appears; record/upload works end-to-end
+  - Transcript appears; next question rendered; TTS plays when `--voice-mode`
+  - Strict CSP in responses; no external network requests
+- [ ] macOS distribution (if shipping)
+  - Sign app with hardened runtime (+ microphone entitlement)
+  - Notarize and staple
+  - Verify gatekeeper opens without warnings
+- [ ] Update `CHANGELOG.md` with desktop highlights
+- [ ] Tag and push: `git tag v<version> && git push origin v<version>`
+- [ ] Upload PyPI artifacts per `PYPI_PUBLISHING.md`
+- [ ] Publish desktop artifacts (attach to release or distribute per-channel)

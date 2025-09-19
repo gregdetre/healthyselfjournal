@@ -11,6 +11,7 @@ This document describes the end‑to‑end process for packaging and publishing 
 - `./CLI_COMMANDS.md` – CLI usage; helpful for post‑install validation
 - `./LLM_PROMPT_TEMPLATES.md` – prompt assets that must ship inside the wheel
 - `./FILE_FORMATS_ORGANISATION.md` – runtime files created by the app; not packaged
+- `./DESKTOP_APP_PYWEBVIEW.md` – Desktop app packaging & release steps
 - External: https://packaging.python.org/en/latest/ (Packaging guide), https://test.pypi.org/ (TestPyPI), https://twine.readthedocs.io/en/stable/ (Twine), https://docs.pypi.org/trusted-publishers/ (Trusted Publishing)
 
 ## Current state
@@ -181,6 +182,7 @@ uvx --python 3.12 healthyselfjournal -- --help
  - [ ] Tag and push: `git tag v<version> && git push origin v<version>`
  - [ ] Update `CHANGELOG.md` with highlights for this release
  - [ ] (If enabled) CI Trusted Publishing workflow runs and succeeds
+  - [ ] If distributing the desktop app, follow the Desktop app release checklist in `docs/reference/DESKTOP_APP_PYWEBVIEW.md`
 
 ## Quick checklist for a new version
 
@@ -199,4 +201,5 @@ Short, practical steps for routine releases (example bumps 0.2.0 → 0.2.1):
    - `uvx healthyselfjournal==0.2.1 -- --help`
    - Optional: `uvx --python 3.12 healthyselfjournal==0.2.1 -- --help`
 7. Commit/tag (optional): `git tag v0.2.1` and push
-8. Update docs/changelog if user‑facing changes were made
+8. Update `CHANGELOG.md` and docs if user‑facing changes were made
+9. If shipping the desktop app, follow the Desktop app release checklist in `docs/reference/DESKTOP_APP_PYWEBVIEW.md`
