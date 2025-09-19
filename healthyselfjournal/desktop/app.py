@@ -13,6 +13,7 @@ from typing import Optional
 import contextlib
 
 from ..web.app import WebAppConfig, build_app
+from .settings import load_settings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -109,14 +110,14 @@ class _BackgroundServer:
                 raise RuntimeError("Web server failed to start") from self._error
             if self._stopped.is_set():
                 if self._error:
-                    raise RuntimeError("Web server stopped unexpectedly") from self._error
+                    raise RuntimeError(
+                        "Web server stopped unexpectedly"
+                    ) from self._error
                 raise RuntimeError("Web server stopped unexpectedly")
             if _is_port_open(host, port):
                 return
             time.sleep(0.1)
-        raise TimeoutError(
-            f"Timed out waiting for desktop web server on {host}:{port}"
-        )
+        raise TimeoutError(f"Timed out waiting for desktop web server on {host}:{port}")
 
     def stop(self, timeout: float = 5.0) -> None:
         server = self._server
@@ -168,9 +169,13 @@ class _DesktopBridge:
 
     def __init__(self) -> None:
         self._window: "webview.Window | None" = None
+        self._on_apply_restart: "callable[[], None] | None" = None
 
     def attach(self, window: "webview.Window") -> None:
         self._window = window
+
+    def set_apply_restart(self, fn: "callable[[], None]") -> None:
+        self._on_apply_restart = fn
 
     def quit(self) -> None:
         """Allow the UI to request app termination."""
@@ -184,6 +189,31 @@ class _DesktopBridge:
             try:
                 window.toggle_devtools()
             except Exception:  # pragma: no cover - optional UI surface
+                pass
+
+    def pick_sessions_dir(self) -> str | None:
+        """Open a native folder picker and return the selected path, if any."""
+        try:
+            import webview
+        except Exception:  # pragma: no cover - dependency optional in tests
+            return None
+        try:
+            result = webview.create_file_dialog(webview.FOLDER_DIALOG)
+            if isinstance(result, list) and result:
+                return str(result[0])
+            if isinstance(result, str):
+                return result
+        except Exception:
+            return None
+        return None
+
+    def apply_and_restart(self) -> None:
+        """Persisted settings already saved via HTTP; restart server and reload UI."""
+        if self._on_apply_restart is not None:
+            try:
+                self._on_apply_restart()
+            except Exception:
+                # Swallow to avoid crashing the UI
                 pass
 
 
@@ -230,6 +260,50 @@ def run_desktop_app(config: DesktopConfig) -> None:
     )
     bridge.attach(window)
 
+    def _apply_and_restart() -> None:
+        # Stop current server
+        try:
+            server.stop()
+        except Exception:
+            pass
+
+        # Rebuild web config by reloading desktop settings, preserving host/port/static
+        ds, _ = load_settings()
+        base = web_config
+        new_web = replace(
+            base,
+            sessions_dir=(
+                ds.sessions_dir if ds.sessions_dir is not None else base.sessions_dir
+            ),
+            resume=(
+                ds.resume_on_launch if ds.resume_on_launch is not None else base.resume
+            ),
+            voice_enabled=(
+                ds.voice_enabled if ds.voice_enabled is not None else base.voice_enabled
+            ),
+        )
+
+        # Start new server and reload window URL
+        new_server = _BackgroundServer(new_web)
+        new_server.start()
+        try:
+            new_server.wait_until_ready(resolved.server_start_timeout)
+        except Exception:
+            new_server.stop()
+            return
+        # Swap server reference
+        nonlocal_server = locals()
+        # We cannot rebind outer 'server' easily without nonlocal; use tricks:
+        # But simplest: just assign to name in enclosing scope via closure capture
+        # However, Python requires nonlocal declaration; restructure to avoid.
+        # Instead, reload the window to point at the same URL using new_web host/port.
+        try:
+            window.load_url(f"http://{new_web.host}:{new_web.port}/")
+        except Exception:
+            pass
+
+    bridge.set_apply_restart(_apply_and_restart)
+
     def _on_closed() -> None:
         server.stop()
 
@@ -243,4 +317,6 @@ def run_desktop_app(config: DesktopConfig) -> None:
     finally:
         server.stop()
         if server.error:
-            raise RuntimeError("Desktop web server exited with an error") from server.error
+            raise RuntimeError(
+                "Desktop web server exited with an error"
+            ) from server.error

@@ -15,12 +15,13 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from openai import APIConnectionError, APIStatusError, OpenAI, OpenAIError
 
 from .events import log_event
 from .config import CONFIG
+from .model_manager import get_model_manager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,6 +102,16 @@ class TranscriptionResult:
     backend: str
 
 
+@dataclass(slots=True)
+class TranscriptionProgress:
+    """Represents a partial transcription update during long-running jobs."""
+
+    text: str
+    segment_index: int
+    segment: dict[str, Any] | None = None
+    done: bool = False
+
+
 class TranscriptionBackend(ABC):
     """Abstract base class for concrete transcription backends."""
 
@@ -112,7 +123,11 @@ class TranscriptionBackend(ABC):
 
     @abstractmethod
     def transcribe(
-        self, wav_path: Path, *, language: str | None = None
+        self,
+        wav_path: Path,
+        *,
+        language: str | None = None,
+        progress: Callable[[TranscriptionProgress], None] | None = None,
     ) -> TranscriptionResult:
         """Transcribe the given WAV file and return structured output."""
 
@@ -141,7 +156,11 @@ class OpenAITranscriptionBackend(TranscriptionBackend):
         self.backoff_base_seconds = backoff_base_seconds
 
     def transcribe(
-        self, wav_path: Path, *, language: str | None = "en"
+        self,
+        wav_path: Path,
+        *,
+        language: str | None = "en",
+        progress: Callable[[TranscriptionProgress], None] | None = None,
     ) -> TranscriptionResult:
         client = _get_openai_client()
         last_error: Exception | None = None
@@ -189,12 +208,25 @@ class OpenAITranscriptionBackend(TranscriptionBackend):
                         "text_len": len(text),
                     },
                 )
-                return TranscriptionResult(
+                result = TranscriptionResult(
                     text=text.strip(),
                     raw_response=raw,
                     model=self.model,
                     backend=self.backend_id,
                 )
+                if progress:
+                    try:
+                        progress(
+                            TranscriptionProgress(
+                                text=result.text,
+                                segment_index=-1,
+                                segment=None,
+                                done=True,
+                            )
+                        )
+                    except Exception:  # pragma: no cover - defensive
+                        pass
+                return result
 
             except (APIStatusError, APIConnectionError, OpenAIError) as exc:
                 last_error = exc
@@ -273,15 +305,47 @@ class FasterWhisperBackend(TranscriptionBackend):
                 "faster-whisper not installed. Install with `uv add faster-whisper`."
             ) from exc
 
-        self._model = WhisperModel(
-            model,
-            device=device or "auto",
-            compute_type=compute_type,
-            cpu_threads=cpu_threads or 0,
-        )
+        manager = get_model_manager()
+        download_root = manager.ensure_faster_whisper_model(model)
+        suggested_device = device or manager.suggest_faster_whisper_device()
+        cpu_threads_value = cpu_threads or 0
+
+        try:
+            self._model = WhisperModel(
+                model,
+                device=suggested_device,
+                compute_type=compute_type,
+                cpu_threads=cpu_threads_value,
+                download_root=str(download_root),
+            )
+            self._device = suggested_device
+        except Exception as exc:
+            if suggested_device == "metal":
+                _LOGGER.warning(
+                    "Metal initialisation failed (%s); retrying with CPU backend.", exc
+                )
+                self._model = WhisperModel(
+                    model,
+                    device="cpu",
+                    compute_type=compute_type,
+                    cpu_threads=cpu_threads_value,
+                    download_root=str(download_root),
+                )
+                self._device = "cpu"
+            else:
+                raise
+
+        try:
+            manager.record_faster_whisper_model(model)
+        except Exception:  # pragma: no cover - metadata persistence best-effort
+            pass
 
     def transcribe(
-        self, wav_path: Path, *, language: str | None = "en"
+        self,
+        wav_path: Path,
+        *,
+        language: str | None = "en",
+        progress: Callable[[TranscriptionProgress], None] | None = None,
     ) -> TranscriptionResult:
         log_event(
             "stt.start",
@@ -304,17 +368,30 @@ class FasterWhisperBackend(TranscriptionBackend):
             segments_iter, info = self._model.transcribe(str(wav_path), **kwargs)
             segments_list: list[dict[str, Any]] = []
             text_parts: list[str] = []
-            for segment in segments_iter:
+            last_index = -1
+            for idx, segment in enumerate(segments_iter):
                 seg_text = (segment.text or "").strip()
                 if seg_text:
                     text_parts.append(seg_text)
-                segments_list.append(
-                    {
-                        "start": float(getattr(segment, "start", 0.0)),
-                        "end": float(getattr(segment, "end", 0.0)),
-                        "text": seg_text,
-                    }
-                )
+                seg_payload = {
+                    "start": float(getattr(segment, "start", 0.0)),
+                    "end": float(getattr(segment, "end", 0.0)),
+                    "text": seg_text,
+                }
+                segments_list.append(seg_payload)
+                last_index = idx
+                if progress and seg_text:
+                    try:
+                        progress(
+                            TranscriptionProgress(
+                                text=" ".join(text_parts).strip(),
+                                segment_index=idx,
+                                segment=seg_payload,
+                                done=False,
+                            )
+                        )
+                    except Exception:  # pragma: no cover - defensive
+                        pass
 
             text = " ".join(text_parts).strip()
             raw = {
@@ -331,14 +408,28 @@ class FasterWhisperBackend(TranscriptionBackend):
                     "model": self.model,
                     "text_len": len(text),
                     "compute": self.compute,
+                    "device": getattr(self, "_device", None),
                 },
             )
-            return TranscriptionResult(
+            result = TranscriptionResult(
                 text=text,
                 raw_response=raw,
                 model=self.model,
                 backend=self.backend_id,
             )
+            if progress:
+                try:
+                    progress(
+                        TranscriptionProgress(
+                            text=result.text,
+                            segment_index=last_index,
+                            segment=None,
+                            done=True,
+                        )
+                    )
+                except Exception:  # pragma: no cover - defensive
+                    pass
+            return result
         except Exception as exc:  # pragma: no cover - defensive guard
             log_event(
                 "stt.failed",
@@ -367,7 +458,11 @@ class MLXWhisperBackend(TranscriptionBackend):
             )
 
     def transcribe(
-        self, wav_path: Path, *, language: str | None = "en"
+        self,
+        wav_path: Path,
+        *,
+        language: str | None = "en",
+        progress: Callable[[TranscriptionProgress], None] | None = None,
     ) -> TranscriptionResult:
         model_id = _resolve_mlx_model_id(self.model)
         cmd = [
@@ -430,12 +525,25 @@ class MLXWhisperBackend(TranscriptionBackend):
                 "text_len": len(text),
             },
         )
-        return TranscriptionResult(
+        result = TranscriptionResult(
             text=text,
             raw_response=raw,
             model=self.model,
             backend=self.backend_id,
         )
+        if progress:
+            try:
+                progress(
+                    TranscriptionProgress(
+                        text=result.text,
+                        segment_index=-1,
+                        segment=None,
+                        done=True,
+                    )
+                )
+            except Exception:  # pragma: no cover - defensive
+                pass
+        return result
 
 
 class WhisperCppBackend(TranscriptionBackend):
@@ -466,7 +574,11 @@ class WhisperCppBackend(TranscriptionBackend):
             self._whisper = Whisper(str(model_path))
 
     def transcribe(
-        self, wav_path: Path, *, language: str | None = "en"
+        self,
+        wav_path: Path,
+        *,
+        language: str | None = "en",
+        progress: Callable[[TranscriptionProgress], None] | None = None,
     ) -> TranscriptionResult:
         log_event(
             "stt.start",
@@ -521,12 +633,25 @@ class WhisperCppBackend(TranscriptionBackend):
                 "text_len": len(text),
             },
         )
-        return TranscriptionResult(
+        result = TranscriptionResult(
             text=text,
             raw_response=raw,
             model=self.model,
             backend=self.backend_id,
         )
+        if progress:
+            try:
+                progress(
+                    TranscriptionProgress(
+                        text=result.text,
+                        segment_index=-1,
+                        segment=None,
+                        done=True,
+                    )
+                )
+            except Exception:  # pragma: no cover - defensive
+                pass
+        return result
 
 
 @dataclass(slots=True)

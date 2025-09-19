@@ -116,6 +116,13 @@ main.hsj-container {
   font-size: 0.95rem;
 }
 
+.hsj-partial {
+  margin: 0;
+  color: var(--hsj-muted);
+  font-style: italic;
+  white-space: pre-wrap;
+}
+
 #history-list {
   display: flex;
   flex-direction: column-reverse;

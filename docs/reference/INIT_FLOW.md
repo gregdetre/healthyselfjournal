@@ -15,6 +15,8 @@ This document describes the initialization flow for non‑technical users. The `
 - `../../healthyselfjournal/transcription.py` – STT backends and selection logic.
 - `../../healthyselfjournal/audio.py` – recording utilities used by the smoke test.
 - `../planning/250917c_publish_to_pypi.md` – packaging goals and user install paths.
+- `../reference/DESKTOP_APP_PYWEBVIEW.md` – Desktop Setup/Preferences and settings precedence
+- `../reference/CONFIGURATION.md` – Canonical configuration reference and precedence
 
 ### Principles, key decisions
 
@@ -70,8 +72,10 @@ Notes:
 
 ### Configuration and precedence
 
-- Autoload order at import: `.env` then `.env.local`; existing OS env always wins.
-- Runtime precedence: CLI flags > OS env > `.env.local` > `.env` > code defaults.
+- Autoload order at import: `.env` then `.env.local`; existing OS env always wins. When running the desktop app, XDG config (`~/.config/healthyselfjournal/.env.local`) is also autoloaded and does not override existing OS env.
+- Runtime precedence:
+  - Desktop: CLI flags > OS env > Desktop settings (XDG TOML) > project `.env.local` > `.env` > code defaults.
+  - CLI/Non‑desktop: CLI flags > OS env > project `.env.local` > `.env` > code defaults.
 - Relevant env variables supported by `config.py`:
   - `SESSIONS_DIR` (or `RECORDINGS_DIR`) → default sessions path.
   - `LLM_MODEL` → LLM provider/model string (supports `provider:model:version[:thinking]`).
@@ -99,6 +103,16 @@ Notes:
 - First run via `uvx healthyselfjournal` → auto‑init launches → user selects Cloud → keys entered → sessions at `./sessions` → optional smoke test → run `journal cli`.
 - Switching to Privacy mode later: edit `.env.local` (`STT_BACKEND=auto-private`) or re‑run `healthyselfjournal init` and choose Privacy.
 - No keys yet: run `init`, skip Cloud, select Privacy; if no local backends present, users can still record audio with `journal cli`, then backfill later after enabling Cloud or installing local STT.
+
+### Desktop variant
+
+- First desktop run shows a browser‑based Setup wizard (Preferences → Run Setup Again to re‑open later):
+  1) Choose mode (Cloud/Privacy)
+  2) Enter keys (when Cloud)
+  3) Choose sessions folder
+  4) Optional quick test later via CLI (`healthyselfjournal mic-check`)
+  5) Persist and apply (settings saved to `~/.config/healthyselfjournal/settings.toml`, keys to `~/.config/healthyselfjournal/.env.local`)
+- Preferences page allows changing Sessions folder, Resume on launch, and Voice mode; use Apply & Restart to apply changes during a desktop session.
 
 ### Troubleshooting
 

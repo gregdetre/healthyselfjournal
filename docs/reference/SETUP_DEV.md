@@ -124,3 +124,41 @@ uv run --active healthyselfjournal journal cli -- --help | cat
 - Re-run `uv sync --active` after changing dependencies.
 - Run `uv lock` before sharing or deploying to ensure reproducible environments.
 
+
+## CI builds and packaging (multi‑OS)
+
+Build artifacts are produced with PyInstaller on each OS via GitHub Actions. We do not cross‑compile.
+
+- Workflow: `.github/workflows/build-desktop.yml`
+- Triggers: manual (workflow_dispatch) and tags matching `v*`
+
+Local packaging (macOS dev box):
+
+```bash
+pip install -U pip wheel setuptools
+pip install -e ./gjdutils
+pip install pyinstaller
+pyinstaller packaging/HealthySelfJournal.spec
+# artifacts in ./dist/
+```
+
+CI matrix builds (what happens):
+
+- macOS (arm64) on `macos-14` with `--target-arch arm64`
+- macOS (x86_64) on `macos-13` with `--target-arch x86_64`
+- Windows (x86_64) on `windows-latest`
+- Linux (x86_64) on `ubuntu-latest`
+
+Download artifacts:
+
+- Navigate to the workflow run → Artifacts → download the zip for your OS/arch.
+
+Signing/notarisation (macOS):
+
+- For distribution, sign the app bundle with a Developer ID certificate and enable hardened runtime; notarize with Apple, then staple the ticket. Do this after PyInstaller output is produced.
+
+References:
+
+- PyInstaller FAQ (not a cross‑compiler)
+- pywebview Packaging guide
+

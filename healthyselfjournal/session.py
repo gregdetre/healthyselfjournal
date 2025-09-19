@@ -441,6 +441,28 @@ class SessionManager:
                 error=exc,
             ) from exc
 
+        return self.finalize_transcription(
+            question,
+            capture,
+            transcription,
+            source=source,
+            extra_log_fields=extra_log_fields,
+        )
+
+    def finalize_transcription(
+        self,
+        question: str,
+        capture: AudioCaptureResult,
+        transcription: TranscriptionResult,
+        *,
+        source: str,
+        extra_log_fields: dict[str, Any] | None = None,
+    ) -> Exchange:
+        """Persist exchange artifacts once transcription already completed."""
+
+        if self.state is None:
+            raise RuntimeError("Session has not been started")
+
         _persist_raw_transcription(capture.wav_path, transcription.raw_response)
 
         try:
@@ -521,9 +543,7 @@ class SessionManager:
             audio_entries = list(doc.frontmatter.data.get("audio_file") or [])
             entry_payload = {
                 "wav": segment_label,
-                "mp3": (
-                    capture.mp3_path.name if capture.mp3_path else None
-                ),
+                "mp3": (capture.mp3_path.name if capture.mp3_path else None),
                 "duration_seconds": round(capture.duration_seconds, 2),
                 "voiced_seconds": round(capture.voiced_seconds, 2),
                 "pending": True,
@@ -754,7 +774,6 @@ class SessionManager:
                         else None
                     ),
                     "duration_seconds": round(exchange.audio.duration_seconds, 2),
-                    "voiced_seconds": round(exchange.audio.voiced_seconds, 2),
                 }
                 # Remove any stale pending markers once transcription succeeded
                 merged_entry = dict(merged_map.get(seg["wav"], {}))
@@ -806,9 +825,7 @@ class SessionManager:
 def _persist_raw_transcription(wav_path: Path, payload: dict) -> None:
     output_path = wav_path.with_suffix(".stt.json")
     tmp_path = output_path.with_name(output_path.name + ".partial")
-    tmp_path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
-    )
+    tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     tmp_path.replace(output_path)
     remove_error_sentinel(wav_path)
     # Optional cleanup: delete WAV when safe (MP3 + STT present)

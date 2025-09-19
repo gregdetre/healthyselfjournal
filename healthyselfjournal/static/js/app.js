@@ -17,6 +17,7 @@ class RecorderController {
         this.quitAfter = false;
         this.recordingStartMs = 0;
         this.accumulatedMs = 0;
+        this.currentJobId = null;
         this.handleDataAvailable = (event) => {
             if (event.data && event.data.size > 0) {
                 this.chunks.push(event.data);
@@ -67,13 +68,18 @@ class RecorderController {
             this.elements.recordButton.disabled = true;
             try {
                 const response = await this.uploadClip(blob, durationMs, voicedMs, this.quitAfter);
-                if (response.status !== 'ok') {
+                if (response.status === 'accepted' && response.job_id) {
+                    await this.awaitJobCompletion(response.job_id);
+                }
+                else if (response.status === 'ok') {
+                    this.setStatus('Thinking about the next question…');
+                    this.handleUploadSuccess(response);
+                    this.setStatus('Ready for the next reflection.');
+                }
+                else {
                     this.handleUploadError(response);
                     return;
                 }
-                this.setStatus('Thinking about the next question…');
-                this.handleUploadSuccess(response, durationMs);
-                this.setStatus('Ready for the next reflection.');
             }
             catch (error) {
                 console.error('Upload failed', error);
@@ -359,7 +365,65 @@ class RecorderController {
         }
         return payload;
     }
-    handleUploadSuccess(payload, durationMs) {
+    async awaitJobCompletion(jobId) {
+        this.currentJobId = jobId;
+        this.showPartialTranscript('');
+        this.setStatus('Transcribing…');
+        const interval = Math.max(this.config.jobPollIntervalMs || 750, 250);
+        while (this.currentJobId === jobId) {
+            const payload = await this.fetchJobStatus(jobId);
+            if (!payload) {
+                this.handleUploadError({
+                    status: 'error',
+                    error: 'processing_failed',
+                    detail: 'Unable to retrieve transcription progress. Check your connection and try again.',
+                });
+                break;
+            }
+            if (payload.partial_transcript) {
+                this.showPartialTranscript(payload.partial_transcript);
+            }
+            if (payload.status === 'completed' && payload.response_payload) {
+                this.clearPartialTranscript();
+                this.setStatus('Thinking about the next question…');
+                this.handleUploadSuccess(payload.response_payload);
+                this.setStatus('Ready for the next reflection.');
+                this.currentJobId = null;
+                return;
+            }
+            if (payload.status === 'error') {
+                this.clearPartialTranscript();
+                this.handleUploadError(payload);
+                this.currentJobId = null;
+                return;
+            }
+            if (payload.status === 'failed') {
+                this.clearPartialTranscript();
+                this.handleUploadError(payload);
+                this.currentJobId = null;
+                return;
+            }
+            await this.sleep(interval);
+        }
+        this.currentJobId = null;
+    }
+    async fetchJobStatus(jobId) {
+        try {
+            const response = await fetch(`${this.config.jobsBaseUrl}/${jobId}`, {
+                cache: 'no-store',
+            });
+            if (!response.ok) {
+                return null;
+            }
+            return (await response.json());
+        }
+        catch (error) {
+            console.error('Failed to poll job status', error);
+            return null;
+        }
+    }
+    handleUploadSuccess(payload) {
+        this.clearPartialTranscript();
         const answeredQuestion = this.elements.currentQuestion.textContent ?? '';
         this.elements.currentQuestion.textContent = payload.next_question;
         const shouldQuitAfter = !!payload.quit_after;
@@ -375,7 +439,8 @@ class RecorderController {
         aBody.textContent = payload.transcript;
         const meta = document.createElement('p');
         meta.className = 'hsj-exchange-meta';
-        meta.textContent = `Segment ${payload.segment_label} · ${(durationMs / 1000).toFixed(1)}s`;
+        const segDuration = Number(payload.duration_seconds ?? 0);
+        meta.textContent = `Segment ${payload.segment_label} · ${segDuration.toFixed(1)}s`;
         historyItem.append(qHeading, qBody, aHeading, aBody, meta);
         this.elements.historyList.prepend(historyItem);
         // Update cumulative duration display (minutes-only text when available)
@@ -399,6 +464,7 @@ class RecorderController {
     }
     handleUploadError(payload) {
         this.quitAfter = false;
+        this.clearPartialTranscript();
         const detail = payload.detail ? ` ${payload.detail}` : '';
         switch (payload.error) {
             case 'short_answer_discarded':
@@ -428,6 +494,24 @@ class RecorderController {
                 break;
             }
         }
+    }
+    showPartialTranscript(text) {
+        const el = this.elements.partialTranscript;
+        if (!el)
+            return;
+        if (!text || text.trim().length === 0) {
+            el.hidden = true;
+            el.textContent = '';
+            return;
+        }
+        el.hidden = false;
+        el.textContent = text;
+    }
+    clearPartialTranscript() {
+        this.showPartialTranscript('');
+    }
+    sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
     async playTts(text) {
         try {
@@ -566,6 +650,7 @@ function bootstrap() {
         recordTimerValue: document.getElementById('record-timer-value') || undefined,
         voiceToggle: document.getElementById('voice-toggle') || undefined,
         revealLink: document.getElementById('reveal-session') || undefined,
+        partialTranscript: document.getElementById('partial-transcript') || undefined,
     };
     // Ensure initial total duration text reflects minutes-only value if provided on body dataset
     if (elements.totalDuration) {
@@ -588,6 +673,8 @@ function bootstrap() {
         ttsEndpoint,
         ttsMime,
         revealEndpoint,
+        jobsBaseUrl: `/session/${sessionId}/jobs`,
+        jobPollIntervalMs: Number(body.dataset.jobPollIntervalMs ?? '750'),
     };
     new RecorderController(elements, config);
 }

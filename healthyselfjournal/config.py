@@ -74,6 +74,18 @@ DEFAULT_MAX_TOKENS_SUMMARY = 1200
 DEFAULT_OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 DEFAULT_OLLAMA_TIMEOUT_SECONDS = _env_float("OLLAMA_TIMEOUT_SECONDS", 30.0)
 DEFAULT_OLLAMA_NUM_CTX = _env_int("OLLAMA_NUM_CTX", 8192)
+DEFAULT_LLM_MODE = os.environ.get("LLM_MODE", "cloud").strip().lower()
+DEFAULT_LOCAL_LLM_MODEL = os.environ.get(
+    "LLM_LOCAL_MODEL", "llama-3.1-8b-instruct-q4_k_m.gguf"
+)
+DEFAULT_LOCAL_LLM_MODEL_URL = os.environ.get("LLM_LOCAL_MODEL_URL")
+DEFAULT_LOCAL_LLM_MODEL_SHA256 = os.environ.get("LLM_LOCAL_MODEL_SHA256")
+DEFAULT_LOCAL_LLM_CONTEXT = _env_int("LLM_LOCAL_CONTEXT", 4096)
+DEFAULT_LOCAL_LLM_GPU_LAYERS = _env_int("LLM_LOCAL_GPU_LAYERS", 0)
+DEFAULT_LOCAL_LLM_THREADS = _env_int("LLM_LOCAL_THREADS", 0)
+DEFAULT_LLM_CLOUD_OFF = (
+    os.environ.get("LLM_CLOUD_OFF", "0").strip().lower() in {"1", "true", "yes", "on"}
+)
 
 # Text-to-speech defaults (OpenAI backend)
 DEFAULT_SPEAK_LLM = os.environ.get("SPEAK_LLM", "0").strip().lower() in {
@@ -124,6 +136,14 @@ class AppConfig:
     ollama_base_url: str = DEFAULT_OLLAMA_BASE_URL
     ollama_timeout_seconds: float = DEFAULT_OLLAMA_TIMEOUT_SECONDS
     ollama_num_ctx: int = DEFAULT_OLLAMA_NUM_CTX
+    llm_mode: str = DEFAULT_LLM_MODE
+    llm_local_model: str = DEFAULT_LOCAL_LLM_MODEL
+    llm_local_model_url: str | None = DEFAULT_LOCAL_LLM_MODEL_URL
+    llm_local_model_sha256: str | None = DEFAULT_LOCAL_LLM_MODEL_SHA256
+    llm_local_context: int = DEFAULT_LOCAL_LLM_CONTEXT
+    llm_local_gpu_layers: int = DEFAULT_LOCAL_LLM_GPU_LAYERS
+    llm_local_threads: int = DEFAULT_LOCAL_LLM_THREADS
+    llm_cloud_off: bool = DEFAULT_LLM_CLOUD_OFF
     # Optional TTS of LLM questions
     speak_llm: bool = DEFAULT_SPEAK_LLM
     tts_model: str = DEFAULT_TTS_MODEL
@@ -208,6 +228,36 @@ def _load_user_config() -> Tuple[List[str], Path | None]:
             terms.extend(
                 [str(x) for x in top_terms if isinstance(x, (str, int, float))]
             )
+    except Exception:
+        pass
+
+    # Apply optional LLM configuration overrides
+    try:
+        llm_cfg = data.get("llm") or {}
+        mode = llm_cfg.get("mode")
+        if isinstance(mode, str):
+            CONFIG.llm_mode = mode.strip().lower()
+        local_model = llm_cfg.get("local_model")
+        if isinstance(local_model, str):
+            CONFIG.llm_local_model = local_model.strip()
+        local_url = llm_cfg.get("local_model_url")
+        if isinstance(local_url, str):
+            CONFIG.llm_local_model_url = local_url.strip()
+        local_sha = llm_cfg.get("local_model_sha256")
+        if isinstance(local_sha, str):
+            CONFIG.llm_local_model_sha256 = local_sha.strip()
+        ctx_val = llm_cfg.get("local_context_length")
+        if isinstance(ctx_val, int):
+            CONFIG.llm_local_context = ctx_val
+        gpu_layers = llm_cfg.get("local_gpu_layers")
+        if isinstance(gpu_layers, int):
+            CONFIG.llm_local_gpu_layers = gpu_layers
+        threads = llm_cfg.get("local_threads")
+        if isinstance(threads, int):
+            CONFIG.llm_local_threads = threads
+        cloud_off = llm_cfg.get("cloud_off")
+        if isinstance(cloud_off, bool):
+            CONFIG.llm_cloud_off = cloud_off
     except Exception:
         pass
 

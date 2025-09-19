@@ -8,6 +8,8 @@ This guide helps end users install and run Healthy Self Journal with minimal eff
 - `PRIVACY.md` – What data is stored, when network calls occur, and how to stay offline
 - `AUDIO_VOICE_RECOGNITION_WHISPER.md` – STT backends and requirements
 - `OLLAMA_GEMMA_DEPLOYMENT_GUIDE.md` – Local LLM for fully offline text generation
+- `DESKTOP_APP_PYWEBVIEW.md` – Desktop Setup/Preferences, endpoints, and settings persistence
+- `CONFIGURATION.md` – Runtime configuration, env vars, and precedence rules
 
 ## Prerequisites
 - Python 3.12+
@@ -32,6 +34,7 @@ Run the interactive first‑run setup to collect keys and preferences:
 uvx healthyselfjournal -- init
 ```
 The wizard helps you choose between Cloud (recommended) and Privacy (local/offline) modes, gathers API keys when needed, sets your sessions directory, and writes `.env.local` so future runs work without extra flags.
+On desktop, a built‑in Setup wizard appears on first launch and saves keys under `~/.config/healthyselfjournal/.env.local` and preferences under `~/.config/healthyselfjournal/settings.toml`.
 
 ## Keys and modes
 - Cloud (default): highest accuracy and responsiveness
@@ -87,4 +90,14 @@ See `PRIVACY.md` for details about what leaves your machine and how to control i
 - Explore CLI flags in `CLI_COMMANDS.md`
 - Read `PRIVACY.md` to understand cloud vs local tradeoffs
 - For a browser UI, see `WEB_RECORDING_INTERFACE.md`
+
+## Desktop app (optional)
+
+Launch the PyWebView desktop app:
+```bash
+uvx healthyselfjournal -- desktop --resume --voice-mode
+```
+- Preferences lets you choose the Sessions folder, toggle resuming the last session, and turn Voice mode on/off.
+- Desktop settings are saved to `~/.config/healthyselfjournal/settings.toml` and override defaults; runtime precedence is CLI flags > OS env > Desktop settings > project `.env.local` > code defaults.
+- The first desktop run shows a Setup wizard to collect keys and the sessions folder; you can re‑run it from Preferences.
 

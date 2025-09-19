@@ -17,7 +17,8 @@
         data-tts-mime="{{ tts_mime }}"
         data-total-seconds="{{ total_seconds }}"
         data-total-hms="{{ total_hms }}"
-        data-total-minutes-text="{{ total_minutes_text }}">
+        data-total-minutes-text="{{ total_minutes_text }}"
+        data-job-poll-interval-ms="750">
 
     <main class="hsj-container">
       {% if not static_assets_ready %}
@@ -36,6 +37,7 @@
         <h1>Healthy Self Journal</h1>
         <p class="hsj-session-id">Session <a id="reveal-session" href="/session/{{ session_id }}/reveal" title="Reveal in Finder">{{ session_id }}</a></p>
         <p class="hsj-total-duration">Total duration so far: <span id="total-duration">{{ total_minutes_text }}</span></p>
+        <p><a id="reveal-sessions-folder" href="/reveal/sessions" title="Reveal Sessions Folder">Reveal Sessions Folder</a></p>
         <div class="hsj-voice-toggle">
           <label>
             <input type="checkbox" id="voice-toggle" {% if voice_attr == 'true' %}checked{% endif %} />
@@ -56,6 +58,7 @@
         </div>
         <p id="record-timer" class="hsj-record-timer" hidden>Recording: <span id="record-timer-value">0:00</span></p>
         <p id="status-text">Click start to begin recording.</p>
+        <p id="partial-transcript" class="hsj-partial" hidden></p>
       </section>
 
       <section class="hsj-history">

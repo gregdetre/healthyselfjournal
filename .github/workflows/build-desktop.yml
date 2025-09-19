@@ -1,0 +1,63 @@
+name: build-desktop
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }}-${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-13
+            arch: x86_64
+          - os: windows-latest
+            arch: x86_64
+          - os: ubuntu-latest
+            arch: x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Upgrade pip and install build deps
+        run: |
+          python -m pip install -U pip wheel setuptools
+
+      - name: Install local gjdutils (editable)
+        run: |
+          python -m pip install -e ./gjdutils
+
+      - name: Install project and PyInstaller
+        run: |
+          python -m pip install . pyinstaller
+
+      - name: Build (macOS with target arch)
+        if: startsWith(runner.os, 'macOS')
+        run: |
+          pyinstaller --noconfirm --clean --target-arch ${{ matrix.arch }} packaging/HealthySelfJournal.spec
+
+      - name: Build (Windows/Linux)
+        if: ${{ !startsWith(runner.os, 'macOS') }}
+        run: |
+          pyinstaller --noconfirm --clean packaging/HealthySelfJournal.spec
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: healthyselfjournal-${{ runner.os }}-${{ matrix.arch }}-${{ github.ref_name || github.sha }}
+          path: dist/**
+          if-no-files-found: error
+
+

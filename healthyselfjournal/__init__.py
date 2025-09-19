@@ -23,7 +23,8 @@ def _autoload_env() -> None:
         # python-dotenv not installed; skip silent
         return
 
-    # Candidate locations: project root (package parent) and current working dir
+    # Candidate locations: project root (package parent), current working dir,
+    # and user XDG config directory for desktop installs
     package_root = Path(__file__).resolve().parents[1]
 
     # Gather paths explicitly to control precedence
@@ -43,6 +44,21 @@ def _autoload_env() -> None:
         paths_in_order.append(cwd_env)
     if cwd_env_local:
         paths_in_order.append(cwd_env_local)
+
+    # Also consider XDG config for desktop users
+    try:
+        from platformdirs import user_config_dir  # type: ignore
+    except Exception:
+        user_config_dir = None  # type: ignore
+
+    if user_config_dir is not None:
+        xdg_dir = Path(user_config_dir("healthyselfjournal", "experim"))
+        xdg_env = xdg_dir / ".env"
+        xdg_env_local = xdg_dir / ".env.local"
+        if xdg_env.exists():
+            paths_in_order.append(str(xdg_env))
+        if xdg_env_local.exists():
+            paths_in_order.append(str(xdg_env_local))
 
     # Merge with precedence: later entries override earlier ones, but never override OS env
     merged: dict[str, str] = {}

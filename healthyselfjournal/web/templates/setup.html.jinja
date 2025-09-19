@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Setup – Healthy Self Journal</title>
+    <link rel="stylesheet" href="/static/css/app.css" />
+  </head>
+  <body>
+    <main class="hsj-container">
+      <header class="hsj-header">
+        <h1>Welcome</h1>
+        <p>Let's set up your journaling experience. You can change these later in Preferences.</p>
+      </header>
+      <form id="setup-form" method="post" action="/setup/save" style="max-width: 720px;">
+        <fieldset>
+          <legend>Mode</legend>
+          <label>
+            <input type="radio" name="mode" value="cloud" {% if default_mode == 'cloud' %}checked{% endif %} /> Cloud (recommended)
+          </label>
+          <label>
+            <input type="radio" name="mode" value="private" {% if default_mode != 'cloud' %}checked{% endif %} /> Privacy (local if available)
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>API Keys (Cloud)</legend>
+          <label for="anthropic_key">Anthropic API key</label>
+          <input id="anthropic_key" name="anthropic_key" type="password" value="{{ anthropic }}" placeholder="sk-ant-..." />
+          <label for="openai_key">OpenAI API key</label>
+          <input id="openai_key" name="openai_key" type="password" value="{{ openai }}" placeholder="sk-..." />
+        </fieldset>
+
+        <div class="hsj-field">
+          <label for="sessions_dir">Sessions folder</label>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <input id="sessions_dir" name="sessions_dir" type="text" value="{{ sessions_dir }}" style="flex:1;" />
+            <button id="pick-folder" type="button">Choose…</button>
+          </div>
+        </div>
+
+        <div class="hsj-field">
+          <label>
+            <input id="resume" name="resume" type="checkbox" />
+            Resume last session on launch
+          </label>
+        </div>
+        <div class="hsj-field">
+          <label>
+            <input id="voice" name="voice" type="checkbox" {% if voice == 'true' %}checked{% endif %} />
+            Voice mode (speak questions)
+          </label>
+        </div>
+        <div style="display:flex;gap:0.5rem;">
+          <button type="submit">Finish</button>
+        </div>
+      </form>
+    </main>
+    <script>
+      (function(){
+        const pick = document.getElementById('pick-folder');
+        pick?.addEventListener('click', async () => {
+          try {
+            const p = await window.pywebview.api.pick_sessions_dir();
+            if (p) document.getElementById('sessions_dir').value = p;
+          } catch {}
+        });
+      })();
+    </script>
+  </body>
+  </html>
+
+

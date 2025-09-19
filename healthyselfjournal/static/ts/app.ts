@@ -709,6 +709,15 @@ function bootstrap(): void {
   };
 
   new RecorderController(elements, config);
+
+  // Wire global Reveal Sessions Folder link to POST to avoid navigation
+  const revealSessionsLink = document.getElementById('reveal-sessions-folder') as HTMLAnchorElement | null;
+  if (revealSessionsLink) {
+    revealSessionsLink.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      fetch('/reveal/sessions', { method: 'POST' }).catch(() => {});
+    });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', bootstrap);

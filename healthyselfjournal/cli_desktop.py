@@ -8,6 +8,7 @@ import typer
 from rich.console import Console
 
 from .config import CONFIG
+from .desktop.settings import load_settings
 
 console = Console()
 
@@ -99,16 +100,32 @@ def desktop(
     from .desktop import DesktopConfig, run_desktop_app
     from .web.app import WebAppConfig
 
+    # Apply desktop settings with precedence: CLI flags > OS env/CONFIG > Desktop settings
+    ds, _ = load_settings()
+
+    effective_sessions_dir = sessions_dir
+    if sessions_dir == CONFIG.recordings_dir and ds.sessions_dir is not None:
+        effective_sessions_dir = ds.sessions_dir
+
+    effective_resume = resume
+    if resume is False and ds.resume_on_launch is not None:
+        effective_resume = bool(ds.resume_on_launch)
+
+    effective_voice = voice_mode
+    if voice_mode == CONFIG.speak_llm and ds.voice_enabled is not None:
+        effective_voice = bool(ds.voice_enabled)
+
     web_cfg = WebAppConfig(
-        sessions_dir=sessions_dir,
-        resume=resume,
+        sessions_dir=effective_sessions_dir,
+        resume=effective_resume,
         host=host,
         port=port,
         reload=False,
-        voice_enabled=voice_mode,
+        voice_enabled=effective_voice,
         tts_model=tts_model,
         tts_voice=tts_voice,
         tts_format=tts_format,
+        desktop_setup=True,
     )
     desktop_cfg = DesktopConfig(
         web=web_cfg,

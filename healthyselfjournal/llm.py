@@ -69,13 +69,35 @@ class SummaryResponse:
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 
+def get_active_llm_model_spec() -> str:
+    """Return the currently active LLM model spec based on configuration."""
+
+    mode = (CONFIG.llm_mode or "cloud").strip().lower()
+    if mode in {"local", "local_llama"}:
+        return f"local:{CONFIG.llm_local_model}"
+    return CONFIG.model_llm
+
+
 def generate_followup_question(request: QuestionRequest) -> QuestionResponse:
     provider, model_name, thinking_enabled = _split_model_spec(request.model)
     if thinking_enabled and provider != "anthropic":
         raise ValueError(f"Thinking mode is not supported for provider '{provider}'")
     rendered = _render_question_prompt(request)
 
-    if provider == "anthropic":
+    if CONFIG.llm_cloud_off and provider not in {"local", "ollama"}:
+        raise RuntimeError(
+            "Cloud LLM access is disabled (cloud_off); switch to local_llama mode."
+        )
+
+    if provider == "local":
+        text = _call_local_llama(
+            rendered,
+            max_tokens=request.max_tokens,
+            temperature=CONFIG.llm_temperature_question,
+            top_p=CONFIG.llm_top_p,
+            top_k=CONFIG.llm_top_k,
+        )
+    elif provider == "anthropic":
         text = _call_anthropic(
             model_name,
             rendered,
@@ -130,6 +152,36 @@ def stream_followup_question(
     global _ANTHROPIC_CLIENT
     if _ANTHROPIC_CLIENT is None:
         _ANTHROPIC_CLIENT = Anthropic()
+
+    if CONFIG.llm_cloud_off and provider not in {"local", "ollama"}:
+        raise RuntimeError(
+            "Cloud LLM access is disabled (cloud_off); switch to local_llama mode."
+        )
+
+    if provider == "local":
+        text = _call_local_llama(
+            rendered,
+            max_tokens=request.max_tokens,
+            temperature=CONFIG.llm_temperature_question,
+            top_p=CONFIG.llm_top_p,
+            top_k=CONFIG.llm_top_k,
+        )
+        try:
+            on_delta(text)
+        except Exception:
+            pass
+        question = text.strip()
+        if not question.endswith("?"):
+            question = question.rstrip(".") + "?"
+        log_event(
+            "llm.question.streaming.success",
+            {
+                "provider": provider,
+                "model": model_name,
+                "max_tokens": request.max_tokens,
+            },
+        )
+        return QuestionResponse(question=question, model=request.model)
 
     if provider == "anthropic":
         # Stream; fail fast with helpful error messages on failure
@@ -241,7 +293,20 @@ def generate_summary(request: SummaryRequest) -> SummaryResponse:
         filesystem_loader=PROMPTS_DIR,
     )
 
-    if provider == "anthropic":
+    if CONFIG.llm_cloud_off and provider not in {"local", "ollama"}:
+        raise RuntimeError(
+            "Cloud LLM access is disabled (cloud_off); switch to local_llama mode."
+        )
+
+    if provider == "local":
+        text = _call_local_llama(
+            rendered,
+            max_tokens=request.max_tokens,
+            temperature=CONFIG.llm_temperature_summary,
+            top_p=CONFIG.llm_top_p,
+            top_k=CONFIG.llm_top_k,
+        )
+    elif provider == "anthropic":
         text = _call_anthropic(
             model_name,
             rendered,
@@ -297,6 +362,31 @@ def _render_question_prompt(request: QuestionRequest) -> str:
     )
 
 
+def _call_local_llama(
+    prompt: str,
+    *,
+    max_tokens: int,
+    temperature: float,
+    top_p: float | None,
+    top_k: int | None,
+) -> str:
+    from .llm_local import (
+        LocalLLMNotAvailableError,
+        generate_local_completion,
+    )
+
+    try:
+        return generate_local_completion(
+            prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+        )
+    except LocalLLMNotAvailableError as exc:
+        raise RuntimeError(str(exc)) from exc
+
+
 def _split_model_spec(spec: str) -> tuple[str, str, bool]:
     """Parse provider:model[:version][:thinking] → (provider, provider_model_id, thinking).
 
@@ -312,12 +402,19 @@ def _split_model_spec(spec: str) -> tuple[str, str, bool]:
     else:
         provider, rest = spec.split(":", 1)
 
+    provider = provider.strip().lower()
+    if provider in {"local_llama", "local"}:
+        provider = "local"
+
     # Split remaining segments: model[:version][:thinking]
     rest_parts = rest.split(":") if rest else []
     if not rest_parts:
         raise ValueError("Invalid model spec: missing model segment")
 
     base_model = rest_parts[0]
+
+    if provider == "local":
+        return provider, base_model, False
     version: str | None = None
     thinking_enabled = False
 

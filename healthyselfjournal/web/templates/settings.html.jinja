@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Preferences – Healthy Self Journal</title>
+    <link rel="stylesheet" href="/static/css/app.css" />
+  </head>
+  <body>
+    <main class="hsj-container">
+      <header class="hsj-header">
+        <h1>Preferences</h1>
+      </header>
+      <form id="prefs-form" method="post" action="/settings/save" style="max-width: 720px;">
+        <div class="hsj-field">
+          <label for="sessions_dir">Sessions folder</label>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <input id="sessions_dir" name="sessions_dir" type="text" value="{{ sessions_dir }}" style="flex:1;" />
+            <button id="pick-folder" type="button">Choose…</button>
+          </div>
+        </div>
+        <div class="hsj-field">
+          <label>
+            <input id="resume" name="resume" type="checkbox" {% if resume == 'true' %}checked{% endif %} />
+            Resume last session on launch
+          </label>
+        </div>
+        <div class="hsj-field">
+          <label>
+            <input id="voice" name="voice" type="checkbox" {% if voice == 'true' %}checked{% endif %} />
+            Voice mode (speak questions)
+          </label>
+        </div>
+        <div style="display:flex;gap:0.5rem;">
+          <button type="submit">Save</button>
+          <button id="apply-restart" type="button">Apply & Restart</button>
+          <a href="/" style="margin-left:auto;">Back</a>
+        </div>
+      </form>
+    </main>
+    <script>
+      (function(){
+        const form = document.getElementById('prefs-form');
+        form?.addEventListener('submit', async (ev) => {
+          ev.preventDefault();
+          const fd = new FormData(form);
+          // Coerce checkboxes to booleans
+          if (!fd.has('resume')) fd.set('resume', 'false'); else fd.set('resume', 'true');
+          if (!fd.has('voice')) fd.set('voice', 'false'); else fd.set('voice', 'true');
+          await fetch('/settings/save', { method: 'POST', body: fd });
+        });
+        const btn = document.getElementById('apply-restart');
+        btn?.addEventListener('click', async () => {
+          // Save then ask host to restart
+          const fd = new FormData(form);
+          if (!fd.has('resume')) fd.set('resume', 'false'); else fd.set('resume', 'true');
+          if (!fd.has('voice')) fd.set('voice', 'false'); else fd.set('voice', 'true');
+          await fetch('/settings/save', { method: 'POST', body: fd });
+          try { await window.pywebview.api.apply_and_restart(); } catch {}
+          // Fallback: hard reload
+          setTimeout(() => location.reload(), 500);
+        });
+        const pick = document.getElementById('pick-folder');
+        pick?.addEventListener('click', async () => {
+          try {
+            const p = await window.pywebview.api.pick_sessions_dir();
+            if (p) document.getElementById('sessions_dir').value = p;
+          } catch {}
+        });
+      })();
+    </script>
+  </body>
+  </html>
+
+

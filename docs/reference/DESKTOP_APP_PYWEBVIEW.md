@@ -15,9 +15,10 @@ This document describes the Desktop PyWebView app: what it does, how it is struc
 - `DIALOGUE_FLOW.md` – Conversation loop expectations and UX.
 - `FILE_FORMATS_ORGANISATION.md` – Where sessions, audio, and summaries are stored on disk.
 - `AUDIO_VOICE_RECOGNITION_WHISPER.md` – STT backends and performance guidance.
-- `../../healthyselfjournal/desktop/app.py` – Desktop runtime: window creation, background server, JS bridge.
+- `../../healthyselfjournal/desktop/app.py` – Desktop runtime: window creation, background server, JS bridge, Apply & Restart.
 - `../../healthyselfjournal/cli_desktop.py` – Typer command that launches the desktop experience.
 - `../../healthyselfjournal/web/app.py` – FastHTML app with strict security headers for desktop and web.
+- `../../healthyselfjournal/desktop/settings.py` – Desktop settings persistence (XDG TOML) used by Preferences and Setup.
 
 ## Principles and key decisions
 
@@ -34,12 +35,15 @@ High‑level flow:
 
 1) CLI entrypoint (`healthyselfjournal desktop`) builds a FastHTML app and starts a background `uvicorn` server on `127.0.0.1:<port>`.
 2) PyWebView creates a window pointing at the loopback URL. `webview.settings.enable_media_stream = True` enables mic capture in WKWebView.
-3) A tiny JS bridge exposes `quit()` and `toggle_devtools()` (when enabled). No arbitrary Python invocation is allowed.
+3) A tiny JS bridge exposes `quit()`, `toggle_devtools()` (when enabled), `pick_sessions_dir()` (native folder picker), and `apply_and_restart()` to restart the background server after saving settings. No arbitrary Python invocation is allowed.
 4) The FastHTML app serves the journaling UI and endpoints:
    - `GET /` boots/resumes a session and redirects to `/journal/<sessions_dir>/<session_id>/`.
    - `POST /session/{id}/upload` accepts MediaRecorder uploads (Opus WEBM/OGG), persists segments, triggers STT, schedules summaries, and produces the next question.
    - `POST /session/{id}/tts` synthesizes assistant text into audio when voice mode is on.
    - `POST/GET /session/{id}/reveal` reveals the session markdown in Finder (macOS).
+   - `POST /reveal/sessions` reveals the configured sessions directory in Finder.
+   - `GET /settings` renders Preferences; `POST /settings/save` persists desktop settings.
+   - `GET /setup` renders first‑run Setup; `POST /setup/save` persists initial mode/keys and sessions path.
 5) Security middleware applies CSP and related headers on every response.
 
 Worker processes:
@@ -82,8 +86,9 @@ Notes:
 - The desktop command starts a background HTTP server and opens a WKWebView window.
 - Recording uses `getUserMedia` + `MediaRecorder` in the embedded WebView; uploads are persisted immediately to the session folder.
 - STT is performed via the configured backend; short/quiet responses can be automatically discarded. A background worker processes segments and streams partial results via polling `/session/{id}/jobs/{job_id}`.
-- Each successful upload updates the running total duration and returns the next question.
+- Each successful upload returns 201 Created and updates the running total duration; the next question is returned once STT completes.
 - When enabled, TTS synthesizes the assistant prompt server‑side and the browser plays it.
+- Desktop voice authority: the Preferences toggle (Voice mode) overrides any `SPEAK_LLM` default for the desktop session.
 - Closing the window stops the background server and exits cleanly.
 
 ## Security posture
@@ -102,6 +107,11 @@ Current state (implemented):
 - Microphone streams enabled; strict security headers applied.
 - JS bridge with `quit()` and optional `toggle_devtools()`.
 - CLI command `healthyselfjournal desktop` with window/server options.
+
+- Desktop settings persistence in XDG config (`~/.config/healthyselfjournal/settings.toml`) with: sessions folder, resume on launch, voice mode, and mode (cloud/local). Precedence: CLI flags > OS env > Desktop settings > project `.env.local` > defaults.
+- Preferences UI (`/settings`) with Sessions folder picker, Resume on launch, Voice mode; Apply & Restart restarts the background server to apply changes.
+- First‑run Setup wizard (`/setup`) for desktop: choose mode (Cloud/Privacy), enter keys, choose sessions folder; writes XDG `.env.local` for keys and desktop settings TOML.
+- Reveal Sessions Folder action (menu/button) opens the configured sessions directory in Finder.
 
 - Multiprocessing transcription worker (`workers/transcription_worker.py`) integrated with the web app; partial transcripts are polled by the client.
 - Model manager for faster‑whisper/ctranslate2 assets under platformdirs with checksum validation.
@@ -123,6 +133,7 @@ Migration status:
 - Only Opus WEBM/OGG uploads are accepted in the web interface; alternate formats are rejected.
 - If `static/js/app.js` is missing, the UI loads with limited functionality.
 - Long uploads or heavyweight STT/LLM may stall if not moved to worker processes.
+- The Setup wizard is only shown when running the desktop shell and no desktop settings file exists; it’s not shown in plain web runs.
 
 ## Troubleshooting
 
