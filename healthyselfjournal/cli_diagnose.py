@@ -482,10 +482,16 @@ def build_app() -> typer.Typer:
             )
             if "Surplus context" in (r_setup.text or ""):
                 msg += " Possible template context mismatch (surplus context)."
-            console.print(Panel.fit(Text(msg, style="red"), title="/setup", border_style="red"))
+            console.print(
+                Panel.fit(Text(msg, style="red"), title="/setup", border_style="red")
+            )
             raise typer.Exit(code=2)
         else:
-            console.print(Panel.fit(Text("OK", style="green"), title="/setup", border_style="green"))
+            console.print(
+                Panel.fit(
+                    Text("OK", style="green"), title="/setup", border_style="green"
+                )
+            )
 
         # Check landing route
         r_root = client.get("/")
@@ -498,6 +504,8 @@ def build_app() -> typer.Typer:
                 )
             )
         else:
-            console.print(Panel.fit(Text("OK", style="green"), title="/", border_style="green"))
+            console.print(
+                Panel.fit(Text("OK", style="green"), title="/", border_style="green")
+            )
 
     return app
