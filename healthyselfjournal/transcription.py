@@ -20,6 +20,7 @@ from typing import Any
 from openai import APIConnectionError, APIStatusError, OpenAI, OpenAIError
 
 from .events import log_event
+from .config import CONFIG
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -159,11 +160,16 @@ class OpenAITranscriptionBackend(TranscriptionBackend):
         for attempt in range(1, self.max_retries + 1):
             try:
                 with wav_path.open("rb") as audio_file:
+                    extra_args: dict[str, Any] = {"response_format": "json"}
+                    if CONFIG.user_vocabulary_terms:
+                        extra_args["prompt"] = _build_vocab_prompt(
+                            CONFIG.user_vocabulary_terms
+                        )
                     response = client.audio.transcriptions.create(
                         file=audio_file,
                         model=self.model,
                         language=language,
-                        response_format="json",
+                        **extra_args,
                     )
 
                 raw = response.model_dump()
@@ -289,9 +295,13 @@ class FasterWhisperBackend(TranscriptionBackend):
         )
 
         try:
-            segments_iter, info = self._model.transcribe(
-                str(wav_path), language=language
-            )
+            kwargs: dict[str, Any] = {"language": language}
+            if CONFIG.user_vocabulary_terms:
+                # faster-whisper supports initial_prompt to bias decoding
+                kwargs["initial_prompt"] = _build_vocab_prompt(
+                    CONFIG.user_vocabulary_terms
+                )
+            segments_iter, info = self._model.transcribe(str(wav_path), **kwargs)
             segments_list: list[dict[str, Any]] = []
             text_parts: list[str] = []
             for segment in segments_iter:
@@ -471,9 +481,12 @@ class WhisperCppBackend(TranscriptionBackend):
         try:
             # whispercpp APIs vary slightly; try kwargs first then positional fallback.
             try:
-                segments_iter = self._whisper.transcribe(
-                    audio=str(wav_path), language=language
-                )
+                kwargs: dict[str, Any] = {"audio": str(wav_path), "language": language}
+                if CONFIG.user_vocabulary_terms:
+                    kwargs["initial_prompt"] = _build_vocab_prompt(
+                        CONFIG.user_vocabulary_terms
+                    )
+                segments_iter = self._whisper.transcribe(**kwargs)
             except TypeError:  # pragma: no cover - API variant
                 segments_iter = self._whisper.transcribe(str(wav_path))
         except Exception as exc:  # pragma: no cover - defensive guard
@@ -812,3 +825,19 @@ def _maybe_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):  # pragma: no cover - defensive
         return None
+
+
+def _build_vocab_prompt(terms: list[str]) -> str:
+    """Build a concise initial prompt to bias STT toward specific terms."""
+    unique: list[str] = []
+    seen: set[str] = set()
+    for t in terms:
+        s = str(t).strip()
+        if not s or s in seen:
+            continue
+        seen.add(s)
+        unique.append(s)
+    return "Names and terms that may appear: " + ", ".join(unique)
+
+
+## No corrections post-processing; vocabulary-only bias via initial prompt

@@ -215,6 +215,10 @@ __marimo__/
 backup/
 obsolete/
 sessions/
+user_config.toml
+
+# XDG user config directory (local machine)
+/.config/healthyselfjournal/user_config.toml
 
 # Frontend/node artifacts
 node_modules/

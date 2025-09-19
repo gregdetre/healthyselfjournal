@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 try:  # Python 3.11+
     import tomllib as _toml
@@ -127,9 +127,8 @@ class AppConfig:
     tts_model: str = DEFAULT_TTS_MODEL
     tts_voice: str = DEFAULT_TTS_VOICE
     tts_format: str = DEFAULT_TTS_FORMAT
-    # Optional user-specific vocabulary and transcript corrections loaded from user_config.toml
+    # Optional user-specific vocabulary loaded from user_config.toml
     user_vocabulary_terms: List[str] = field(default_factory=list)
-    user_transcript_corrections: Dict[str, str] = field(default_factory=dict)
     user_config_loaded_from: Path | None = None
 
 
@@ -173,24 +172,23 @@ def _find_user_config_path() -> Path | None:
     return None
 
 
-def _load_user_config() -> Tuple[List[str], Dict[str, str], Path | None]:
-    """Parse user_config.toml if present and return (terms, corrections, path)."""
+def _load_user_config() -> Tuple[List[str], Path | None]:
+    """Parse user_config.toml if present and return (terms, path)."""
 
     path = _find_user_config_path()
     if path is None:
-        return [], {}, None
+        return [], None
     if _toml is None:  # pragma: no cover - missing toml reader
-        return [], {}, None
+        return [], None
 
     try:
         raw_text = path.read_text(encoding="utf-8")
         data = _toml.loads(raw_text)  # type: ignore[attr-defined]
     except Exception:
         # On parse error, ignore silently (treat as absent)
-        return [], {}, None
+        return [], None
 
     terms: List[str] = []
-    corrections: Dict[str, str] = {}
 
     try:
         vocab = data.get("vocabulary") or {}
@@ -200,13 +198,6 @@ def _load_user_config() -> Tuple[List[str], Dict[str, str], Path | None]:
     except Exception:
         terms = []
 
-    try:
-        corr = data.get("corrections") or {}
-        if isinstance(corr, dict):
-            corrections = {str(k): str(v) for k, v in corr.items()}
-    except Exception:
-        corrections = {}
-
     # Also allow top-level keys as a convenience
     try:
         top_terms = data.get("vocabulary_terms")
@@ -214,12 +205,6 @@ def _load_user_config() -> Tuple[List[str], Dict[str, str], Path | None]:
             terms.extend(
                 [str(x) for x in top_terms if isinstance(x, (str, int, float))]
             )
-    except Exception:
-        pass
-    try:
-        top_corr = data.get("transcript_corrections")
-        if isinstance(top_corr, dict):
-            corrections.update({str(k): str(v) for k, v in top_corr.items()})
     except Exception:
         pass
 
@@ -231,15 +216,14 @@ def _load_user_config() -> Tuple[List[str], Dict[str, str], Path | None]:
             seen.add(t)
             deduped_terms.append(t)
 
-    return deduped_terms, corrections, path
+    return deduped_terms, path
 
 
 # Load user config once at import and attach to CONFIG
 try:
-    _terms, _corr, _path = _load_user_config()
-    if _terms or _corr:
+    _terms, _path = _load_user_config()
+    if _terms:
         CONFIG.user_vocabulary_terms = _terms
-        CONFIG.user_transcript_corrections = _corr
         CONFIG.user_config_loaded_from = _path
 except Exception:
     # Non-fatal; user_config is optional
