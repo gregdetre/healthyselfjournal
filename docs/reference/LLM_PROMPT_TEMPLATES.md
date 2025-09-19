@@ -6,6 +6,7 @@ Jinja2 templates for flexible prompt generation with context and conditionals.
 
 ## See also
 
+- `ARCHITECTURE.md` - LLM integration and template engine design
 - `OPENING_QUESTIONS.md` - Embedded example questions and variety strategies
 - `CONVERSATION_SUMMARIES.md` - Context from previous sessions
 - `DIALOGUE_FLOW.md` - When different prompts are used

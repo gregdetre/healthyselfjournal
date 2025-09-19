@@ -6,6 +6,7 @@ A command-line journaling app using voice input to lower friction and dialogue-b
 
 ## See also
 
+- `ARCHITECTURE.md` - System architecture, components, and data flow
 - `COMMAND_LINE_INTERFACE.md` - Recording controls and visual feedback
 - `DIALOGUE_FLOW.md` - Question sequencing and session management
 - `FILE_FORMATS_ORGANISATION.md` - Storage structure for audio and transcripts

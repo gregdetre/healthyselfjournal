@@ -13,6 +13,7 @@ Core requirements:
 
 ## References
 
+- `docs/reference/ARCHITECTURE.md` - System architecture and implementation overview
 - `docs/reference/PRODUCT_VISION_FEATURES.md` - Core product vision and features
 - `docs/reference/COMMAND_LINE_INTERFACE.md` - CLI visual feedback specifications
 - `docs/reference/FILE_FORMATS_ORGANISATION.md` - File structure and naming conventions

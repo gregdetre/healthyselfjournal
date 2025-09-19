@@ -6,6 +6,7 @@ Continuous Q&A loop with LLM-generated follow-up questions after each response.
 
 ## See also
 
+- `ARCHITECTURE.md` - Session orchestration and dialogue lifecycle
 - `RECORDING_CONTROLS.md` - How to end sessions
 - `OPENING_QUESTIONS.md` - How sessions start
 - `LLM_PROMPT_TEMPLATES.md` - Question generation logic

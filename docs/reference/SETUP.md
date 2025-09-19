@@ -4,6 +4,7 @@
 This document explains how to set up and work on this project using uv, with a focus on using the external virtual environment and a local editable clone of `gjdutils` inside the project root for easy editing in Cursor.
 
 ## See also
+- `ARCHITECTURE.md` – System dependencies and configuration management overview
 - `AGENTS.md` – brief signpost for agents/tools working in this repo.
 - Evergreen guidance – structure and maintenance approach for evergreen docs: [WRITE_EVERGREEN_DOC.md](https://raw.githubusercontent.com/gregdetre/gjdutils/refs/heads/main/docs/instructions/WRITE_EVERGREEN_DOC.md)
 
