@@ -5,7 +5,7 @@ This page is a high-level index. For detailed usage, see:
 - `CLI_COMMANDS.md` – Command index and examples
 - `CLI_RECORDING_INTERFACE.md` – Terminal recording (`journal cli`)
 - `WEB_RECORDING_INTERFACE.md` – Web recording (`journal web`)
-- `DESKTOP_APP.md` – PyWebView desktop shell (`healthyselfjournal desktop`)
+- `DESKTOP_PYWEBVIEW_APP.py` – PyWebView desktop shell (`healthyselfjournal desktop`)
 - `SESSIONS.md` – Session utilities (`session list`, merge, reconcile, summarise)
 
 See also:
