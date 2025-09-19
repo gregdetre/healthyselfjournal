@@ -129,8 +129,8 @@ Decision (V1): Soft reminder at ~20 minutes based on research; no automated brea
 - [x] Implement question generation after transcription
 - [x] Display AI response as text output
 - [x] Update markdown with Q&A format
-  - "## AI Q: " prefix for questions
-  - User response as section content
+  - Use `## AI Q` heading followed by fenced `llm-question` block
+  - User response as section content after the fence
   - Enforce prompt token budget; include recent summaries per context rules
 
 ### Stage: Session management and controls

@@ -30,11 +30,19 @@ By default, large `.wav` files are automatically deleted once both the `.mp3` an
 summary: LLM-generated session summary
 ---
 
-## AI Q: First question from LLM
+## AI Q
+
+```llm-question
+First question from LLM (may span multiple lines)
+```
 
 User's transcribed response here
 
-## AI Q: Follow-up question
+## AI Q
+
+```llm-question
+Follow-up question (may span multiple lines)
+```
 
 Next response...
 ```

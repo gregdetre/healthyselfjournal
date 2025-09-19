@@ -54,7 +54,7 @@ User decided on dual-key system:
 
 User specified flat directory structure: "Yeah, let's do everything in a flat directory. Use `yyMMdd_HHmm` as the filename timestamp, common to both .md and .mp3 next to each other"
 
-Markdown format: "Each question from the LLM will be a `##` H2 heading prepended with `AI Q: ` and then the question, and then the user response will be the text in that heading."
+Markdown format: "Each question from the LLM will be a `## AI Q` H2 heading followed by a fenced `llm-question` block containing the full multi-line question; the user response follows after the closing fence."
 
 ### Summary Generation
 
@@ -84,8 +84,9 @@ User confirmed: "The LLM should always see the session so far and some recent su
 - **Directory**: Flat structure, all files in one directory
 - **Naming**: `yyMMdd_HHmm` format for both .mp3 and .md pairs
 - **Markdown Format**:
-  - H2 headings with "AI Q: " prefix for questions
-  - User responses as text under each heading
+  - H2 headings `## AI Q` for each exchange
+  - Fenced `llm-question` block under the heading with the question text
+  - User responses as text after the fence
   - Summary in frontmatter, regenerated after each Q&A
 
 ### User Controls

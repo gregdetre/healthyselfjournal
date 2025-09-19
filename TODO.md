@@ -1,12 +1,14 @@
-remove LRU cache
+vocab for transcription
+
+example dir
+
+conf file. that can be overridden by CLI?
+
+init
 
 PyPI, uvx
 
-init
-  conf file
-    that can be overridden by CLI
-
-vocab for transcription
+Electron/Tauri
 
 fully private mode that uses a local model for the LLM questioning.
 

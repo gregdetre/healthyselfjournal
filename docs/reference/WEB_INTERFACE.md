@@ -25,6 +25,7 @@ The web interface brings the Healthy Self Journal experience into the browser wh
 
 ### Server layer (Python)
 - Entry point: `healthyselfjournal/cli_web.py` exposes `uv run healthyselfjournal web` with `--sessions-dir`, `--host`, `--port`, `--reload` and optional voice/TTS options.
+- Entry point: `healthyselfjournal/cli_web.py` exposes `uv run healthyselfjournal web` with `--sessions-dir`, `--resume`, `--host`, `--port`, `--reload` and optional voice/TTS options.
 - Application builder: `healthyselfjournal/web/app.py` constructs a FastHTML app on demand, mounts `/static/`, and maintains per-session state (`WebSessionState`).
 - Compatibility shim: `_get_fast_html_class()` patches `fastcore.xml.ft` when necessary so FastHTML initialises correctly with current `fastcore` releases. With FastHTML 0.12+, routes should return plain strings/objects and FastHTML wraps responses; avoid manually returning `HTMLResponse` from handlers.
 - Routes:
@@ -58,7 +59,7 @@ The web interface brings the Healthy Self Journal experience into the browser wh
 - Historic questions, transcripts, and summaries remain in the markdown body/frontmatter; no web-specific divergence.
 
 ## Runtime flow
-1. User runs `uv run healthyselfjournal web [options]` (see next section).
+1. User runs `uv run healthyselfjournal web [options]` (see next section). If `--resume` is provided, the server resumes the most recent session instead of starting a new one.
 2. The root page loads and initialises a new session, showing the opening question.
 3. On “Start recording”, the client captures audio, visualises levels, and tracks voiced time.
 4. When recording stops, the clip is discarded if it fails the short-answer thresholds; otherwise it uploads to `/session/{id}/upload`.
@@ -82,6 +83,7 @@ The web interface brings the Healthy Self Journal experience into the browser wh
   - **port**: `8765`
   - **reload**: `false`
   - **sessions-dir**: `CONFIG.recordings_dir` (see resolution below)
+  - **kill-existing**: `false` (optional; frees the port before starting)
 
 - **Sessions directory resolution**
   - **SESSIONS_DIR** or **RECORDINGS_DIR** env var if set
@@ -136,9 +138,11 @@ The web interface brings the Healthy Self Journal experience into the browser wh
   ```bash
   uv run healthyselfjournal web \
     [--sessions-dir PATH] \
+    [--resume] \
     [--host 127.0.0.1] \
     [--port 8765] \
     [--reload/--no-reload] \
+    [--kill-existing] \
     [--voice-mode/--no-voice-mode] \
     [--tts-model MODEL] \
     [--tts-voice VOICE] \
