@@ -950,6 +950,8 @@ def _render_session_shell(
     stt_warnings: list[str],
     voice_rms_dbfs_threshold: float,
     static_assets_ready: bool,
+    pending_count: int,
+    reconcile_command: str,
 ) -> str:
     """Return the base HTML shell; dynamic behaviour handled client-side."""
 
@@ -992,6 +994,8 @@ def _render_session_shell(
             "stt_warnings": stt_warnings,
             "voice_rms_dbfs_threshold": voice_rms_dbfs_threshold,
             "static_assets_ready": static_assets_ready,
+            "pending_count": pending_count,
+            "reconcile_command": reconcile_command,
         },
         filesystem_loader=template_path.parent,
     )
