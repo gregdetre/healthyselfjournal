@@ -2,7 +2,7 @@ vocab for transcription
 
 example dir
 
-conf file. that can be overridden by CLI?
+adjust the way the quit button works
 
 init
 
