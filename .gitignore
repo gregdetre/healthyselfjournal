@@ -215,6 +215,7 @@ __marimo__/
 backup/
 obsolete/
 sessions/
+experim_sessions/
 user_config.toml
 
 # XDG user config directory (local machine)
