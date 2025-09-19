@@ -17,15 +17,20 @@ This document explains how configuration is loaded, what can be customized via e
 
 ## Configuration sources and precedence
 
-At import time, the package loads environment variables from `.env` then `.env.local` without overriding existing OS environment variables.
+At import time, the package loads environment variables from `.env` then `.env.local` and also from XDG (`~/.config/healthyselfjournal/.env` and `.env.local`) for desktop users, without overriding existing OS environment variables.
 
 Runtime precedence (highest to lowest):
 
 1. CLI flags (e.g., `--stt-backend`, `--language`)
 2. OS environment variables
-3. `.env.local`
-4. `.env`
-5. Code defaults (`healthyselfjournal/config.py`)
+3. Desktop settings (XDG `settings.toml`) when CLI flags are left at defaults
+4. `.env.local` (including XDG variant for desktop)
+5. `.env`
+6. Code defaults (`healthyselfjournal/config.py`)
+
+Notes:
+- Desktop app (`healthyselfjournal desktop`) applies a small set of user preferences from XDG `settings.toml` (sessions folder, resume, voice) when the corresponding CLI options are left at their defaults. Explicit CLI flags and OS env still take precedence.
+- `.env.local` can exist in the project, CWD, or XDG config directory for desktop users; OS env variables always win over file-based values.
 
 Relevant environment variables include:
 
@@ -41,6 +46,18 @@ Relevant environment variables include:
   - `LLM_MODEL` – provider:model[:version][:thinking]
 - Optional TTS
   - `SPEAK_LLM`, `TTS_MODEL`, `TTS_VOICE`, `TTS_FORMAT`
+
+### Desktop settings (XDG)
+
+File: `~/.config/healthyselfjournal/settings.toml`
+
+Keys:
+- `sessions_dir` – override default sessions directory for the desktop app
+- `resume_on_launch` – `true`/`false`
+- `voice_enabled` – `true`/`false`
+- `mode` – `cloud` or `private` (influences STT defaults and Setup UI)
+
+These settings are applied when launching the desktop app if the corresponding CLI flags are left at defaults. Change them via Preferences in the desktop UI.
 
 ## User-specific vocabulary (vocabulary-only)
 

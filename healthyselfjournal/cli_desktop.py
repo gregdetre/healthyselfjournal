@@ -100,18 +100,26 @@ def desktop(
     from .desktop import DesktopConfig, run_desktop_app
     from .web.app import WebAppConfig
 
-    # Apply desktop settings with precedence: CLI flags > OS env/CONFIG > Desktop settings
+    # Apply desktop settings with precedence aligned to CLI docs:
+    # CLI flags > OS env/CONFIG > Desktop settings (XDG) > project .env.local > code defaults
     ds, _ = load_settings()
 
     effective_sessions_dir = sessions_dir
-    if sessions_dir == CONFIG.recordings_dir and ds.sessions_dir is not None:
+    # Only use Desktop setting for sessions_dir when the CLI arg is at its default
+    # and OS env/CONFIG didn't already change it (CONFIG.recordings_dir carries env overrides)
+    if (
+        sessions_dir == CONFIG.recordings_dir
+        and ds.sessions_dir is not None
+    ):
         effective_sessions_dir = ds.sessions_dir
 
     effective_resume = resume
+    # If CLI left at default False and Desktop has a preference, use it
     if resume is False and ds.resume_on_launch is not None:
         effective_resume = bool(ds.resume_on_launch)
 
     effective_voice = voice_mode
+    # If CLI flag left at CONFIG default and Desktop has an explicit toggle, use it
     if voice_mode == CONFIG.speak_llm and ds.voice_enabled is not None:
         effective_voice = bool(ds.voice_enabled)
 

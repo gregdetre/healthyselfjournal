@@ -495,7 +495,7 @@ def build_app(config: WebAppConfig) -> Any:
     def index():
         """Landing page that boots or resumes a session and redirects to pretty URL."""
 
-        # First-run Setup wizard for desktop: if resume is enabled and no desktop settings file exists
+        # First-run Setup wizard for desktop: if no desktop settings file exists
         # Optional first-run Setup redirect only when explicitly requested
         if bool(getattr(app.state, "config", None)) and bool(
             getattr(app.state.config, "desktop_setup", False)
@@ -504,7 +504,7 @@ def build_app(config: WebAppConfig) -> Any:
                 from ..desktop import settings as _ds
 
                 ds, path_used = _ds.load_settings()
-                if bool(getattr(app.state, "resume", False)) and path_used is None:
+                if path_used is None:
                     return Response(status_code=307, headers={"Location": "/setup"})
             except Exception:
                 pass
@@ -984,9 +984,7 @@ def build_app(config: WebAppConfig) -> Any:
                 return JSONResponse({"status": "ok"}, status_code=200)
             except Exception as exc:  # pragma: no cover - runtime path
                 _LOGGER.exception("Reveal failed: %s", exc)
-                return _error_response(
-                    REVEAL_FAILED, status_code=500, detail=str(exc)
-                )
+                return _error_response(REVEAL_FAILED, status_code=500, detail=str(exc))
         except Exception as exc:  # pragma: no cover - generic surfacing
             _LOGGER.exception("Reveal endpoint error: %s", exc)
             return _error_response(REVEAL_FAILED, status_code=500, detail=str(exc))
@@ -1246,9 +1244,7 @@ def build_app(config: WebAppConfig) -> Any:
                 return JSONResponse({"status": "ok"}, status_code=200)
             except Exception as exc:  # pragma: no cover - runtime path
                 _LOGGER.exception("Reveal sessions folder failed: %s", exc)
-                return _error_response(
-                    REVEAL_FAILED, status_code=500, detail=str(exc)
-                )
+                return _error_response(REVEAL_FAILED, status_code=500, detail=str(exc))
         except Exception as exc:  # pragma: no cover - generic surfacing
             _LOGGER.exception("Reveal sessions directory endpoint error: %s", exc)
             return _error_response(REVEAL_FAILED, status_code=500, detail=str(exc))

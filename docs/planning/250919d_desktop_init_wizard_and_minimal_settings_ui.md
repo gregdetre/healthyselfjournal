@@ -51,7 +51,7 @@ Constraints and desired UX:
   - Acceptance: `load_settings()` returns defaults on first run; `save_settings()` creates file; round-trip tested
 - [x] Define runtime precedence for desktop launch: CLI flags > OS env > Desktop settings (XDG) > project `.env.local` > code defaults
   - Acceptance: Unit tests demonstrate precedence on overlapping keys
-  - Note: Implemented precedence is currently CLI flags > Desktop settings (XDG) > OS env/CONFIG > project `.env.local` > code defaults. Confirm alignment with intended policy.
+  - Implemented: Desktop settings applied only when CLI flags are left at defaults; OS env/CONFIG retains higher precedence.
 
 ### Stage: Voice mode authority
 - [x] Update `web/app.py` voice wiring to respect an explicit desktop override
@@ -80,6 +80,7 @@ Constraints and desired UX:
 - [x] Add Settings menu entry: "Run Setup Again"
   - Acceptance: Re-opens wizard; changes persist and apply after restart
   - Note: Quick test (mic check) not implemented yet; defer to later iteration.
+  - Update: First-run redirect now unconditional when no `settings.toml` exists (desktop mode).
 
 ### Stage: QA, tests, and docs
 - [ ] Unit tests
@@ -109,10 +110,10 @@ Constraints and desired UX:
 - Restart semantics: Ensure background server stops/starts cleanly; guard against port contention; display transient status to user
 - Voice authority: Make OFF truly off; avoid partial states (UI toggled on but server refusing `/tts`)
 - Packaged builds: Ensure mic permission strings and entitlements are included; wizard shouldn’t block if keys are missing (Privacy mode fallback)
- - Precedence mismatch: Code currently applies Desktop settings over OS env when CLI flags use defaults. Decide policy and align implementation/docs.
- - First-run gating: Wizard redirect depends on `resume` being true. Packaged desktop path sets this, CLI path does not; confirm desired first-run behavior.
+- Precedence alignment: Desktop settings now apply only when CLI flags are defaults; OS env retains precedence. Docs updated.
+- First-run gating: Wizard redirect now unconditional when no settings file exists.
  - Apply & Restart lifecycle: New server instance isn't retained in outer scope; window close handler may only stop the original server. Risk of orphaned server after restart; consider tracking and stopping the current server instance.
- - Reveal Sessions Folder: Implemented for macOS (`open`) only. Add support for Windows (`explorer`) and Linux (`xdg-open`).
+- Reveal Sessions Folder: Cross-platform support implemented (macOS `open`, Windows `explorer`, Linux `xdg-open`).
 
 
 ## Acceptance summary (v1)
