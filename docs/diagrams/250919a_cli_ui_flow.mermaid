@@ -1,0 +1,129 @@
+flowchart TD
+  %% ==== Styles ====
+  classDef ui fill:#f2f7ff,stroke:#3b82f6,color:#0f172a,stroke-width:1px
+  classDef audio fill:#fff7ed,stroke:#fb923c,color:#0f172a,stroke-width:1px
+  classDef stt fill:#ecfeff,stroke:#06b6d4,color:#0f172a,stroke-width:1px
+  classDef llm fill:#ecfdf5,stroke:#10b981,color:#0f172a,stroke-width:1px
+  classDef tts fill:#eef2ff,stroke:#6366f1,color:#0f172a,stroke-width:1px
+  classDef storage fill:#fefce8,stroke:#f59e0b,color:#0f172a,stroke-width:1px
+  classDef control fill:#fef2f2,stroke:#ef4444,color:#0f172a,stroke-width:1px
+  classDef note fill:#f1f5f9,stroke:#94a3b8,color:#0f172a,stroke-width:1px
+
+  %% ==== Entry points and preflight ====
+  subgraph Entry[CLI Entry and Preflight]
+    direction TB
+    EP[[CLI: healthyselfjournal journal\n--sessions-dir --llm-model --stt-* --voice-mode ...]]:::ui
+    Dep{Verify runtime deps\nreadchar, sounddevice, soundfile, numpy}:::control
+    Init{Needs setup?}:::control
+    Wizard[Run init wizard\nsets env; user may cancel]:::ui
+    Prep[Prepare runtime/backends:\n• Resolve STT backend/model/compute\n• Validate --stt-formatting\n• auto-private notices/warnings\n• Require API keys as needed\n• Configure TTS; disable streaming when speaking]:::control
+    MicChk{--mic-check?}:::control
+
+    EP --> Dep
+    Dep --> Init
+    Init -- yes --> Wizard --> Prep
+    Init -- no --> Prep
+    Prep --> MicChk
+  end
+
+  %% ==== Mic check mini-loop ====
+  subgraph MicCheck[Optional Mic Check]
+    direction TB
+    MicPanel[Mic check 3s:\n- Record temp WAV\n- Transcribe and format\n- Show transcript panel]:::ui
+    MicKeys{Keys:\nENTER continue\nESC retry\nq quit}:::control
+    MicQuit[Exit app]:::control
+
+    MicChk -- yes --> MicPanel --> MicKeys
+    MicKeys -- ENTER/other --> StartOrResume
+    MicKeys -- ESC --> MicPanel
+    MicKeys -- q --> MicQuit
+    MicChk -- no --> StartOrResume
+  end
+
+  %% ==== Start or resume session ====
+  subgraph StartResume[Start/Resume Session]
+    direction TB
+    StartOrResume{--resume?}:::control
+    StartNew[Start new session\ncreate yyMMdd_HHmm.md + assets dir\nload recent summaries]:::storage
+    ResumeLatest[Resume latest session.md\nload recent summaries\nset next response index]:::storage
+    PickQ{Existing body?}:::control
+    UseOpener[Use opening question]:::llm
+    TryGenQ[Generate next question from body]:::llm
+    IntroPanel[Show intro panel\nRecording starts immediately\nTip: say give me a question]:::ui
+
+    StartOrResume -- no --> StartNew --> UseOpener --> IntroPanel --> QPanel
+    StartOrResume -- yes --> ResumeLatest --> PickQ
+    PickQ -- yes --> TryGenQ --> IntroPanel --> QPanel
+    PickQ -- no --> UseOpener --> IntroPanel --> QPanel
+  end
+
+  %% ==== Main journaling loop ====
+  subgraph Loop[Main Journaling Loop]
+    direction TB
+    QPanel[AI panel: display question]:::ui
+    TTSon{Speak questions?}:::control
+    Speak[TTS speak question\nENTER skips]:::tts
+    SpeakFail[TTS failed - continue]:::control
+    Record[Recording UI:\n- Unicode meter\n- SPACE pause/resume\n- Any key stops\n- Q quit-after\n- ESC cancel]:::audio
+    Disposition{After stop}:::control
+    Cancel[Cancelled\nDiscard take\nRe-ask same question]:::control
+    Short[Very short or quiet\nAuto-discard\nRe-ask]:::control
+    Persist[Persist exchange:\n- Raw STT JSON saved\n- Format transcript\n- Append to body\n- Frontmatter: audio and duration\n- Saved message]:::storage
+    STT[STT transcribe via selected backend]:::stt
+    YouPanel[You panel: show transcript]:::ui
+    SummSched[Background summary regen scheduled]:::storage
+    QuitAfter{quit-after?}:::control
+    ThinkMode{Stream next question?}:::control
+    Thinking[[Thinking... collect deltas]]:::llm
+    NextQ[Generate next question]:::llm
+
+    QPanel --> TTSon
+    TTSon -- yes --> Speak --> Record
+    Speak -- error --> SpeakFail --> Record
+    TTSon -- no --> Record
+    Record --> Disposition
+    Disposition -- ESC --> Cancel --> QPanel
+    Disposition -- very short --> Short --> QPanel
+    Disposition -- normal --> STT --> Persist --> YouPanel --> SummSched --> QuitAfter
+    QuitAfter -- yes --> ExitPath
+    QuitAfter -- no --> ThinkMode
+    ThinkMode -- streaming --> Thinking --> QPanel
+    ThinkMode -- no --> NextQ --> QPanel
+  end
+
+  %% ==== Finalization ====
+  subgraph End[Finalize / Cleanup]
+    direction TB
+    ExitPath[End loop]:::control
+    EmptySess{Empty session?\nno audio, no body, not resumed}:::control
+    Cleanup[Remove empty .md and dir\nlog cli.cancelled\nSession cancelled; nothing saved.]:::storage
+    Finalize[Finalize summary\nflush background executor\nlog session.complete]:::storage
+    SavedPanel[Session saved to yyMMdd_HHmm.md]:::ui
+    ReconcileHint[Pending WAVs without STT?\nHint to run reconcile]:::note
+
+    ExitPath --> EmptySess
+    EmptySess -- yes --> Cleanup
+    EmptySess -- no --> Finalize --> SavedPanel --> ReconcileHint
+  end
+
+  %% ==== Adjacent CLI utilities (pointers) ====
+  subgraph Utilities[Other CLI commands]
+    direction TB
+    ListCmd[[journal list - panels of summaries]]:::ui
+    ReconcileCmd[[reconcile - transcribe pending WAVs]]:::stt
+    SummariesCmd[[summaries list/backfill/regenerate]]:::llm
+    MergeCmd[[merge - move assets, append Q and A, regenerate summary]]:::storage
+    WebCmd[[web - start FastHTML app browser UI]]:::ui
+  end
+
+  %% Anchors from preflight to utilities (conceptual)
+  EP --- ListCmd
+  EP --- ReconcileCmd
+  EP --- SummariesCmd
+  EP --- MergeCmd
+  EP --- WebCmd
+
+  %% ==== Notes / legends ====
+  Legend[Legend:\n- Blue = CLI UI\n- Orange = Audio\n- Teal = STT\n- Green = LLM\n- Indigo = TTS\n- Amber = Storage\n- Red = Control or Error\n- Gray = Note\nKeys during recording: SPACE pause/resume; any key stop; Q quit-after; ESC cancel]:::note
+
+
