@@ -4,6 +4,15 @@ Voice-first reflective journaling for the command line. Speak freely; your words
 
 See also: `AGENTS.md`
 
+## Quickstart (users)
+
+Looking for install/run instructions? See `docs/reference/SETUP_USER.md`.
+
+```bash
+uvx healthyselfjournal -- init
+uvx healthyselfjournal -- journal cli
+```
+
 ## Why this exists (vision)
 
 - Lower friction to start: voice-first input encourages natural expression
@@ -66,7 +75,7 @@ Quit requested. Ending session after summary update.
 
 ## Setup
 
-Prefer the external virtualenv workflow in `docs/reference/SETUP.md`:
+Prefer the external virtualenv workflow in `docs/reference/SETUP_DEV.md`:
 
 ```bash
 source /Users/greg/.venvs/experim__healthyselfjournal/bin/activate
@@ -77,15 +86,14 @@ uv sync --active
 
 ### Getting started (PyPI users)
 
-Use either pip or uvx:
+Use either uvx or pip:
 
 ```bash
-# pip
-pip install healthyselfjournal
+# uvx (no install)
 uvx healthyselfjournal -- init
 uvx healthyselfjournal -- journal cli
 
-# Or install with pip if you prefer
+# Or install with pip
 pip install healthyselfjournal
 healthyselfjournal init
 healthyselfjournal journal cli

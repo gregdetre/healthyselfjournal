@@ -8,8 +8,9 @@ This document covers the architecture, runtime flow, and operational guidance fo
 - `docs/planning/250918b_web_interface_planning.md` – Original implementation stages and acceptance criteria that guided this build.
 - `docs/reference/CLI_COMMANDS.md` – CLI usage reference, including the web entry command and shared options.
 - `docs/reference/FILE_FORMATS_ORGANISATION.md` – Canonical description of session artefacts (`browser-XXX.webm`, frontmatter updates, `.stt.json`).
+- `docs/reference/RESILIENCE.md` – Detect-and-suggest behaviour, placeholders, reconcile guidance.
 - `docs/reference/BACKGROUND_PROCESSING.md` – How transcript summaries are scheduled; the web upload path uses the same executor model.
-- `docs/reference/SETUP.md` – Environment and asset build steps (`npm run build`) required before running the server.
+- `docs/reference/SETUP_DEV.md` – Environment and asset build steps (`npm run build`) required before running the server.
 - `docs/reference/libraries/FASTHTML.md` – Notes and caveats for the framework used to serve the pages.
 - `docs/reference/AUDIO_SPEECH_GENERATION.md` – Design and configuration for speaking assistant questions out loud.
 
@@ -29,6 +30,7 @@ This document covers the architecture, runtime flow, and operational guidance fo
 - Entry point: `healthyselfjournal/cli_journal.py` registers `journal web` with `--sessions-dir`, `--resume`, `--host`, `--port`, `--reload` and optional voice/TTS options.
 - Application builder: `healthyselfjournal/web/app.py` constructs a FastHTML app on demand, mounts `/static/`, and maintains per-session state (`WebSessionState`).
 - Compatibility shim: `_get_fast_html_class()` patches `fastcore.xml.ft` when necessary so FastHTML initialises correctly with current `fastcore` releases. With FastHTML 0.12+, routes should return plain strings/objects and FastHTML wraps responses; avoid manually returning `HTMLResponse` from handlers.
+- The rendered shell shows a passive banner when outstanding segments exist for the current session, mirroring the CLI hint and embedding the reconcile command.
 - Routes:
 - `GET /` – Starts or resumes a session then redirects to the pretty URL `GET /journal/{sessions_dir_basename}/{session_id}/`.
   - `GET /journal/{sessions_dir}/{session_id}/` – Renders the main recording page (UI shell) for that session.
@@ -41,7 +43,7 @@ This document covers the architecture, runtime flow, and operational guidance fo
   4. Log events (`web.upload.received`, `web.upload.processed`).
   5. Schedule summary regeneration on the shared background executor.
   6. Generate the next question via `llm.generate_followup_question`.
-- Error responses return JSON with `status="error"` and reason keys (`unknown_session`, `processing_failed`, etc.) to keep the client-side handler simple. Returning plain dicts is supported in 0.12 (FastHTML emits JSON); for custom headers/streaming we still use Starlette `Response`.
+- Error responses return JSON with `status="error"` and reason keys (`unknown_session`, `processing_failed`, etc.) to keep the client-side handler simple. When transcription is deferred the payload also includes the exact `healthyselfjournal reconcile --sessions-dir ...` command so the browser can surface actionable guidance. Returning plain dicts is supported in 0.12 (FastHTML emits JSON); for custom headers/streaming we still use Starlette `Response`.
 
 ### Client layer (TypeScript + CSS)
 - Source: `healthyselfjournal/static/ts/app.ts` compiled to `static/js/app.js` via `npm run build`; styling lives in `static/css/app.css`.
@@ -147,6 +149,6 @@ For end-user run instructions and flags, see `WEB_RECORDING_INTERFACE.md`.
 ## Troubleshooting
 - **MediaRecorder unsupported**: Firefox/Safari variants lacking Opus support will fail early; inform users to switch browsers or add future polyfills.
 - **Permission errors**: If microphone access is denied, the UI surfaces a blocking status message; resolve by resetting browser permissions.
-- **Upload failures**: JSON errors include a `detail` field; transcription or LLM failures bubble up so issues (API keys, backend availability) mirror CLI troubleshooting steps.
+- **Upload failures**: JSON errors include a `detail` field; transcription or LLM failures bubble up so issues (API keys, backend availability) mirror CLI troubleshooting steps. When transcription is deferred, the detail message contains the exact reconcile command so you can recover once connectivity returns.
 - **TypeScript build issues**: Ensure `npm install` has run; the `tsconfig.json` targets ES2020 modules using Node resolution, so stale node_modules or incompatible tooling will surface compiler errors.
 - **Voice playback issues**: Ensure `OPENAI_API_KEY` is set when `--voice-mode` is enabled (default backend is OpenAI). Some browsers restrict autoplay; first playback should occur after a user gesture (record/stop) to satisfy policies. If audio is silent, check `sessions/events.log` for `tts.error` entries.

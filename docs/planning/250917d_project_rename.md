@@ -6,7 +6,7 @@ Rename the entire project (package name, CLI command, imports, branding, docs, a
 ### References
 
 - docs/reference/COMMAND_LINE_INTERFACE.md — CLI usage and flags to update
-- docs/reference/SETUP.md — install/run instructions to update
+- docs/reference/SETUP_DEV.md — install/run instructions to update
 - docs/reference/RECORDING_CONTROLS.md — user-visible CLI text to update
 - docs/planning/250917c_publish_to_pypi.md — release steps for new dist name
 - gjdutils/docs/instructions/RENAME_OR_MOVE.md — safe rename/move process

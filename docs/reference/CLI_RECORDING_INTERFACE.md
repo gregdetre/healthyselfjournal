@@ -69,7 +69,7 @@ See `RECORDING_CONTROLS.md` for the full flow, keyboard shortcuts, and short‑a
 
 ## See also
 
-- `CLI_COMMANDS.md` – Command index and quick reference
+- `COMMAND_LINE_INTERFACE.md` – Command index and quick reference
 - `WEB_RECORDING_INTERFACE.md` – Run the browser-based interface (`journal web`)
 - `CONFIGURATION.md` – Precedence and environment variables
 - `FILE_FORMATS_ORGANISATION.md` – What gets saved when

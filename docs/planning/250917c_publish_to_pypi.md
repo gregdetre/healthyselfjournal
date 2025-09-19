@@ -12,7 +12,7 @@
 - `healthyselfjournal/llm.py`: loads prompt templates via `PROMPTS_DIR = Path(__file__).parent / "prompts"` → ensure prompt files ship in the wheel.
 - `healthyselfjournal/prompts/*.jinja`: runtime assets required by `llm.py`.
 - `gjdutils/src/gjdutils/cli/pypi/{app.py, check.py, deploy.py}` and `src/gjdutils/pypi_build.py`: working PyPI flows for `gjdutils` (opinionated, but tightly coupled to `gjdutils`).
-- Repo rule doc: `docs/reference/SETUP.md` (venv + `uv` usage), `docs/reference/COMMAND_LINE_INTERFACE.md` (CLI expectations).
+- Repo rule doc: `docs/reference/SETUP_DEV.md` (venv + `uv` usage), `docs/reference/COMMAND_LINE_INTERFACE.md` (CLI expectations).
 - External: Standard packaging flow (Hatch build backend, `python -m build`, `twine upload`), `uvx` usage for running packages.
 
 
@@ -68,7 +68,7 @@
 #### Stage: Documentation & follow-ups
 - [x] Update `README.md` with install/run snippets:
   - `uvx healthyselfjournal` examples added; PyPI flow documented.
-- [x] Update `docs/reference/SETUP.md` and `COMMAND_LINE_INTERFACE.md` with PyPI install notes.
+- [x] Update `docs/reference/SETUP_USER.md` and `COMMAND_LINE_INTERFACE.md` with PyPI install notes.
 - [ ] (Optional) Add CI job for publishing on tag, using trusted publishing or API token.
 - [ ] (Optional) Add `CHANGELOG.md` and release notes workflow.
 

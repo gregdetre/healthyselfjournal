@@ -7,7 +7,7 @@ This document describes the end‑to‑end process for packaging and publishing 
 ## See also
 
 - `../planning/250917c_publish_to_pypi.md` – implementation plan, acceptance criteria, commands, risks
-- `./SETUP.md` – preferred venv + uv workflow and local development setup
+- `./SETUP_DEV.md` – preferred venv + uv workflow and local development setup
 - `./CLI_COMMANDS.md` – CLI usage; helpful for post‑install validation
 - `./LLM_PROMPT_TEMPLATES.md` – prompt assets that must ship inside the wheel
 - `./FILE_FORMATS_ORGANISATION.md` – runtime files created by the app; not packaged
@@ -176,7 +176,7 @@ uvx --python 3.12 healthyselfjournal -- --help
 - [ ] Fresh venv installs `healthyselfjournal` from TestPyPI and `--help` works
 - [ ] `uvx twine upload dist/*` publishes to PyPI
 - [ ] `uvx healthyselfjournal -- --help` works on a clean machine
-- [ ] Docs updated (`README.md`, `CLI_COMMANDS.md`) if flags/flows changed
+- [ ] Docs updated (`README.md`, `COMMAND_LINE_INTERFACE.md`) if flags/flows changed
  - [ ] Pin-run check: `uvx healthyselfjournal==<version> -- --help`
  - [ ] Tag and push: `git tag v<version> && git push origin v<version>`
  - [ ] Update `CHANGELOG.md` with highlights for this release

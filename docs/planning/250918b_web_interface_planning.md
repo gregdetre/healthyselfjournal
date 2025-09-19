@@ -129,7 +129,7 @@ Acceptance criteria:
 - [ ] Update `docs/reference/COMMAND_LINE_INTERFACE.md` with web entrypoint details
 - [ ] Add `docs/reference/FILE_FORMATS_ORGANISATION.md` note about web-originated audio using `webm/opus` (no conversion)
 - [ ] Add a brief `docs/reference/BACKGROUND_PROCESSING.md` note on web uploads and conversion
-- [ ] Document TypeScript build commands in `docs/reference/SETUP.md`
+- [ ] Document TypeScript build commands in `docs/reference/SETUP_DEV.md`
 
 Acceptance criteria:
 - Docs include how to run the web server, build TS, and where files go

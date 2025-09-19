@@ -3,7 +3,7 @@
 ## Quick Start
 
 - New to the project? Start here: `README.md` and `AGENTS.md`.
-- Setting up development? See: `docs/reference/SETUP.md` (⭐ START HERE).
+- Setting up development? See: `docs/reference/SETUP_DEV.md` (⭐ START HERE).
 - Running the app? See: `docs/reference/COMMAND_LINE_INTERFACE.md` and `docs/reference/RECORDING_CONTROLS.md`.
 - Understanding the product? See: `docs/reference/PRODUCT_VISION_FEATURES.md`.
 - Data and files? See: `docs/reference/FILE_FORMATS_ORGANISATION.md`.
@@ -15,7 +15,7 @@
 ### Setup & Infrastructure
 Guides for getting your environment ready and understanding core tooling.
 
-- **SETUP** (⭐ START HERE): `docs/reference/SETUP.md` — Install tooling, use the preferred external venv, and run with `uv`.
+- **SETUP** (⭐ START HERE): `docs/reference/SETUP_DEV.md` — Install tooling, use the preferred external venv, and run with `uv`.
 - THIRD-PARTY LIBRARIES: `docs/reference/THIRD_PARTY_LIBRARIES_NEEDED.md` — External deps and rationale.
 - AUDIO & WHISPER: `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md` — Speech-to-text setup, formats, and caveats.
 - SPEECH (TTS): `docs/reference/AUDIO_SPEECH_GENERATION.md` — Speech synthesis and playback options.
@@ -72,7 +72,7 @@ Project-level docs at the root.
 
 ## By Persona
 
-- **New Developer**: `docs/reference/SETUP.md`, `docs/reference/COMMAND_LINE_INTERFACE.md`, `docs/reference/DIALOGUE_FLOW.md`, `docs/reference/FILE_FORMATS_ORGANISATION.md`.
+- **New Developer**: `docs/reference/SETUP_DEV.md`, `docs/reference/COMMAND_LINE_INTERFACE.md`, `docs/reference/DIALOGUE_FLOW.md`, `docs/reference/FILE_FORMATS_ORGANISATION.md`.
 - **AI Agent**: `AGENTS.md`, `docs/reference/LLM_PROMPT_TEMPLATES.md`, `docs/reference/CONVERSATION_SUMMARIES.md`.
 - **Maintainer**: `docs/reference/PRODUCT_VISION_FEATURES.md`, `docs/planning/250917a_voice_journaling_app_v1.md`, `docs/conversations/250917a_journaling_app_ui_technical_decisions.md`.
 

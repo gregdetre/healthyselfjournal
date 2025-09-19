@@ -41,6 +41,6 @@ See `WEB_INTERFACE.md` for a deeper architecture overview. Runtime flow mirrors 
 ## See also
 
 - `CLI_RECORDING_INTERFACE.md` – Terminal-based recording
-- `CLI_COMMANDS.md` – Command index and quick reference
+- `COMMAND_LINE_INTERFACE.md` – Command index and quick reference
 - `FILE_FORMATS_ORGANISATION.md` – Session layout and artefacts
 

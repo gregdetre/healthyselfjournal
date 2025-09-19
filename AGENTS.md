@@ -22,7 +22,8 @@ See: `docs/reference/PRODUCT_VISION_FEATURES.md`
 
 ## Setup
 
-- See `docs/reference/SETUP.md` for uv + external venv workflow
+- Developers: `docs/reference/SETUP_DEV.md` (uv + external venv workflow)
+- Users: `docs/reference/SETUP_USER.md` (install and quickstart)
 - Preferred venv: `/Users/greg/.venvs/experim__healthyselfjournal` (source it first)
 - `gjdutils` is a local editable dep via `[tool.uv.sources]`
 - `ffmpeg` on PATH enables background MP3 conversion (optional)

@@ -34,7 +34,7 @@ Key options:
 
 ### Dependency setup
 
-> Assumes you are using the shared external venv described in `docs/reference/SETUP.md`.
+> Assumes you are using the shared external venv described in `docs/reference/SETUP_DEV.md`.
 
 **OpenAI (cloud)**
 ```
@@ -66,7 +66,7 @@ uv add whispercpp
 Environment requirements:
 
 - `journal`: requires `ANTHROPIC_API_KEY` when the LLM provider is `anthropic:*` (default cloud mode). Local `ollama:*` models keep dialogue/summaries offline. `OPENAI_API_KEY` is still needed only when `--stt-backend cloud-openai` is selected.
-- `reconcile`: requires `OPENAI_API_KEY` only when `--stt-backend cloud-openai` is selected. Local backends run fully offline if their dependencies are installed.
+- `reconcile`: requires `OPENAI_API_KEY` only when `--stt-backend cloud-openai` is selected. Local backends run fully offline if their dependencies are installed, and now scan CLI WAV plus web `.webm`/`.ogg` uploads. `.stt.json` payloads are written atomically before optional WAV cleanup.
 
 ### Microphone input handling and sample‑rate fallback
 
@@ -84,7 +84,7 @@ Client-side formatting runs only when `--stt-formatting` is `sentences`. The heu
 
 ### Event logging & persistence
 
-Every transcription logs start/success/failure events with backend, model, compute (when relevant), and text length. Raw responses persist alongside each WAV as `<segment>.stt.json`. Frontmatter now records:
+Every transcription logs start/success/failure events with backend, model, compute (when relevant), and text length. Raw responses persist alongside each recording as `<segment>.stt.json` (written atomically). When transcription is deferred the app writes `<segment>.stt.error.txt` and a markdown placeholder until `reconcile` succeeds. Frontmatter now records:
 
 - `model_stt` — resolved model name/path
 - `stt_backend`, `stt_compute`, `stt_formatting`
