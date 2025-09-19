@@ -183,8 +183,8 @@ def _load_user_config() -> Tuple[List[str], Dict[str, str], Path | None]:
         return [], {}, None
 
     try:
-        raw = path.read_bytes()
-        data = _toml.loads(raw)  # type: ignore[attr-defined]
+        raw_text = path.read_text(encoding="utf-8")
+        data = _toml.loads(raw_text)  # type: ignore[attr-defined]
     except Exception:
         # On parse error, ignore silently (treat as absent)
         return [], {}, None
@@ -211,7 +211,9 @@ def _load_user_config() -> Tuple[List[str], Dict[str, str], Path | None]:
     try:
         top_terms = data.get("vocabulary_terms")
         if isinstance(top_terms, list):
-            terms.extend([str(x) for x in top_terms if isinstance(x, (str, int, float))])
+            terms.extend(
+                [str(x) for x in top_terms if isinstance(x, (str, int, float))]
+            )
     except Exception:
         pass
     try:
