@@ -1344,6 +1344,7 @@ def _render_session_page(
         if resolved_cfg
         else "sessions"
     )
+    sessions_dir_name = Path(str(sessions_dir)).name
 
     # Session/LLM/STT context for debug panel
     app_version = state.manager.config.app_version
@@ -1378,6 +1379,7 @@ def _render_session_page(
         server_reload=server_reload,
         server_resume=server_resume,
         sessions_dir=sessions_dir,
+        sessions_dir_name=sessions_dir_name,
         app_version=app_version,
         llm_model=llm_model,
         stt_backend=stt_backend,
@@ -1572,6 +1574,7 @@ def _render_session_shell(
     server_reload: bool,
     server_resume: bool,
     sessions_dir: str,
+    sessions_dir_name: str,
     app_version: str,
     llm_model: str,
     stt_backend: str,
@@ -1617,6 +1620,7 @@ def _render_session_shell(
             "server_reload": server_reload,
             "server_resume": server_resume,
             "sessions_dir": sessions_dir,
+            "sessions_dir_name": sessions_dir_name,
             "app_version": app_version,
             "llm_model": llm_model,
             "stt_backend": stt_backend,
