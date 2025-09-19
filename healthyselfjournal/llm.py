@@ -106,6 +106,7 @@ def generate_followup_question(request: QuestionRequest) -> QuestionResponse:
             top_p=CONFIG.llm_top_p,
             top_k=CONFIG.llm_top_k,
             thinking_enabled=thinking_enabled,
+            cache_question_prompt=True,
         )
     elif provider == "ollama":
         text = _call_ollama(
@@ -202,6 +203,7 @@ def stream_followup_question(
                 top_p=CONFIG.llm_top_p,
                 top_k=CONFIG.llm_top_k,
                 thinking_enabled=thinking_enabled,
+                cache_question_prompt=True,
             )
             with _ANTHROPIC_CLIENT.messages.stream(**stream_kwargs) as stream:
                 for text in stream.text_stream:
@@ -591,6 +593,7 @@ def _call_anthropic(
     max_retries: int = 3,
     backoff_base_seconds: float = 1.5,
     thinking_enabled: bool = False,
+    cache_question_prompt: bool = False,
 ) -> str:
     global _ANTHROPIC_CLIENT
     if _ANTHROPIC_CLIENT is None:
@@ -608,6 +611,7 @@ def _call_anthropic(
                 top_p=top_p,
                 top_k=top_k,
                 thinking_enabled=thinking_enabled,
+                cache_question_prompt=cache_question_prompt,
             )
             response = _ANTHROPIC_CLIENT.messages.create(**create_kwargs)
             return "".join(
@@ -686,6 +690,7 @@ def _build_anthropic_kwargs(
     top_p: float | None,
     top_k: int | None,
     thinking_enabled: bool,
+    cache_question_prompt: bool = False,
 ) -> dict[str, Any]:
     """Construct kwargs for Anthropic messages API with consistent thinking behavior.
 
@@ -705,18 +710,68 @@ def _build_anthropic_kwargs(
     else:
         effective_budget_tokens = None
 
-    create_kwargs: dict[str, Any] = {
-        "model": model,
-        "max_tokens": max_tokens,
-        "temperature": effective_temperature,
-        "system": SYSTEM_PROMPT,
-        "messages": [
+    # When caching question prompts, convert system and user content into content blocks
+    # and mark the stable prefix (before the '## Context' section) as cacheable.
+    if cache_question_prompt:
+        # Split prompt at the first '## Context' heading, if present
+        marker = "## Context"
+        idx = prompt.find(marker)
+        if idx != -1:
+            stable_prefix = prompt[:idx].rstrip()
+            dynamic_suffix = prompt[idx:]
+        else:
+            # If no marker, treat entire prompt as dynamic to be safe
+            stable_prefix = ""
+            dynamic_suffix = prompt
+
+        system_blocks: list[dict[str, Any]] = [
             {
-                "role": "user",
-                "content": prompt,
+                "type": "text",
+                "text": SYSTEM_PROMPT,
+                "cache_control": {"type": "ephemeral"},
             }
-        ],
-    }
+        ]
+
+        user_content_blocks: list[dict[str, Any]] = []
+        if stable_prefix:
+            user_content_blocks.append(
+                {
+                    "type": "text",
+                    "text": stable_prefix,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            )
+        if dynamic_suffix:
+            user_content_blocks.append({"type": "text", "text": dynamic_suffix})
+
+        create_kwargs: dict[str, Any]
+        create_kwargs = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": effective_temperature,
+            "system": system_blocks,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": user_content_blocks,
+                }
+            ],
+            # Required beta header to enable prompt caching
+            "extra_headers": {"anthropic-beta": "prompt-caching-2024-07-31"},
+        }
+    else:
+        create_kwargs = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": effective_temperature,
+            "system": SYSTEM_PROMPT,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+        }
     if thinking_enabled:
         create_kwargs["thinking"] = {
             "type": "enabled",
