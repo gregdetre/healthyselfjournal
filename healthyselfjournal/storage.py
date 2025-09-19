@@ -11,6 +11,8 @@ import yaml
 
 _LOGGER = logging.getLogger(__name__)
 
+from .utils.pending import placeholder_block, placeholder_comment
+
 
 FRONTMATTER_KEYS = {
     "created_at",
@@ -130,6 +132,74 @@ def append_exchange_body(
 
     doc.body = "\n".join(blocks).rstrip() + "\n\n"
     write_transcript(markdown_path, doc)
+
+
+def append_pending_exchange(
+    markdown_path: Path,
+    question: str,
+    segment_label: str,
+) -> None:
+    """Append a placeholder exchange for a failed transcription attempt."""
+
+    append_exchange_body(
+        markdown_path,
+        question,
+        placeholder_block(segment_label),
+    )
+
+
+def replace_pending_exchange(
+    markdown_path: Path,
+    segment_label: str,
+    transcript_text: str,
+) -> bool:
+    """Replace a placeholder entry with the supplied transcript text."""
+
+    doc = load_transcript(markdown_path)
+    block = placeholder_block(segment_label)
+    replacement = transcript_text.strip()
+
+    if block in doc.body:
+        doc.body = doc.body.replace(block, replacement, 1)
+    else:
+        marker = placeholder_comment(segment_label)
+        if marker not in doc.body:
+            return False
+        lines = doc.body.splitlines()
+        for idx, line in enumerate(lines):
+            if line.strip() == marker:
+                start_idx = max(idx - 1, 0)
+                lines[start_idx] = replacement
+                lines.pop(idx)
+                doc.body = "\n".join(lines)
+                break
+        else:
+            return False
+
+    doc.body = doc.body.rstrip() + "\n\n"
+    write_transcript(markdown_path, doc)
+    return True
+
+
+def clear_pending_flag(markdown_path: Path, segment_label: str) -> bool:
+    """Remove pending metadata markers for the given audio segment."""
+
+    doc = load_transcript(markdown_path)
+    audio_entries = list(doc.frontmatter.data.get("audio_file") or [])
+    changed = False
+
+    for entry in audio_entries:
+        if str(entry.get("wav")) == segment_label:
+            if entry.pop("pending", None) is not None:
+                changed = True
+            if entry.pop("pending_reason", None) is not None:
+                changed = True
+
+    if changed:
+        doc.frontmatter.data["audio_file"] = audio_entries
+        write_transcript(markdown_path, doc)
+
+    return changed
 
 
 def _parse_frontmatter(raw: str) -> tuple[MutableMapping[str, Any], str]:

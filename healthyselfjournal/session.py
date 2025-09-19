@@ -27,6 +27,7 @@ from .storage import (
     Frontmatter,
     TranscriptDocument,
     append_exchange_body,
+    append_pending_exchange,
     load_transcript,
     write_transcript,
 )
@@ -41,6 +42,7 @@ from .transcription import (
 )
 from .events import log_event
 from .utils.audio_utils import maybe_delete_wav_when_safe
+from .utils.pending import remove_error_sentinel, write_error_sentinel
 from .utils.session_layout import (
     build_segment_path,
     next_cli_segment_name,
@@ -108,6 +110,25 @@ class SessionConfig:
     stt_backend_selection: BackendSelection | None = None
     stt_warnings: List[str] = field(default_factory=list)
     llm_questions_debug: bool = False
+
+
+class PendingTranscriptionError(RuntimeError):
+    """Raised when audio capture succeeds but STT must be deferred."""
+
+    def __init__(
+        self,
+        *,
+        segment_label: str,
+        audio_path: Path,
+        source: str,
+        error: Exception,
+    ) -> None:
+        super().__init__(str(error))
+        self.segment_label = segment_label
+        self.audio_path = audio_path
+        self.source = source
+        self.error = error
+        self.error_type = error.__class__.__name__
 
 
 class SessionManager:
@@ -380,7 +401,7 @@ class SessionManager:
         self.state.response_index += 1
         extra: dict[str, Any] | None = None
         if segment_label:
-            extra = {"segment_label": segment_label}
+            extra = {"segment_label": segment_label, "ui": "web"}
         return self._transcribe_and_store(
             question,
             capture,
@@ -400,10 +421,25 @@ class SessionManager:
             raise RuntimeError("Session has not been started")
 
         backend = self._get_transcription_backend()
-        transcription = backend.transcribe(
-            capture.wav_path,
-            language=self.config.language,
-        )
+        try:
+            transcription = backend.transcribe(
+                capture.wav_path,
+                language=self.config.language,
+            )
+        except Exception as exc:
+            self._handle_transcription_failure(
+                question=question,
+                capture=capture,
+                source=source,
+                error=exc,
+                extra_log_fields=extra_log_fields,
+            )
+            raise PendingTranscriptionError(
+                segment_label=capture.wav_path.name,
+                audio_path=capture.wav_path,
+                source=source,
+                error=exc,
+            ) from exc
 
         _persist_raw_transcription(capture.wav_path, transcription.raw_response)
 
@@ -459,6 +495,80 @@ class SessionManager:
 
         log_event("session.exchange.recorded", log_payload)
         return exchange
+
+    def _handle_transcription_failure(
+        self,
+        *,
+        question: str,
+        capture: AudioCaptureResult,
+        source: str,
+        error: Exception,
+        extra_log_fields: dict[str, Any] | None = None,
+    ) -> None:
+        if self.state is None:
+            return
+
+        segment_label = capture.wav_path.name
+
+        with self._io_lock:
+            append_pending_exchange(
+                self.state.markdown_path,
+                question,
+                segment_label,
+            )
+
+            doc = load_transcript(self.state.markdown_path)
+            audio_entries = list(doc.frontmatter.data.get("audio_file") or [])
+            entry_payload = {
+                "wav": segment_label,
+                "mp3": (
+                    capture.mp3_path.name if capture.mp3_path else None
+                ),
+                "duration_seconds": round(capture.duration_seconds, 2),
+                "voiced_seconds": round(capture.voiced_seconds, 2),
+                "pending": True,
+                "pending_reason": error.__class__.__name__,
+                "source": source,
+            }
+
+            replaced = False
+            for entry in audio_entries:
+                if str(entry.get("wav")) == segment_label:
+                    entry.update(entry_payload)
+                    replaced = True
+                    break
+            if not replaced:
+                audio_entries.append(entry_payload)
+
+            total_duration = sum(
+                float(item.get("duration_seconds", 0.0)) for item in audio_entries
+            )
+            doc.frontmatter.data["audio_file"] = audio_entries
+            doc.frontmatter.data["duration_seconds"] = round(total_duration, 2)
+            write_transcript(self.state.markdown_path, doc)
+
+        write_error_sentinel(capture.wav_path, error)
+
+        payload = {
+            "session_id": self.state.session_id,
+            "response_index": self.state.response_index,
+            "wav": segment_label,
+            "mp3": capture.mp3_path.name if capture.mp3_path else None,
+            "duration_seconds": round(capture.duration_seconds, 2),
+            "voiced_seconds": round(capture.voiced_seconds, 2),
+            "error_type": error.__class__.__name__,
+            "error": str(error),
+            "source": source,
+            "ui": source,
+        }
+        if extra_log_fields:
+            payload.update(extra_log_fields)
+
+        log_event("session.exchange.pending", payload)
+
+        self.state.quit_requested = capture.quit_after
+        self.state.last_cancelled = False
+        self.state.last_discarded_short = False
 
     def generate_next_question(self, transcript: str) -> QuestionResponse:
         if self.state is None:
@@ -627,9 +737,16 @@ class SessionManager:
         with self._io_lock:
             doc = load_transcript(self.state.markdown_path)
 
-            # Build list of new segments from current process
-            new_segments = [
-                {
+            existing_list = list(doc.frontmatter.data.get("audio_file") or [])
+            merged_map: dict[str, dict[str, Any]] = {
+                str(item.get("wav")): dict(item)
+                for item in existing_list
+                if item.get("wav")
+            }
+
+            new_segments: list[dict[str, Any]] = []
+            for exchange in self.state.exchanges:
+                seg = {
                     "wav": exchange.audio.wav_path.name,
                     "mp3": (
                         exchange.audio.mp3_path.name
@@ -637,36 +754,35 @@ class SessionManager:
                         else None
                     ),
                     "duration_seconds": round(exchange.audio.duration_seconds, 2),
+                    "voiced_seconds": round(exchange.audio.voiced_seconds, 2),
                 }
-                for exchange in self.state.exchanges
-            ]
+                # Remove any stale pending markers once transcription succeeded
+                merged_entry = dict(merged_map.get(seg["wav"], {}))
+                merged_entry.update(seg)
+                merged_entry.pop("pending", None)
+                merged_entry.pop("pending_reason", None)
+                merged_map[seg["wav"]] = merged_entry
+                new_segments.append(seg)
 
-            if self.state.resumed:
-                # Merge with existing without duplicating entries
-                existing_list = list(doc.frontmatter.data.get("audio_file") or [])
-                by_wav: dict[str, dict] = {
-                    str(item.get("wav")): item for item in existing_list
-                }
-                for seg in new_segments:
-                    by_wav[seg["wav"]] = seg
-                merged_list = [
-                    # Keep original order, append any truly new ones in order recorded
-                    *[item for item in existing_list if str(item.get("wav")) in by_wav],
-                    *[
-                        seg
-                        for seg in new_segments
-                        if seg["wav"] not in {str(i.get("wav")) for i in existing_list}
-                    ],
-                ]
-                total_duration = sum(
-                    float(item.get("duration_seconds", 0.0)) for item in merged_list
-                )
-                audio_file_value = merged_list
-            else:
-                total_duration = sum(
-                    item.audio.duration_seconds for item in self.state.exchanges
-                )
-                audio_file_value = new_segments
+            merged_list: list[dict[str, Any]] = []
+            seen: set[str] = set()
+            for entry in existing_list:
+                wav = str(entry.get("wav"))
+                if wav in merged_map:
+                    merged_list.append(merged_map[wav])
+                    seen.add(wav)
+                else:
+                    merged_list.append(entry)
+            for seg in new_segments:
+                wav = seg["wav"]
+                if wav not in seen:
+                    merged_list.append(merged_map[wav])
+                    seen.add(wav)
+
+            total_duration = sum(
+                float(item.get("duration_seconds", 0.0)) for item in merged_list
+            )
+            audio_file_value = merged_list
 
             doc.frontmatter.data.update(
                 {
@@ -689,9 +805,12 @@ class SessionManager:
 
 def _persist_raw_transcription(wav_path: Path, payload: dict) -> None:
     output_path = wav_path.with_suffix(".stt.json")
-    output_path.write_text(
+    tmp_path = output_path.with_name(output_path.name + ".partial")
+    tmp_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
     )
+    tmp_path.replace(output_path)
+    remove_error_sentinel(wav_path)
     # Optional cleanup: delete WAV when safe (MP3 + STT present)
     try:
         from .config import CONFIG as _CFG
