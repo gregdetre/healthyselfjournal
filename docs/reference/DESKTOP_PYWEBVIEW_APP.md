@@ -42,9 +42,9 @@ High‑level flow:
    - `POST/GET /session/{id}/reveal` reveals the session markdown in Finder (macOS).
 5) Security middleware applies CSP and related headers on every response.
 
-Planned worker processes:
+Worker processes:
 
-- Transcription worker process handles longer audio segments to keep the UI thread unblocked.
+- Transcription worker process handles longer audio segments to keep the UI thread unblocked. Partial transcript updates are exposed via a job status endpoint the client polls.
 - Optional local LLM worker via `llama-cpp-python` for offline operation (configurable mode).
 
 ## Commands and options
@@ -81,7 +81,7 @@ Notes:
 
 - The desktop command starts a background HTTP server and opens a WKWebView window.
 - Recording uses `getUserMedia` + `MediaRecorder` in the embedded WebView; uploads are persisted immediately to the session folder.
-- STT is performed via the configured backend; short/quiet responses can be automatically discarded.
+- STT is performed via the configured backend; short/quiet responses can be automatically discarded. A background worker processes segments and streams partial results via polling `/session/{id}/jobs/{job_id}`.
 - Each successful upload updates the running total duration and returns the next question.
 - When enabled, TTS synthesizes the assistant prompt server‑side and the browser plays it.
 - Closing the window stops the background server and exits cleanly.
@@ -103,10 +103,13 @@ Current state (implemented):
 - JS bridge with `quit()` and optional `toggle_devtools()`.
 - CLI command `healthyselfjournal desktop` with window/server options.
 
+- Multiprocessing transcription worker (`workers/transcription_worker.py`) integrated with the web app; partial transcripts are polled by the client.
+- Model manager for faster‑whisper/ctranslate2 assets under platformdirs with checksum validation.
+- LLM adapter with `cloud` and `local` modes and a `cloud_off` switch for privacy‑first usage.
+
 Target state (planned; tracked in planning doc):
 
-- Multiprocessing for STT/LLM workloads with partial transcript streaming.
-- First‑run model manager for offline STT and optional local LLM under platformdirs.
+- Optional local LLM worker process and richer desktop settings (init wizard, cloud‑off toggle in UI).
 - Packaged app via PyInstaller (one‑folder), with signing/notarisation on macOS.
 - Desktop UX niceties: menu items, About panel, cloud‑off switch in settings.
 
@@ -161,8 +164,52 @@ Migration status:
 
 Acceptance for dev run: window opens < 3s; recording works end‑to‑end; transcript + next question update; TTS returns audio when enabled; no CSP violations.
 
-## Packaging (preview)
+## Packaging & distribution (cross‑platform)
 
-- Use PyInstaller one‑folder builds; collect binaries for `ctranslate2`/`faster_whisper` as needed.
-- Add mic usage string and entitlement; enable hardened runtime; sign and notarize.
-- Post‑package, repeat the manual testing steps to verify parity with dev.
+Overview:
+
+- Build native artifacts with PyInstaller per‑OS. PyInstaller is not a cross‑compiler; use native machines or CI runners for each target OS.
+- macOS can build Apple Silicon (arm64) and Intel (x86_64) binaries. Prefer a universal2 build when feasible; otherwise ship two builds.
+- Use GitHub Actions matrix to produce artifacts for macOS (arm64 + Intel), Windows, and Linux from a single tag or manual run.
+
+What gets packaged:
+
+- One‑folder bundles that include the Python runtime and app code. Models are not bundled; they are managed/downloaded at runtime under platformdirs.
+- The FastHTML UI and static assets are included from `healthyselfjournal/static/`.
+
+macOS notes:
+
+- Ensure `Info.plist` contains `NSMicrophoneUsageDescription` and the app is signed with the hardened runtime and appropriate microphone entitlement for distribution.
+- For development builds, unsigned artifacts are fine; for distribution, sign and notarize after PyInstaller emits the app bundle.
+- You can build per‑arch on native runners (macOS‑14 arm64, macOS‑13 x86_64) or attempt a `universal2` build when your Python and native deps support it.
+
+Windows notes:
+
+- Build on Windows runners to produce an installer‑free one‑folder directory or wrap with an installer later if desired. Code signing is optional but recommended.
+
+Linux notes:
+
+- Build on a reasonably old glibc baseline for wider compatibility (GitHub `ubuntu-latest` is acceptable for initial releases). No signing required.
+
+Local packaging (developer machine):
+
+```bash
+# ensure environment is synced
+uv sync --active
+
+# package using the project spec
+uv run --active pyinstaller packaging/HealthySelfJournal.spec
+
+# resulting bundles land under ./dist/
+```
+
+CI packaging (GitHub Actions):
+
+- A CI workflow for desktop builds is not included yet. When adding one, use a matrix to build per‑OS and per‑arch, and invoke the PyInstaller spec. Update this section with the workflow path once added.
+
+References:
+
+- PyInstaller FAQ (cross‑compiling not supported) – pyinstaller.org
+- pywebview Packaging guide – pywebview.org
+
+Post‑package, repeat the manual testing steps to verify parity with dev.

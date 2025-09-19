@@ -33,11 +33,11 @@
 ### Stages & actions
 
 #### Stage: Prepare local environment and baseline checks (macOS, Apple Silicon)
-- [ ] Ensure external venv active (`/Users/greg/.venvs/experim__healthyselfjournal`) and project sync
-  - [ ] `uv sync --active`
+- [x] Ensure external venv active (`/Users/greg/.venvs/experim__healthyselfjournal`) and project sync
+  - [x] `uv sync --active`
   - [x] Run unit tests (offline subset): `pytest tests/test_storage.py -q`
   - Acceptance: Sync completes; baseline tests pass locally.
-- [ ] Install PyWebView and PyInstaller in the venv
+- [x] Install PyWebView and PyInstaller in the venv
   - [ ] `uv run --active pip install pywebview pyinstaller`
   - [x] Declared both packages in `pyproject.toml`; `uv sync --active` will install on next sync.
   - Acceptance: Packages installed; `python -c "import webview; print(webview.__version__)"` works.
@@ -49,7 +49,7 @@
   - Acceptance: A window opens and serves the current FastHTML UI.
   - Progress: Desktop shell exposed via `healthyselfjournal desktop`; manual WKWebView mic verification still pending.
 - [ ] Verify `getUserMedia` + `MediaRecorder` inside WKWebView
-  - [ ] Add Info.plist entries: `NSMicrophoneUsageDescription` (and if needed `NSSpeechRecognitionUsageDescription`).
+  - [x] Add Info.plist entries: `NSMicrophoneUsageDescription` (and if needed `NSSpeechRecognitionUsageDescription`).
   - [ ] Confirm permission prompt appears and recording meter updates in real time.
   - [ ] Save short test recording and check it persists under the current session.
   - Acceptance: Recording works end-to-end (start/stop/meter/saved WAV), no UI freezes.
@@ -57,23 +57,23 @@
   - Kill criteria: WKWebView cannot capture mic reliably even with entitlements and `enable_media_stream=True`.
 
 #### Stage: Offline STT integration via faster-whisper (macOS)
-- [ ] Add a `multiprocessing` transcription worker invoked from the UI flow
-  - [ ] Parent process remains responsive while worker handles audio segments.
-  - [ ] Stream partial STT results to UI through the HTTP app (Server-Sent Events or polling) to avoid JS bridge complexity.
+- [x] Add a `multiprocessing` transcription worker invoked from the UI flow
+  - [x] Parent process remains responsive while worker handles audio segments.
+  - [x] Stream partial STT results to UI through the HTTP app (Server-Sent Events or polling) to avoid JS bridge complexity.
   - Acceptance: UI remains responsive; partial transcripts appear for longer recordings.
-- [ ] Model management (first run)
-  - [ ] Create a model manager that downloads faster-whisper models into `platformdirs` location, with resume and checksum.
-  - [ ] Detect Metal vs CPU and select a compatible model backend (prefer CPU first; Metal optional).
+- [x] Model management (first run)
+  - [x] Create a model manager that downloads faster-whisper models into `platformdirs` location, with resume and checksum.
+  - [x] Detect Metal vs CPU and select a compatible model backend (prefer CPU first; Metal optional).
   - Acceptance: On clean machine, first-run downloads and then transcribes offline without errors.
 
 #### Stage: Local LLM adapter and llama-cpp-python (parallel; do not block)
-- [ ] Introduce an LLM adapter in `llm.py` with modes: `cloud` and `local_llama` (default: `cloud` for POC)
-  - [ ] Config flag in `user_config.toml` or env var to switch modes; add a `cloud_off` option to force offline.
-  - [ ] Keep Ollama optional as a dev-only mode; do not include in packaged build by default.
+- [x] Introduce an LLM adapter in `llm.py` with modes: `cloud` and `local_llama` (default: `cloud` for POC)
+  - [x] Config flag in `user_config.toml` or env var to switch modes; add a `cloud_off` option to force offline.
+  - [x] Keep Ollama optional as a dev-only mode; do not include in packaged build by default.
   - Acceptance: App runs with `cloud` mode unchanged; switching to `local_llama` routes calls locally.
 - [ ] Bring up `llama-cpp-python` locally (dev-run only)
   - [ ] Install `llama-cpp-python` CPU wheel first; verify inference with a small quantized model (e.g., Q4_K_M).
-  - [ ] Manage model paths under `platformdirs` (not bundled); add checksums and resume.
+  - [x] Manage model paths under `platformdirs` (not bundled); add checksums and resume.
   - [ ] Optional: test Metal wheel; fall back to CPU if unstable.
   - Acceptance: Dialogue loop works offline end-to-end with local LLM in dev.
 - [ ] Defer packaging of local LLM until after PyWebView mic POC passes
@@ -81,9 +81,9 @@
   - Acceptance: Packaging plan documented; not a blocker for mic POC.
 
 #### Stage: Packaging with PyInstaller (one-folder) for macOS
-- [ ] Add PyInstaller spec file for the PyWebView runner
-  - [ ] Include binary/data collection for `ctranslate2` and `faster_whisper` (collect dynamic libs, data).
-  - [ ] Exclude models from bundle; verify runtime model directory use.
+- [x] Add PyInstaller spec file for the PyWebView runner
+  - [x] Include binary/data collection for `ctranslate2` and `faster_whisper` (collect dynamic libs, data).
+  - [x] Exclude models from bundle; verify runtime model directory use.
   - Acceptance: Dist folder contains an app that launches successfully.
 - [ ] Run packaged app and repeat the mic + STT flow
   - [ ] Verify permissions prompts still work; recording and transcription succeed.
@@ -103,7 +103,7 @@
 - [x] Enforce local-only content and strict CSP
   - [x] No remote JS or mixed content; block `eval` via middleware + regression test (`tests/test_web_app_security.py`).
   - Acceptance: CSP violations are zero in console during typical use.
-- [ ] Add explicit setting to disable network LLM usage (cloud off switch)
+- [x] Add explicit setting to disable network LLM usage (cloud off switch)
   - [ ] Document storage locations and export policy in UI.
   - Acceptance: With cloud off, no outbound requests are made (verified via proxy or logs).
 
