@@ -16,6 +16,7 @@ import tempfile
 from typing import Literal, Any
 
 from .events import log_event
+from .config import CONFIG
 
 
 AudioFormat = Literal["wav", "mp3", "flac", "ogg", "opus", "aac", "pcm"]
@@ -31,6 +32,24 @@ class TTSOptions:
 
 class TTSError(RuntimeError):
     pass
+
+
+def resolve_tts_options(overrides: dict[str, Any] | None = None) -> TTSOptions:
+    """Merge configuration defaults with runtime overrides."""
+
+    opts = TTSOptions(
+        backend="openai",
+        model=CONFIG.tts_model,
+        voice=CONFIG.tts_voice,
+        audio_format=CONFIG.tts_format,  # type: ignore[arg-type]
+    )
+    if overrides:
+        for key, value in overrides.items():
+            if value is None:
+                continue
+            if hasattr(opts, key):
+                setattr(opts, key, value)
+    return opts
 
 
 def speak_text(text: str, opts: TTSOptions) -> None:

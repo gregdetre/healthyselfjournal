@@ -2,11 +2,12 @@ from __future__ import annotations
 
 """FastHTML application setup for the web journaling interface."""
 
+from collections import OrderedDict
 from dataclasses import dataclass, field
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -15,13 +16,38 @@ import subprocess
 from starlette.staticfiles import StaticFiles
 
 from ..audio import AudioCaptureResult
-from ..storage import load_transcript
-from ..utils.time_utils import format_hh_mm_ss, format_minutes_text
 from ..config import CONFIG
+from ..errors import (
+    AUDIO_FORMAT_UNSUPPORTED,
+    EMPTY_AUDIO,
+    INACTIVE_SESSION,
+    INVALID_PAYLOAD,
+    MISSING_AUDIO,
+    PROCESSING_FAILED,
+    QUESTION_FAILED,
+    SHORT_ANSWER_DISCARDED,
+    UNKNOWN_SESSION,
+    UPLOAD_TOO_LARGE,
+    VOICE_DISABLED,
+    MISSING_TEXT,
+    TTS_FAILED,
+    TTS_ERROR,
+    REVEAL_FAILED,
+    UNSUPPORTED_PLATFORM,
+)
 from ..events import log_event
 from ..session import SessionConfig, SessionManager
+from ..storage import load_transcript
 from ..transcription import BackendNotAvailableError, resolve_backend_selection
-from ..tts import TTSOptions, synthesize_text, TTSError
+from ..tts import TTSOptions, TTSError, resolve_tts_options, synthesize_text
+from ..utils.audio_utils import (
+    extension_for_media_type,
+    is_supported_media_type,
+    normalize_mime,
+    should_discard_short_answer,
+)
+from ..utils.session_layout import build_segment_path, next_web_segment_name
+from ..utils.time_utils import format_hh_mm_ss, format_minutes_text
 from gjdutils.strings import jinja_render
 
 
@@ -29,6 +55,13 @@ _LOGGER = logging.getLogger(__name__)
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_STATIC_DIR = _PACKAGE_ROOT / "static"
+
+
+def _error_response(error: str, status_code: int, detail: str | None = None) -> JSONResponse:
+    payload: dict[str, Any] = {"status": "error", "error": error}
+    if detail:
+        payload["detail"] = detail
+    return JSONResponse(payload, status_code=status_code)
 
 
 @lru_cache(maxsize=1)
@@ -123,21 +156,21 @@ def build_app(config: WebAppConfig) -> Any:
     FastHTML = _get_fast_html_class()
     app = FastHTML()
     app.state.config = resolved
-    app.state.sessions = {}
+    app.state.sessions = OrderedDict()
+    app.state.max_sessions = 4
     app.state.resume = bool(resolved.resume)
     # Configure voice mode and TTS options for this app instance
     voice_enabled = bool(resolved.voice_enabled or CONFIG.speak_llm)
     app.state.voice_enabled = voice_enabled
-    app.state.tts_options = (
-        TTSOptions(
-            backend="openai",
-            model=(resolved.tts_model or CONFIG.tts_model),
-            voice=(resolved.tts_voice or CONFIG.tts_voice),
-            audio_format=(resolved.tts_format or CONFIG.tts_format),  # type: ignore[arg-type]
-        )
-        if voice_enabled
-        else None
-    )
+    if voice_enabled:
+        overrides = {
+            "model": resolved.tts_model,
+            "voice": resolved.tts_voice,
+            "audio_format": resolved.tts_format,
+        }
+        app.state.tts_options = resolve_tts_options(overrides)
+    else:
+        app.state.tts_options = None
 
     # Serve static files (JS, CSS, media) under /static/
     app.mount(
@@ -176,7 +209,9 @@ def build_app(config: WebAppConfig) -> Any:
         # Redirect to pretty session URL: /journal/<sessions_dir_name>/<session_id>/
         resolved_cfg = getattr(app.state, "config", None)
         sessions_dir_path = (
-            getattr(resolved_cfg, "sessions_dir", Path("sessions")) if resolved_cfg else Path("sessions")
+            getattr(resolved_cfg, "sessions_dir", Path("sessions"))
+            if resolved_cfg
+            else Path("sessions")
         )
         sessions_dir_name = Path(str(sessions_dir_path)).name
         location = f"/journal/{sessions_dir_name}/{state.session_id}/"
@@ -194,7 +229,9 @@ def build_app(config: WebAppConfig) -> Any:
         # Ensure sessions_dir in URL matches configured one; redirect if not
         resolved_cfg = getattr(app.state, "config", None)
         configured_sessions_dir = (
-            getattr(resolved_cfg, "sessions_dir", Path("sessions")) if resolved_cfg else Path("sessions")
+            getattr(resolved_cfg, "sessions_dir", Path("sessions"))
+            if resolved_cfg
+            else Path("sessions")
         )
         configured_name = Path(str(configured_sessions_dir)).name
         if sessions_dir != configured_name:
@@ -204,46 +241,56 @@ def build_app(config: WebAppConfig) -> Any:
             )
 
         # Obtain or resume the requested session
-        state: WebSessionState | None = app.state.sessions.get(session_id)
+        state = _touch_session(app, session_id)
         if state is None:
             state = _resume_specific_session(app, session_id)
             if state is None:
-                return JSONResponse(
-                    {"status": "error", "error": "unknown_session"}, status_code=404
-                )
+                return _error_response(UNKNOWN_SESSION, status_code=404)
 
-        return _render_session_page(app, state)
+        return _render_session_page(
+            app, state, static_assets_ready=_static_assets_ready(app)
+        )
 
     @app.post("/session/{session_id}/upload")  # type: ignore[attr-defined]
     async def upload(session_id: str, request: Request):
-        state = app.state.sessions.get(session_id)
+        state = _touch_session(app, session_id)
         if state is None:
-            return JSONResponse(
-                {"status": "error", "error": "unknown_session"}, status_code=404
-            )
+            return _error_response(UNKNOWN_SESSION, status_code=404)
 
         form = await request.form()
         upload = form.get("audio")
         if upload is None:
-            return JSONResponse(
-                {"status": "error", "error": "missing_audio"}, status_code=400
-            )
+            return _error_response(MISSING_AUDIO, status_code=400)
         if not isinstance(upload, UploadFile):
-            return JSONResponse(
-                {"status": "error", "error": "invalid_payload"}, status_code=400
+            return _error_response(INVALID_PAYLOAD, status_code=400)
+
+        mime_form = form.get("mime")
+        if isinstance(mime_form, bytes):
+            try:
+                mime_form = mime_form.decode()
+            except Exception:
+                mime_form = None
+        mime = normalize_mime(mime_form) or normalize_mime(upload.content_type)
+        if mime is None:
+            mime = "audio/webm"
+
+        if not is_supported_media_type(mime):
+            return _error_response(
+                AUDIO_FORMAT_UNSUPPORTED,
+                status_code=415,
+                detail="Only Opus WEBM/OGG uploads are supported in the web interface.",
             )
 
-        # Metadata provided by the browser recorder
-        mime_val = form.get("mime")
-        if isinstance(mime_val, bytes):
-            try:
-                mime_val = mime_val.decode()
-            except Exception:
-                mime_val = None
-        if not isinstance(mime_val, str):
-            mime_val = None
-        content_type = upload.content_type or "audio/webm"
-        mime = (mime_val or content_type).lower()
+        blob = await upload.read()
+        size_bytes = len(blob)
+        if size_bytes == 0:
+            return _error_response(EMPTY_AUDIO, status_code=400)
+        if size_bytes > CONFIG.web_upload_max_bytes:
+            return _error_response(
+                UPLOAD_TOO_LARGE,
+                status_code=413,
+                detail=f"Upload exceeded {CONFIG.web_upload_max_bytes} bytes",
+            )
 
         def _to_float(val: Any, default: float) -> float:
             if isinstance(val, (int, float)):
@@ -259,30 +306,35 @@ def build_app(config: WebAppConfig) -> Any:
         duration_ms = _to_float(form.get("duration_ms"), 0.0)
         voiced_ms = _to_float(form.get("voiced_ms"), duration_ms)
 
-        # Persist uploaded audio to the active session directory
+        def _truthy(val: Any) -> bool:
+            if isinstance(val, (int, float)):
+                return bool(val)
+            if isinstance(val, bytes):
+                try:
+                    val = val.decode()
+                except Exception:
+                    return False
+            if isinstance(val, str):
+                return val.strip().lower() in {"1", "true", "yes", "on", "q"}
+            return False
+
+        quit_after = _truthy(form.get("quit_after"))
+
         session_state = state.manager.state
         if session_state is None:
-            return JSONResponse(
-                {"status": "error", "error": "inactive_session"}, status_code=409
-            )
+            return _error_response(INACTIVE_SESSION, status_code=409)
 
         target_dir = session_state.audio_dir
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        next_index = session_state.response_index + 1
-        extension = _extension_for_mime(mime, upload.filename)
-        segment_basename = _build_segment_basename(next_index)
-        target_path = target_dir / f"{segment_basename}{extension}"
-        while target_path.exists():  # Defensive: avoid accidental overwrite
-            next_index += 1
-            segment_basename = _build_segment_basename(next_index)
-            target_path = target_dir / f"{segment_basename}{extension}"
-
-        blob = await upload.read()
-        if not blob:
-            return JSONResponse(
-                {"status": "error", "error": "empty_audio"}, status_code=400
-            )
+        previous_index = session_state.response_index
+        extension = extension_for_media_type(mime, upload.filename)
+        index_hint = previous_index + 1
+        index, segment_basename = next_web_segment_name(
+            target_dir, start_index=index_hint
+        )
+        target_path = build_segment_path(target_dir, segment_basename, extension)
+        session_state.response_index = max(index - 1, previous_index)
 
         target_path.write_bytes(blob)
         duration_seconds = max(duration_ms, 0.0) / 1000.0
@@ -294,20 +346,44 @@ def build_app(config: WebAppConfig) -> Any:
             duration_seconds=duration_seconds,
             voiced_seconds=voiced_seconds,
             cancelled=False,
-            quit_after=False,
+            quit_after=quit_after,
             discarded_short_answer=False,
         )
 
         log_event(
             "web.upload.received",
             {
+                "ui": "web",
                 "session_id": session_id,
                 "filename": target_path.name,
                 "content_type": mime,
-                "bytes": len(blob),
+                "bytes": size_bytes,
                 "duration_seconds": round(duration_seconds, 2),
+                "quit_after": quit_after,
             },
         )
+
+        if should_discard_short_answer(duration_seconds, voiced_seconds, CONFIG):
+            session_state.response_index = previous_index
+            try:
+                target_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            log_event(
+                "session.exchange.discarded_short",
+                {
+                    "ui": "web",
+                    "session_id": session_id,
+                    "response_index": previous_index + 1,
+                    "duration_seconds": round(duration_seconds, 2),
+                    "voiced_seconds": round(voiced_seconds, 2),
+                },
+            )
+            return _error_response(
+                SHORT_ANSWER_DISCARDED,
+                status_code=422,
+                detail="Response was too short or quiet; no transcript generated.",
+            )
 
         try:
             exchange = state.manager.process_uploaded_exchange(
@@ -315,16 +391,25 @@ def build_app(config: WebAppConfig) -> Any:
                 capture,
                 segment_label=target_path.name,
             )
-        except Exception as exc:  # pragma: no cover - runtime path
-            _LOGGER.exception("Failed to process uploaded exchange")
-            return JSONResponse(
-                {
-                    "status": "error",
-                    "error": "processing_failed",
-                    "detail": str(exc),
-                },
-                status_code=500,
+        except BackendNotAvailableError as exc:
+            session_state.response_index = previous_index
+            _LOGGER.exception("STT backend rejected uploaded audio")
+            return _error_response(
+                AUDIO_FORMAT_UNSUPPORTED,
+                status_code=415,
+                detail=str(exc),
             )
+        except Exception as exc:  # pragma: no cover - runtime path
+            session_state.response_index = previous_index
+            _LOGGER.exception("Failed to process uploaded exchange")
+            detail = str(exc)
+            if "opus" in detail.lower():
+                return _error_response(
+                    AUDIO_FORMAT_UNSUPPORTED,
+                    status_code=415,
+                    detail=detail,
+                )
+            return _error_response(PROCESSING_FAILED, status_code=500, detail=detail)
 
         summary_scheduled = True
         try:
@@ -338,22 +423,20 @@ def build_app(config: WebAppConfig) -> Any:
             state.current_question = next_question.question
         except Exception as exc:  # pragma: no cover - runtime path
             _LOGGER.exception("Next question generation failed")
-            return JSONResponse(
-                {
-                    "status": "error",
-                    "error": "question_failed",
-                    "detail": str(exc),
-                },
-                status_code=502,
-            )
+            return _error_response(QUESTION_FAILED, status_code=502, detail=str(exc))
 
         log_event(
             "web.upload.processed",
             {
+                "ui": "web",
                 "session_id": session_id,
                 "segment_label": target_path.name,
+                "response_index": (
+                    state.manager.state.response_index if state.manager.state else None
+                ),
                 "transcript_chars": len(exchange.transcript),
                 "next_question_chars": len(state.current_question or ""),
+                "quit_after": quit_after,
             },
         )
 
@@ -378,6 +461,7 @@ def build_app(config: WebAppConfig) -> Any:
             "next_question": state.current_question,
             "llm_model": getattr(next_question, "model", None),
             "summary_scheduled": summary_scheduled,
+            "quit_after": quit_after,
         }
         return JSONResponse(response_payload, status_code=201)
 
@@ -389,16 +473,12 @@ def build_app(config: WebAppConfig) -> Any:
         """
 
         # Validate session
-        state = app.state.sessions.get(session_id)
+        state = _touch_session(app, session_id)
         if state is None:
-            return JSONResponse(
-                {"status": "error", "error": "unknown_session"}, status_code=404
-            )
+            return _error_response(UNKNOWN_SESSION, status_code=404)
 
         if not getattr(app.state, "voice_enabled", False):
-            return JSONResponse(
-                {"status": "error", "error": "voice_disabled"}, status_code=400
-            )
+            return _error_response(VOICE_DISABLED, status_code=400)
 
         try:
             try:
@@ -419,39 +499,14 @@ def build_app(config: WebAppConfig) -> Any:
                 text_val = ""
             text = text_val.strip()
             if not text:
-                return JSONResponse(
-                    {"status": "error", "error": "missing_text"}, status_code=400
-                )
+                return _error_response(MISSING_TEXT, status_code=400)
 
             tts_opts: TTSOptions | None = getattr(app.state, "tts_options", None)
             if tts_opts is None:
-                tts_opts = TTSOptions(
-                    backend="openai",
-                    model=CONFIG.tts_model,
-                    voice=CONFIG.tts_voice,
-                    audio_format=CONFIG.tts_format,  # type: ignore[arg-type]
-                )
+                tts_opts = resolve_tts_options(None)
 
             audio_bytes = synthesize_text(text, tts_opts)
-            # Map simple content-type from format
-            fmt = tts_opts.audio_format
-            content_type = (
-                "audio/wav"
-                if fmt == "wav"
-                else (
-                    "audio/mpeg"
-                    if fmt == "mp3"
-                    else (
-                        "audio/flac"
-                        if fmt == "flac"
-                        else (
-                            "audio/ogg"
-                            if fmt in {"ogg", "opus"}
-                            else "audio/aac" if fmt == "aac" else "audio/wave"
-                        )
-                    )
-                )
-            )
+            content_type = _tts_format_to_mime(str(tts_opts.audio_format))
 
             headers = {"Cache-Control": "no-store"}
             return Response(
@@ -459,16 +514,10 @@ def build_app(config: WebAppConfig) -> Any:
             )
         except TTSError as exc:
             _LOGGER.exception("TTS failed: %s", exc)
-            return JSONResponse(
-                {"status": "error", "error": "tts_failed", "detail": str(exc)},
-                status_code=502,
-            )
+            return _error_response(TTS_FAILED, status_code=502, detail=str(exc))
         except Exception as exc:  # pragma: no cover - generic surfacing
             _LOGGER.exception("TTS endpoint error: %s", exc)
-            return JSONResponse(
-                {"status": "error", "error": "tts_error", "detail": str(exc)},
-                status_code=500,
-            )
+            return _error_response(TTS_ERROR, status_code=500, detail=str(exc))
 
     @app.post("/session/{session_id}/reveal")  # type: ignore[attr-defined]
     async def reveal(session_id: str):
@@ -478,18 +527,14 @@ def build_app(config: WebAppConfig) -> Any:
         - Others: returns a 501 to indicate unsupported platform for now
         """
 
-        state = app.state.sessions.get(session_id)
+        state = _touch_session(app, session_id)
         if state is None:
-            return JSONResponse(
-                {"status": "error", "error": "unknown_session"}, status_code=404
-            )
+            return _error_response(UNKNOWN_SESSION, status_code=404)
 
         try:
             st = state.manager.state
             if st is None:
-                return JSONResponse(
-                    {"status": "error", "error": "inactive_session"}, status_code=409
-                )
+                return _error_response(INACTIVE_SESSION, status_code=409)
 
             md_path = st.markdown_path
             if sys.platform == "darwin":
@@ -498,25 +543,12 @@ def build_app(config: WebAppConfig) -> Any:
                     return JSONResponse({"status": "ok"}, status_code=200)
                 except Exception as exc:  # pragma: no cover - runtime path
                     _LOGGER.exception("Reveal failed: %s", exc)
-                    return JSONResponse(
-                        {
-                            "status": "error",
-                            "error": "reveal_failed",
-                            "detail": str(exc),
-                        },
-                        status_code=500,
-                    )
+                    return _error_response(REVEAL_FAILED, status_code=500, detail=str(exc))
             else:
-                return JSONResponse(
-                    {"status": "error", "error": "unsupported_platform"},
-                    status_code=501,
-                )
+                return _error_response(UNSUPPORTED_PLATFORM, status_code=501)
         except Exception as exc:  # pragma: no cover - generic surfacing
             _LOGGER.exception("Reveal endpoint error: %s", exc)
-            return JSONResponse(
-                {"status": "error", "error": "reveal_error", "detail": str(exc)},
-                status_code=500,
-            )
+            return _error_response(REVEAL_FAILED, status_code=500, detail=str(exc))
 
     @app.get("/session/{session_id}/reveal")  # type: ignore[attr-defined]
     async def reveal_get(session_id: str):
@@ -570,7 +602,9 @@ def _build_session_manager(app: Any) -> SessionManager:
     return manager
 
 
-def _render_session_page(app: Any, state: WebSessionState) -> str:
+def _render_session_page(
+    app: Any, state: WebSessionState, *, static_assets_ready: bool
+) -> str:
     """Render the HTML shell for the given session state."""
 
     # Resolve voice/TTS options for this app instance
@@ -617,6 +651,15 @@ def _render_session_page(app: Any, state: WebSessionState) -> str:
     stt_warnings = list(state.manager.config.stt_warnings or [])
     voice_rms_dbfs_threshold = CONFIG.voice_rms_dbfs_threshold
 
+    if not static_assets_ready:
+        log_event(
+            "web.static.assets_missing",
+            {
+                "ui": "web",
+                "static_dir": str(getattr(resolved_cfg, "static_dir", "")),
+            },
+        )
+
     body = _render_session_shell(
         state,
         voice_enabled=voice_enabled,
@@ -638,8 +681,75 @@ def _render_session_page(app: Any, state: WebSessionState) -> str:
         stt_auto_reason=stt_auto_reason,
         stt_warnings=stt_warnings,
         voice_rms_dbfs_threshold=voice_rms_dbfs_threshold,
+        static_assets_ready=static_assets_ready,
     )
     return body
+
+
+def _sessions_map(app: Any) -> OrderedDict[str, WebSessionState]:
+    return cast(OrderedDict[str, WebSessionState], app.state.sessions)
+
+
+def _register_session(app: Any, session_id: str, web_state: WebSessionState) -> None:
+    sessions = _sessions_map(app)
+    sessions[session_id] = web_state
+    sessions.move_to_end(session_id)
+    _trim_sessions(app)
+    _log_active_sessions(app)
+
+
+def _touch_session(app: Any, session_id: str) -> WebSessionState | None:
+    sessions = _sessions_map(app)
+    state = sessions.get(session_id)
+    if state is not None:
+        sessions.move_to_end(session_id)
+        _log_active_sessions(app)
+    return state
+
+
+def _trim_sessions(app: Any) -> None:
+    sessions = _sessions_map(app)
+    max_sessions = max(1, int(getattr(app.state, "max_sessions", 4)))
+    while len(sessions) > max_sessions:
+        evicted_id, _ = sessions.popitem(last=False)
+        log_event("web.session.evicted", {"ui": "web", "session_id": evicted_id})
+
+
+def _log_active_sessions(app: Any) -> None:
+    try:
+        session_ids = list(_sessions_map(app).keys())
+        log_event("web.sessions.active", {"ui": "web", "session_ids": session_ids})
+    except Exception:
+        pass
+
+
+def _static_assets_ready(app: Any) -> bool:
+    resolved_cfg = getattr(app.state, "config", None)
+    if resolved_cfg is None:
+        return True
+    try:
+        static_dir = Path(getattr(resolved_cfg, "static_dir", ""))
+    except Exception:
+        return True
+    candidate = static_dir / "js" / "app.js"
+    try:
+        return candidate.exists()
+    except Exception:
+        return True
+
+
+def _tts_format_to_mime(fmt: str) -> str:
+    mapping = {
+        "wav": "audio/wav",
+        "wave": "audio/wave",
+        "mp3": "audio/mpeg",
+        "flac": "audio/flac",
+        "ogg": "audio/ogg",
+        "opus": "audio/ogg",
+        "aac": "audio/aac",
+        "pcm": "audio/pcm",
+    }
+    return mapping.get(fmt.lower(), "audio/wave")
 
 
 def _resume_specific_session(app: Any, session_id: str) -> WebSessionState | None:
@@ -670,7 +780,7 @@ def _resume_specific_session(app: Any, session_id: str) -> WebSessionState | Non
         current_question = manager.config.opening_question
 
     web_state = WebSessionState(manager=manager, current_question=current_question)
-    app.state.sessions[state.session_id] = web_state
+    _register_session(app, state.session_id, web_state)
     return web_state
 
 
@@ -682,11 +792,12 @@ def _start_session(app: Any) -> WebSessionState:
     current_question = manager.config.opening_question
 
     web_state = WebSessionState(manager=manager, current_question=current_question)
-    app.state.sessions[state.session_id] = web_state
+    _register_session(app, state.session_id, web_state)
 
     log_event(
         "web.session.started",
         {
+            "ui": "web",
             "session_id": state.session_id,
             "markdown_path": state.markdown_path.name,
             "audio_dir": str(state.audio_dir),
@@ -725,37 +836,18 @@ def _start_or_resume_session(app: Any) -> WebSessionState:
         current_question = manager.config.opening_question
 
     web_state = WebSessionState(manager=manager, current_question=current_question)
-    app.state.sessions[state.session_id] = web_state
+    _register_session(app, state.session_id, web_state)
 
     log_event(
         "web.session.resumed",
         {
+            "ui": "web",
             "session_id": state.session_id,
             "markdown_path": state.markdown_path.name,
             "audio_dir": str(state.audio_dir),
         },
     )
     return web_state
-
-
-def _build_segment_basename(index: int) -> str:
-    return f"browser-{index:03d}"
-
-
-def _extension_for_mime(mime: str, filename: str | None) -> str:
-    """Infer a file extension from the supplied MIME type/filename."""
-
-    if mime.startswith("audio/webm"):
-        return ".webm"
-    if mime in {"audio/ogg", "application/ogg"}:
-        return ".ogg"
-    if mime in {"audio/mpeg", "audio/mp3"}:
-        return ".mp3"
-    if mime == "audio/wav" or mime == "audio/x-wav":
-        return ".wav"
-    if filename and "." in filename:
-        return "." + filename.rsplit(".", 1)[-1]
-    return ".bin"
 
 
 def _render_session_shell(
@@ -780,6 +872,7 @@ def _render_session_shell(
     stt_auto_reason: str,
     stt_warnings: list[str],
     voice_rms_dbfs_threshold: float,
+    static_assets_ready: bool,
 ) -> str:
     """Return the base HTML shell; dynamic behaviour handled client-side."""
 
@@ -788,23 +881,7 @@ def _render_session_shell(
     short_duration = CONFIG.short_answer_duration_seconds
     short_voiced = CONFIG.short_answer_voiced_seconds
     voice_attr = "true" if voice_enabled else "false"
-    tts_mime = (
-        "audio/wav"
-        if tts_format == "wav"
-        else (
-            "audio/mpeg"
-            if tts_format == "mp3"
-            else (
-                "audio/flac"
-                if tts_format == "flac"
-                else (
-                    "audio/ogg"
-                    if tts_format in {"ogg", "opus"}
-                    else "audio/aac" if tts_format == "aac" else "audio/wave"
-                )
-            )
-        )
-    )
+    tts_mime = _tts_format_to_mime(tts_format)
 
     template_path = (
         Path(__file__).resolve().parent / "templates" / "session_shell.html.jinja"
@@ -837,6 +914,7 @@ def _render_session_shell(
             "stt_auto_reason": stt_auto_reason,
             "stt_warnings": stt_warnings,
             "voice_rms_dbfs_threshold": voice_rms_dbfs_threshold,
+            "static_assets_ready": static_assets_ready,
         },
         filesystem_loader=template_path.parent,
     )

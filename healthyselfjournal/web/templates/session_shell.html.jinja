@@ -11,6 +11,7 @@
         data-reveal-endpoint="/session/{{ session_id }}/reveal"
         data-short-duration="{{ short_duration }}"
         data-short-voiced="{{ short_voiced }}"
+        data-voice-rms-dbfs-threshold="{{ voice_rms_dbfs_threshold }}"
         data-voice-enabled="{{ voice_attr }}"
         data-tts-endpoint="/session/{{ session_id }}/tts"
         data-tts-mime="{{ tts_mime }}"
@@ -19,6 +20,12 @@
         data-total-minutes-text="{{ total_minutes_text }}">
 
     <main class="hsj-container">
+      {% if not static_assets_ready %}
+      <div class="hsj-warning-banner" style="background:#fff4e5;border:1px solid #f0b37e;padding:0.75rem 1rem;border-radius:6px;margin-bottom:1rem;">
+        <strong>Static assets missing.</strong>
+        <span>Run <code>npm install</code> and <code>npm run build</code> to regenerate <code>static/js/app.js</code>.</span>
+      </div>
+      {% endif %}
       <header class="hsj-header">
         <h1>Healthy Self Journal</h1>
         <p class="hsj-session-id">Session <a id="reveal-session" href="/session/{{ session_id }}/reveal" title="Reveal in Finder">{{ session_id }}</a></p>
@@ -105,6 +112,7 @@
                 <li><strong>Short duration</strong>: {{ short_duration }}s</li>
                 <li><strong>Short voiced</strong>: {{ short_voiced }}s</li>
                 <li><strong>Voice RMS threshold</strong>: {{ voice_rms_dbfs_threshold }} dBFS</li>
+                <li><strong>JS ready</strong>: {{ 'true' if static_assets_ready else 'false' }}</li>
               </ul>
             </div>
           </div>
@@ -115,5 +123,3 @@
     <script type="module" src="/static/js/app.js"></script>
   </body>
 </html>
-
-

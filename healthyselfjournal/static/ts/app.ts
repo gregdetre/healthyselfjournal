@@ -12,6 +12,7 @@ interface RecorderConfig {
   sessionId: string;
   shortDurationMs: number;
   shortVoicedMs: number;
+  voiceRmsDbfsThreshold: number;
   voiceEnabled: boolean;
   ttsEndpoint?: string;
   ttsMime?: string;
@@ -43,12 +44,14 @@ interface UploadSuccessResponse {
   next_question: string;
   llm_model?: string | null;
   summary_scheduled?: boolean;
+  quit_after?: boolean;
 }
 
 interface UploadErrorResponse {
   status: 'error';
   error: string;
   detail?: string;
+  http_status?: number;
 }
 
 class RecorderController {
@@ -65,13 +68,16 @@ class RecorderController {
   private voicedMs = 0;
   private lastMeterSample = 0;
   private cancelFlag = false;
-  private readonly voicedThreshold = 0.07; // heuristic amplitude threshold 0-1
+  private readonly rmsEpsilon = 1e-10; // avoid log10(0)
+  private readonly voiceThresholdDbfs: number;
+  private quitAfter = false;
   private audioEl?: HTMLAudioElement;
   private timerRafId?: number;
   private recordingStartMs = 0;
   private accumulatedMs = 0;
 
   constructor(private readonly elements: DOMElements, private readonly config: RecorderConfig) {
+    this.voiceThresholdDbfs = config.voiceRmsDbfsThreshold ?? -40;
     this.elements.recordButton.addEventListener('click', () => {
       // If TTS is playing, stop it and immediately start recording
       if (this.audioEl && !this.audioEl.paused) {
@@ -94,6 +100,12 @@ class RecorderController {
     window.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         this.cancelRecording();
+        return;
+      }
+      if ((event.key === 'q' || event.key === 'Q') && (this.state === 'recording' || this.state === 'paused')) {
+        event.preventDefault();
+        this.quitAfter = true;
+        this.stopRecording();
         return;
       }
       if (event.code === 'Space' || event.key === ' ') {
@@ -178,6 +190,7 @@ class RecorderController {
   private async startRecording(): Promise<void> {
     try {
       this.elements.recordButton.disabled = true;
+      this.quitAfter = false;
       if (!this.mediaStream) {
         this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       }
@@ -239,6 +252,7 @@ class RecorderController {
       return;
     }
     this.cancelFlag = true;
+    this.quitAfter = false;
     this.state = 'idle';
     this.stopMeterLoop();
     this.stopTimerLoop(true);
@@ -314,6 +328,7 @@ class RecorderController {
 
     if (this.cancelFlag) {
       this.cancelFlag = false;
+      this.quitAfter = false;
       this.resetButton();
       this.setStatus('Recording cancelled.');
       this.state = 'idle';
@@ -323,9 +338,16 @@ class RecorderController {
       return;
     }
 
-    if (durationMs < this.config.shortDurationMs || voicedMs < this.config.shortVoicedMs) {
+    if (durationMs <= this.config.shortDurationMs && voicedMs <= this.config.shortVoicedMs) {
+      this.quitAfter = false;
       this.resetButton();
-      this.setStatus('Discarded a very short or quiet clip. Try again when ready.');
+      const dSec = (durationMs / 1000).toFixed(2);
+      const vSec = (voicedMs / 1000).toFixed(2);
+      const thDur = (this.config.shortDurationMs / 1000).toFixed(2);
+      const thVoiced = (this.config.shortVoicedMs / 1000).toFixed(2);
+      this.setStatus(
+        `Discarded (short/quiet): duration ${dSec}s (≤ ${thDur}s) & voiced ${vSec}s (≤ ${thVoiced}s). Try again.`,
+      );
       this.state = 'idle';
       return;
     }
@@ -335,9 +357,10 @@ class RecorderController {
     this.elements.recordButton.disabled = true;
 
     try {
-      const response = await this.uploadClip(blob, durationMs, voicedMs);
+      const response = await this.uploadClip(blob, durationMs, voicedMs, this.quitAfter);
       if (response.status !== 'ok') {
-        throw new Error(response.error || 'Unknown upload error');
+        this.handleUploadError(response);
+        return;
       }
       this.setStatus('Thinking about the next question…');
       this.handleUploadSuccess(response, durationMs);
@@ -346,6 +369,7 @@ class RecorderController {
       console.error('Upload failed', error);
       this.setStatus('Upload failed. Please check your connection and try again.');
     } finally {
+      this.quitAfter = false;
       this.resetButton();
       this.state = 'idle';
       this.accumulatedMs = 0;
@@ -374,7 +398,9 @@ class RecorderController {
 
       const now = performance.now();
       const delta = Math.max(now - this.lastMeterSample, 0);
-      if (rms > this.voicedThreshold) {
+      // Convert amplitude RMS (0..1) to dBFS and compare with configured threshold
+      const dbfs = 20 * Math.log10(Math.max(rms, this.rmsEpsilon));
+      if (dbfs >= this.voiceThresholdDbfs) {
         this.voicedMs += delta;
       }
       this.lastMeterSample = now;
@@ -398,14 +424,19 @@ class RecorderController {
     this.setMeterLevel(0);
   }
 
-  private async uploadClip(blob: Blob, durationMs: number, voicedMs: number): Promise<UploadResponse> {
+  private async uploadClip(
+    blob: Blob,
+    durationMs: number,
+    voicedMs: number,
+    quitAfter: boolean,
+  ): Promise<UploadResponse> {
     const form = new FormData();
     const filename = `browser-${Date.now()}.webm`;
     form.append('audio', blob, filename);
     form.append('mime', blob.type || 'audio/webm');
     form.append('duration_ms', durationMs.toString());
     form.append('voiced_ms', voicedMs.toString());
-    form.append('question', this.elements.currentQuestion.textContent ?? '');
+    form.append('quit_after', quitAfter ? '1' : '0');
 
     const response = await fetch(this.config.uploadUrl, {
       method: 'POST',
@@ -413,12 +444,8 @@ class RecorderController {
     });
 
     const payload = (await response.json()) as UploadResponse;
-    if (!response.ok) {
-      throw new Error(
-        payload.status === 'error'
-          ? payload.error
-          : `Upload failed with status ${response.status}`,
-      );
+    if (!response.ok && payload.status === 'error') {
+      payload.http_status = response.status;
     }
     return payload;
   }
@@ -426,6 +453,7 @@ class RecorderController {
   private handleUploadSuccess(payload: UploadSuccessResponse, durationMs: number): void {
     const answeredQuestion = this.elements.currentQuestion.textContent ?? '';
     this.elements.currentQuestion.textContent = payload.next_question;
+    const shouldQuitAfter = !!payload.quit_after;
 
     const historyItem = document.createElement('article');
     historyItem.className = 'hsj-exchange';
@@ -453,6 +481,11 @@ class RecorderController {
         payload.total_duration_minutes_text || payload.total_duration_hms;
     }
 
+    if (shouldQuitAfter) {
+      this.setStatus('Session complete (quit-after).');
+      return;
+    }
+
     // Optionally speak the next question using server-side TTS, then auto-start recording
     if (this.config.voiceEnabled && this.config.ttsEndpoint) {
       void this.playTts(payload.next_question).finally(() => {
@@ -460,6 +493,43 @@ class RecorderController {
       });
     } else {
       this.autoStartAfterQuestion();
+    }
+  }
+
+  private handleUploadError(payload: UploadErrorResponse): void {
+    this.quitAfter = false;
+    const detail = payload.detail ? ` ${payload.detail}` : '';
+    switch (payload.error) {
+      case 'short_answer_discarded':
+        this.setStatus(
+          'Server discarded a very short or quiet clip. Try again when ready.',
+        );
+        break;
+      case 'audio_format_unsupported':
+        this.setStatus(
+          'Upload rejected: speech-to-text backend cannot process this audio format.' + detail,
+        );
+        break;
+      case 'upload_too_large':
+        this.setStatus('Upload exceeded the server size limit. Try a shorter reflection.');
+        break;
+      case 'inactive_session':
+      case 'unknown_session':
+        this.setStatus('Session is no longer active. Refresh the page to resume.');
+        break;
+      case 'processing_failed':
+        this.setStatus('Processing failed on the server. Check logs and try again.' + detail);
+        break;
+      case 'question_failed':
+        this.setStatus(
+          'Answer saved but the next question could not be generated. Check logs.' + detail,
+        );
+        break;
+      default: {
+        const hint = payload.error ? ` (${payload.error})` : '';
+        this.setStatus(`Upload failed${hint}.${detail}`.trim());
+        break;
+      }
     }
   }
 
@@ -474,6 +544,7 @@ class RecorderController {
         body: JSON.stringify({ text }),
       });
       if (!response.ok) {
+        this.setStatus('TTS unavailable; continuing silently.');
         return; // Fail soft; keep UX responsive
       }
       const blob = await response.blob();
@@ -488,7 +559,7 @@ class RecorderController {
       // Revoke after some delay to ensure playback is not interrupted
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (err) {
-      // Silently ignore TTS errors for now
+      this.setStatus('TTS unavailable; continuing silently.');
     }
   }
 
@@ -593,6 +664,7 @@ function bootstrap(): void {
 
   const shortDurationSeconds = Number(body.dataset.shortDuration ?? '1.2');
   const shortVoicedSeconds = Number(body.dataset.shortVoiced ?? '0.6');
+  const voiceRmsDbfsThreshold = Number(body.dataset.voiceRmsDbfsThreshold ?? '-40');
   const voiceEnabled = (body.dataset.voiceEnabled ?? 'false') === 'true';
   const ttsEndpoint = body.dataset.ttsEndpoint;
   const ttsMime = body.dataset.ttsMime;
@@ -629,6 +701,7 @@ function bootstrap(): void {
     sessionId,
     shortDurationMs: shortDurationSeconds * 1000,
     shortVoicedMs: shortVoicedSeconds * 1000,
+    voiceRmsDbfsThreshold,
     voiceEnabled,
     ttsEndpoint,
     ttsMime,

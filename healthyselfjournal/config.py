@@ -85,6 +85,7 @@ DEFAULT_SPEAK_LLM = os.environ.get("SPEAK_LLM", "0").strip().lower() in {
 DEFAULT_TTS_MODEL = os.environ.get("TTS_MODEL", "gpt-4o-mini-tts")
 DEFAULT_TTS_VOICE = os.environ.get("TTS_VOICE", "shimmer")
 DEFAULT_TTS_FORMAT = os.environ.get("TTS_FORMAT", "wav")
+DEFAULT_WEB_UPLOAD_MAX_BYTES = _env_int("WEB_UPLOAD_MAX_BYTES", 50_000_000)
 
 
 @dataclass(slots=True)
@@ -128,6 +129,7 @@ class AppConfig:
     tts_model: str = DEFAULT_TTS_MODEL
     tts_voice: str = DEFAULT_TTS_VOICE
     tts_format: str = DEFAULT_TTS_FORMAT
+    web_upload_max_bytes: int = DEFAULT_WEB_UPLOAD_MAX_BYTES
     # Optional user-specific vocabulary loaded from user_config.toml
     user_vocabulary_terms: List[str] = field(default_factory=list)
     user_config_loaded_from: Path | None = None
