@@ -22,7 +22,7 @@ Architectural overview of the HealthySelfJournal voice journaling application, c
 
 ### 1. Interface Layer
 
-**Components**: `cli.py`, `cli_web.py`, `web/app.py`
+**Components**: `cli.py`, `cli_journal_web.py`, `web/app.py`
 
 The interface layer provides two distinct user experiences:
 - **CLI**: Typer-based command-line interface with real-time audio meter

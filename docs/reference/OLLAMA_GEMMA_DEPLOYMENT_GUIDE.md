@@ -562,4 +562,4 @@ export OLLAMA_HOST=0.0.0.0:11434
 
 If you’d like, I can apply these edits directly in the guide and add a small “App Quickstart” section.
 
-- I reviewed the guide against our code paths in `healthyselfjournal/llm.py`, `healthyselfjournal/config.py`, and `healthyselfjournal/cli_journal.py`. The main risks are the unsupported env vars and a couple of overconfident performance claims.
+- I reviewed the guide against our code paths in `healthyselfjournal/llm.py`, `healthyselfjournal/config.py`, and `healthyselfjournal/cli_journal_cli.py`. The main risks are the unsupported env vars and a couple of overconfident performance claims.

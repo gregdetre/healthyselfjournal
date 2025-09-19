@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 
 import typer
@@ -17,7 +18,7 @@ from .config import CONFIG
 from .events import get_event_log_path, init_event_logger, log_event
 from .history import load_recent_summaries
 from .llm import SummaryRequest, generate_summary, get_model_provider
-from .session import SessionConfig, SessionManager
+from .session import PendingTranscriptionError, SessionConfig, SessionManager
 from .storage import load_transcript, write_transcript
 from .transcription import (
     BackendNotAvailableError,
@@ -26,6 +27,11 @@ from .transcription import (
 )
 from .mic_check import run_interactive_mic_check
 from .tts import TTSOptions, speak_text
+from .utils.pending import (
+    count_pending_segments,
+    pending_segments_by_session,
+    reconcile_command_for_dir,
+)
 
 
 console = Console()
@@ -262,15 +268,9 @@ def _require_env(var_name: str) -> None:
 
 
 def _count_missing_stt(audio_root: Path) -> int:
-    """Return the number of .wav files without a sibling .stt.json under a root dir."""
-    if not audio_root.exists():
-        return 0
-    missing = 0
-    for wav in audio_root.rglob("*.wav"):
-        stt = wav.with_suffix(".stt.json")
-        if not stt.exists():
-            missing += 1
-    return missing
+    """Return the number of recordings missing their transcription payloads."""
+
+    return count_pending_segments(audio_root)
 
 
 def prepare_runtime_and_backends(
@@ -395,9 +395,10 @@ def start_or_resume_session(
             # Surface pending transcription work, but don't auto-run.
             pending = _count_missing_stt(sessions_dir)
             if pending:
+                cmd = reconcile_command_for_dir(sessions_dir)
                 console.print(
                     f"[yellow]{pending} recording(s) pending transcription.[/] "
-                    f"Run [cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/] to backfill."
+                    f"Run [cyan]{cmd}[/] to backfill."
                 )
     else:
         console.print(
@@ -413,9 +414,10 @@ def start_or_resume_session(
         question = opening_question
         pending = _count_missing_stt(sessions_dir)
         if pending:
+            cmd = reconcile_command_for_dir(sessions_dir)
             console.print(
                 f"[yellow]{pending} recording(s) pending transcription.[/] "
-                f"Run [cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/] to backfill."
+                f"Run [cyan]{cmd}[/] to backfill."
             )
 
     return state, question
@@ -466,12 +468,31 @@ def run_journaling_loop(
 
         try:
             exchange = manager.record_exchange(question, console)
+        except PendingTranscriptionError as exc:
+            cmd = reconcile_command_for_dir(sessions_dir)
+            console.print(
+                f"[red]Transcription failed:[/] {exc.error}\n"
+                "[yellow]Your audio was saved.[/] Backfill later with "
+                f"[cyan]{cmd}[/]."
+            )
+            log_event(
+                "cli.error",
+                {
+                    "where": "record_exchange",
+                    "error_type": exc.error_type,
+                    "error": str(exc.error),
+                    "action": "continue_without_transcript",
+                    "pending": True,
+                    "segment": exc.segment_label,
+                },
+            )
+            continue
         except Exception as exc:  # pragma: no cover - runtime error surface
-            # Keep the session alive: audio is already saved on disk.
+            cmd = reconcile_command_for_dir(sessions_dir)
             console.print(
                 f"[red]Transcription failed:[/] {exc}\n"
                 "[yellow]Your audio was saved.[/] You can backfill later with: "
-                "[cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/]"
+                f"[cyan]{cmd}[/]"
             )
             log_event(
                 "cli.error",
@@ -482,8 +503,6 @@ def run_journaling_loop(
                     "action": "continue_without_transcript",
                 },
             )
-            # Re-ask the same question so the user can continue.
-            # Skip transcript display and summary scheduling.
             continue
 
         if exchange is None:
@@ -650,9 +669,10 @@ def finalize_or_cleanup(*, manager: SessionManager, state, sessions_dir: Path) -
         )
         pending = _count_missing_stt(sessions_dir)
         if pending:
+            cmd = reconcile_command_for_dir(sessions_dir)
             console.print(
                 f"[yellow]{pending} recording(s) still pending transcription.[/] "
-                f"Use [cyan]healthyselfjournal reconcile --sessions-dir '{sessions_dir}'[/] to process them."
+                f"Use [cyan]{cmd}[/] to process them."
             )
 
 
@@ -674,9 +694,71 @@ def build_app() -> typer.Typer:
     # Explicit subcommand for the interactive CLI loop
     app.command("cli")(journal)
 
+    @app.command("list")
+    def journal_list(
+        sessions_dir: Path = typer.Option(
+            CONFIG.recordings_dir,
+            "--sessions-dir",
+            help="Directory where session markdown/audio files are stored.",
+        ),
+        pending: bool = typer.Option(
+            False,
+            "--pending",
+            help="Show sessions with outstanding transcription segments.",
+        ),
+    ) -> None:
+        if not pending:
+            console.print(
+                "[cyan]Use --pending to list sessions with unfinished transcriptions.[/]"
+            )
+            return
+
+        grouped = pending_segments_by_session(sessions_dir)
+        if not grouped:
+            console.print("[green]No pending transcription work found.[/]")
+            return
+
+        cmd = reconcile_command_for_dir(sessions_dir)
+        for session_id in sorted(grouped):
+            segments = grouped[session_id]
+            ext_counts = Counter(
+                seg.audio_path.suffix.lower().lstrip(".") or "audio"
+                for seg in segments
+            )
+            errors = sum(1 for seg in segments if seg.has_error)
+            ext_parts = [
+                f"{count} {ext}"
+                for ext, count in sorted(ext_counts.items())
+            ]
+            lines = [
+                f"{len(segments)} pending segment{'s' if len(segments) != 1 else ''}",
+            ]
+            if ext_parts:
+                lines.append(f"Types: {', '.join(ext_parts)}")
+            if errors:
+                lines.append(
+                    f"{errors} segment{'s' if errors != 1 else ''} flagged with errors"
+                )
+            sample_names = ", ".join(seg.segment_label for seg in segments[:3])
+            if sample_names:
+                lines.append(f"Examples: {sample_names}")
+                if len(segments) > 3:
+                    lines[-1] += " …"
+            lines.append(f"Run {cmd}")
+
+            body = Text("\n".join(lines))
+            border = "red" if errors else "yellow"
+            console.print(
+                Panel.fit(
+                    body,
+                    title=session_id,
+                    border_style=border,
+                )
+            )
+
     # Subcommand to launch the web interface
     try:
-        from .cli_web import (
+        from .cli_journal_web import (
             web as web_command,
         )  # Lazy-heavy imports are inside the function
 

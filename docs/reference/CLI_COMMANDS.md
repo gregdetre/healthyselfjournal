@@ -14,6 +14,16 @@ Single source for command discovery. See linked pages for detailed flags.
 - `merge` – Merge two sessions into the earlier one.
 - `init` – Setup wizard for first-time configuration.
 
+## Structure
+
+Each command lives in its own `cli_*.py` module for clarity:
+- `cli_journal_cli.py` – journaling CLI sub-app
+- `cli_journal_web.py` – journaling web sub-app
+- `cli_session.py` – session utilities
+- `cli_summarise.py` – summaries utilities
+- `cli_mic_check.py` – microphone check command
+- `cli_reconcile.py`, `cli_merge.py`, `cli_init.py` – other commands
+
 ## Examples
 
 ```bash

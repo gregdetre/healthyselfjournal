@@ -64,7 +64,7 @@ The intro panel and opening question are printed only after dependency verificat
 
 ## Sources & References
 - `healthyselfjournal/cli.py` – dependency verification and command wiring.
-- `healthyselfjournal/cli_journal.py` – startup flow, session start/resume UI, event logger init.
+- `healthyselfjournal/cli_journal_cli.py` – startup flow, session start/resume UI, event logger init.
 - `healthyselfjournal/session.py` – session start, history load, transcript write.
 - `healthyselfjournal/history.py` – `load_recent_summaries()` scanning/parsing.
 - `healthyselfjournal/audio.py` – heavy imports and capture loop.

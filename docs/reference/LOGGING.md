@@ -8,7 +8,7 @@ This document describes logging in Healthy Self Journal. It covers the structure
 - `../reference/PRIVACY.md` – What metadata is recorded and what is explicitly never logged.
 - `../reference/WEB_ARCHITECTURE.md` – Web upload flow and where web events are emitted.
 - `../../healthyselfjournal/events.py` – Canonical event logging API and sanitisation logic.
-- `../../healthyselfjournal/cli_journal.py` – Initialises the event logger for CLI sessions.
+- `../../healthyselfjournal/cli_journal_cli.py` – Initialises the event logger for CLI sessions.
 - `../../healthyselfjournal/session.py` – Session lifecycle emits `session.*` events.
 - `../../healthyselfjournal/tts.py` – TTS events (`tts.request`, `tts.response`, `tts.error`).
 - `../../tests/test_web_app.py` – Examples of capturing events in tests by monkey‑patching `log_event`.

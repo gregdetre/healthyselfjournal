@@ -16,7 +16,7 @@ Non-goals for this effort:
 ## References
 
 Code (most relevant first):
-- `healthyselfjournal/cli_journal.py` — CLI entry for journaling loop; setup, backend resolution, panels, TTS, loop, streaming, finalize.
+- `healthyselfjournal/cli_journal_cli.py` — CLI entry for journaling loop; setup, backend resolution, panels, TTS, loop, streaming, finalize.
 - `healthyselfjournal/audio.py` — Recording/meter/controls, short-answer guard, post-processing, MP3 conversion.
 - `healthyselfjournal/session.py` — Session state, exchange recording, persistence, next-question generation, summaries.
 - `healthyselfjournal/transcription.py` — Backend selection, OpenAI/faster-whisper/MLX/whispercpp.

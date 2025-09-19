@@ -35,17 +35,19 @@
 #### Stage: Prepare local environment and baseline checks (macOS, Apple Silicon)
 - [ ] Ensure external venv active (`/Users/greg/.venvs/experim__healthyselfjournal`) and project sync
   - [ ] `uv sync --active`
-  - [ ] Run unit tests (offline subset): `pytest tests/test_storage.py -q`
+  - [x] Run unit tests (offline subset): `pytest tests/test_storage.py -q`
   - Acceptance: Sync completes; baseline tests pass locally.
 - [ ] Install PyWebView and PyInstaller in the venv
   - [ ] `uv run --active pip install pywebview pyinstaller`
+  - [x] Declared both packages in `pyproject.toml`; `uv sync --active` will install on next sync.
   - Acceptance: Packages installed; `python -c "import webview; print(webview.__version__)"` works.
 
 #### Stage: Mic capture POC in PyWebView (highest risk early)
-- [ ] Create a minimal PyWebView runner that points at the existing FastHTML app on `http://127.0.0.1:<port>`
-  - [ ] Expose only needed JS bridge functions (e.g., quit, open devtools in dev) and set `enable_media_stream=True`.
-  - [ ] Configure a strict CSP and disable remote URLs.
+- [x] Create a minimal PyWebView runner that points at the existing FastHTML app on `http://127.0.0.1:<port>`
+  - [x] Expose only needed JS bridge functions (quit + devtools) and set `enable_media_stream=True` (`healthyselfjournal/desktop/app.py`).
+  - [x] Configure a strict CSP and disable remote URLs via middleware (`healthyselfjournal/web/app.py`).
   - Acceptance: A window opens and serves the current FastHTML UI.
+  - Progress: Desktop shell exposed via `healthyselfjournal desktop`; manual WKWebView mic verification still pending.
 - [ ] Verify `getUserMedia` + `MediaRecorder` inside WKWebView
   - [ ] Add Info.plist entries: `NSMicrophoneUsageDescription` (and if needed `NSSpeechRecognitionUsageDescription`).
   - [ ] Confirm permission prompt appears and recording meter updates in real time.
@@ -98,8 +100,8 @@
   - Acceptance: Gatekeeper allows app to run on a clean mac without warnings.
 
 #### Stage: Security, privacy, and settings
-- [ ] Enforce local-only content and strict CSP
-  - [ ] No remote JS or mixed content; block `eval`.
+- [x] Enforce local-only content and strict CSP
+  - [x] No remote JS or mixed content; block `eval` via middleware + regression test (`tests/test_web_app_security.py`).
   - Acceptance: CSP violations are zero in console during typical use.
 - [ ] Add explicit setting to disable network LLM usage (cloud off switch)
   - [ ] Document storage locations and export policy in UI.

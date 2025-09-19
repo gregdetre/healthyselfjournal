@@ -26,8 +26,8 @@ This document covers the architecture, runtime flow, and operational guidance fo
 ## Architecture overview
 
 ### Server layer (Python)
-- Entry point: `healthyselfjournal/cli_journal.py` registers `journal web` with `--sessions-dir`, `--host`, `--port`, `--reload` and optional voice/TTS options.
-- Entry point: `healthyselfjournal/cli_journal.py` registers `journal web` with `--sessions-dir`, `--resume`, `--host`, `--port`, `--reload` and optional voice/TTS options.
+- Entry point: `healthyselfjournal/cli_journal_web.py` registers `journal web` with `--sessions-dir`, `--host`, `--port`, `--reload` and optional voice/TTS options.
+- Entry point: `healthyselfjournal/cli_journal_web.py` registers `journal web` with `--sessions-dir`, `--resume`, `--host`, `--port`, `--reload` and optional voice/TTS options.
 - Application builder: `healthyselfjournal/web/app.py` constructs a FastHTML app on demand, mounts `/static/`, and maintains per-session state (`WebSessionState`).
 - Compatibility shim: `_get_fast_html_class()` patches `fastcore.xml.ft` when necessary so FastHTML initialises correctly with current `fastcore` releases. With FastHTML 0.12+, routes should return plain strings/objects and FastHTML wraps responses; avoid manually returning `HTMLResponse` from handlers.
 - The rendered shell shows a passive banner when outstanding segments exist for the current session, mirroring the CLI hint and embedding the reconcile command.

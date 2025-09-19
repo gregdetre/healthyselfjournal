@@ -17,7 +17,7 @@
 ## References
 
 - Code
-  - `healthyselfjournal/cli_journal.py` — CLI loop; startup/finish detect-and-suggest; failure message with reconcile hint; `_count_missing_stt()` counts only `.wav`.
+  - `healthyselfjournal/cli_journal_cli.py` — CLI loop; startup/finish detect-and-suggest; failure message with reconcile hint; `_count_missing_stt()` counts only `.wav`.
   - `healthyselfjournal/session.py` — High-level session API; `record_exchange` (CLI capture path); `_transcribe_and_store()` persists raw STT and appends to markdown; `process_uploaded_exchange()` (web path).
   - `healthyselfjournal/cli_reconcile.py` — Scans `*.wav`, writes `<seg>.stt.json` atomically, optional safe WAV deletion; does not touch markdown.
   - `healthyselfjournal/web/app.py` — Upload pipeline; returns error on STT failure; no pending banner; no reconcile integration.
