@@ -1,181 +1,207 @@
 # Healthy Self Journal
 
-Voice-first reflective journaling for the command line. Speak freely; your words are captured, transcribed with Whisper, and met with concise, evidence‑informed follow‑up questions from Claude to keep you moving forward without drifting into rumination.
+**Speak your thoughts. Get better questions. Build healthier patterns.**
 
-See also: `AGENTS.md`
+A voice-based journaling tool that makes self-reflection as easy as thinking out loud. No typing, no blank page anxiety – just speak naturally and receive thoughtful, evidence-based questions that guide you toward clarity without getting stuck in unhelpful thought loops.
 
-## Quickstart (users)
+## What makes this different
 
-Looking for install/run instructions? See `docs/reference/SETUP_USER.md`.
+🎙️ **Voice-first**: Start journaling instantly by speaking – no typing, no friction
+🧠 **Wise, helpful questions**: Evidence-based prompts adapted from cognitive behavioral therapy, psychology research, mindfulness practice, and famous coaches.
+🔄 **Keeps you moving**: Gentle redirection when you're spiraling; deeper exploration when you're onto something
+📊 **Builds on your history**: Each session connects to previous ones for continuity and growth
+🔒 **Privacy choice**: Use private/local LLM+transcription, or Anthropic + OpenAI, as you prefer.
 
-```bash
-uvx healthyselfjournal -- init
-uvx healthyselfjournal -- journal cli
-```
-
-## Why this exists (vision)
-
-- Lower friction to start: voice-first input encourages natural expression
-- Keep momentum: adaptive dialogue vs static prompts
-- Avoid harmful patterns: gentle redirection away from unproductive rumination
-- Build continuity: multiple daily sessions with brief summaries for context
-
-Core feature set (implemented today):
-- Live audio recording with real-time meter and simple controls (any key to stop; `ESC` cancels; `Q` saves then quits)
-- Immediate WAV persistence; background MP3 conversion when `ffmpeg` is available
-- OpenAI Whisper STT with retries; raw `.stt.json` stored per take
-- Claude-generated follow‑ups using Jinja prompts with embedded example questions
-- Recent session summaries loaded under a budget and fed into prompts
-- Background summary regeneration written to YAML frontmatter
-- Resume the latest session with `--resume`; change location with `--sessions-dir`
-
-## Snapshot: What it feels like
-
-```text
-(experim__healthyselfjournal) experim/healthyselfjournal git:(main) ✗  uv run --active healthyselfjournal journal cli --resume
-╭───────────────────────────────── Healthy Self Journal ──────────────────────────────────╮
-│ Recording starts immediately.                                                            │
-│ Press any key to stop. ESC cancels the current take; Q saves then ends after this entry. │
-╰──────────────────────────────────────────────────────────────────────────────────────────╯
-AI: I can hear you weighing a few options. Before we try to solve anything, what's the
-one part of this that matters most to you right now?
-Recording started. Press any key to stop (ESC cancels, Q quits after this response).
-Recording  [██░░░░░░░░░░░░░░] Press any key to stop (ESC cancels, Q quits)
-Saved WAV → 250917_101234_01.wav (1:48); MP3 conversion queued.
-╭──────────────────────────────────────────────────── You ────────────────────────────────────────────────────╮
-│ I’m torn between applying for the new role and doubling down on my current project. I’m worried I’ll        │
-│ disappoint people either way.                                                                               │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭─────────────────────────────────────────────── Next Question ───────────────────────────────────────────────╮
-│ It sounds important to honor both commitment and growth. In the next week, what would a small step look     │
-│ like that tests the new role idea without burning bridges?                                                  │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-AI: You mentioned wanting to grow without letting people down. What’s a 30‑minute experiment you could try
-this week to explore the new role while keeping current work healthy?
-Recording started. Press any key to stop (ESC cancels, Q quits after this response).
-Recording  [████░░░░░░░░░░░░] Press any key to stop (ESC cancels, Q quits)
-Saved WAV → 250917_101234_02.wav (0:56); MP3 conversion queued.
-╭──────────────────────────────────────────────────── You ────────────────────────────────────────────────────╮
-│ I could draft a short proposal for the role and ask for feedback from one mentor. That feels doable.        │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-Quit requested. Ending session after summary update.
-╭──────── Session Complete ─────────╮
-│ Session saved to 250917_101234.md │
-╰───────────────────────────────────╯
-```
-
-## Prerequisites
-
-- Python 3.12+
-- `ffmpeg` on `PATH` (optional, for background MP3 conversion)
-- Environment variables (set according to the backends you use):
-  - `OPENAI_API_KEY` – required for OpenAI speech-to-text or TTS features.
-  - `ANTHROPIC_API_KEY` – required only when using `anthropic:*` models for questions/summaries (cloud default).
-  - `OLLAMA_BASE_URL` – optional override when running local `ollama:*` models (defaults to `http://localhost:11434`).
-
-## Setup
-
-Prefer the external virtualenv workflow in `docs/reference/SETUP_DEV.md`:
+## Quick start
 
 ```bash
-source /Users/greg/.venvs/experim__healthyselfjournal/bin/activate
-uv sync --active
-```
-
-## Usage
-
-### Getting started (PyPI users)
-
-Use either uvx or pip:
-
-```bash
-# uvx (no install)
-uvx healthyselfjournal -- init
-uvx healthyselfjournal -- journal cli
-
-# Or install with pip
+# Install and set up (one time)
 pip install healthyselfjournal
 healthyselfjournal init
+
+# Start journaling
 healthyselfjournal journal cli
 ```
 
-To run the dialogue loop fully offline, install Ollama + Gemma (see `docs/reference/OLLAMA_GEMMA_DEPLOYMENT_GUIDE.md`), ensure the daemon is running, then start the CLI with:
+That's it. Recording starts immediately. Press any key to stop and get your next question.
+
+## Who this is for
+
+If you've tried journaling but found it hard to maintain, or if you want to process your thoughts without getting stuck in rumination, this tool is designed for you. It combines the ease of voice recording with the structure of guided reflection, using techniques validated by research to help you develop healthier thinking patterns.
+
+## How it works
+
+1. **Start speaking** – Recording begins immediately when you launch
+2. **Press any key to stop** – Your audio is transcribed automatically
+3. **Get a thoughtful question** – Based on what you shared and your patterns
+4. **Keep going or wrap up** – Continue as long as helpful, or press Q to end with a summary
+
+### Example session
+
+```
+You: "I'm torn between applying for the new role and doubling down on my current
+     project. I'm worried I'll disappoint people either way."
+
+AI: "I can hear the weight of wanting to honor both paths and the people involved.
+    When you imagine disappointing people - what's the hardest part about that for you?"
+
+You: "I guess I hate feeling like I've let someone down who believed in me.
+     Especially my current team. They took a chance on me when I didn't have much
+     experience in this area. And we've built something together, you know? But then
+     this other opportunity... it's exactly the kind of challenge I've been wanting.
+     More leadership, bigger scope. I keep thinking about five years from now - will
+     I regret not trying? But also these are real relationships, not just work..."
+
+AI: "There's something powerful in how you describe building something together with
+    your team. What does it mean to you that they 'took a chance' on you?"
+
+[conversation continues...]
+```
+
+## Installation & Setup
+
+### Requirements
+- Python 3.12 or newer
+- Optional: an API key from OpenAI (for voice transcription) and Anthropic (for questions)
+- Optional: ffmpeg for audio compression
+
+### Install
 
 ```bash
+# Option 1: Install with pip
+pip install healthyselfjournal
+
+# Option 2: Run without installing (using uvx)
+uvx healthyselfjournal -- init
+```
+
+### First-time setup
+
+The setup wizard will help you:
+- Add your API keys securely
+- Choose between Cloud mode (recommended) or Privacy mode (fully offline)
+- Pick where to save your journal sessions
+
+```bash
+healthyselfjournal init
+```
+
+## Daily use
+
+```bash
+# Start a new session
+healthyselfjournal journal cli
+
+# Continue your last session
+healthyselfjournal journal cli --resume
+
+# Use the web interface instead
+healthyselfjournal journal web
+```
+
+### Controls
+- **Any key**: Stop recording and get your next question
+- **ESC**: Cancel the current recording (discard it)
+- **Q**: Save and quit after this response
+
+### Privacy options
+
+**Cloud mode** (default): Uses OpenAI for transcription and Anthropic Claude for questions. Best accuracy and response quality.
+
+**Privacy mode**: Everything stays on your device. Requires [Ollama](https://ollama.ai) for local AI and choosing a local transcription option. See `docs/reference/PRIVACY.md` for details.
+
+## Where your journal lives
+
+Your sessions are saved as markdown files with audio recordings:
+```
+sessions/
+├── 250919_143022.md          # Today's afternoon session
+├── 250919_143022/
+│   ├── 250919_143022_01.wav  # Your voice recordings
+│   └── 250919_143022_02.wav
+└── events.log                 # Activity log
+```
+
+You own all your data. Export it, back it up, or delete it anytime.
+
+## The research behind it
+
+This tool is built on decades of evidence-based psychological research, integrating over 30 documented therapeutic and coaching frameworks:
+
+### Core Therapeutic Foundations
+- **Cognitive Behavioral Therapy (CBT)**: Socratic questioning to identify and reframe thought patterns (meta-analyses show d=0.73 effect size)
+- **Motivational Interviewing**: Amplifying "change talk" and intrinsic motivation (70+ RCTs supporting effectiveness)
+- **Clean Language (David Grove)**: Using your exact words and metaphors to maintain authenticity and avoid therapist contamination
+- **Explanatory Style (Seligman's 3 P's)**: Challenging permanence, pervasiveness, and personalization in negative thinking
+
+### Anti-Rumination & Safety Features
+- **Structured vs. Destructive Rumination**: Evidence-based detection of maladaptive thought loops
+- **Self-Distancing Techniques**: Third-person perspective and temporal distancing (strong neurological evidence)
+- **Concrete vs. Abstract Processing**: Redirecting to specific, actionable thoughts when stuck
+- **Session Timing Optimization**: 15-20 minute sweet spot to prevent rumination (based on expressive writing research)
+
+### Narrative & Meaning-Making
+- **Redemptive Narrative Construction (McAdams)**: Guiding from contamination to growth narratives
+- **Implementation Intentions**: "When-then" planning for 2-3x better habit formation
+- **Cognitive-Emotional Integration**: Balanced processing outperforms emotion-only expression
+
+### Mindfulness & Contemplative Practices
+- **Plum Village Tradition**: Mindful reflection and present-moment awareness
+- **Beginning Anew Practice**: Four-part framework for relationship and self-compassion
+- **Body Awareness Integration**: Somatic grounding when caught in mental loops
+
+### Coaching Methodologies
+- **GROW Model**: Goal-Reality-Options-Will framework with strong evidence base
+- **Solution-Focused Brief Therapy**: Future-oriented questions emphasizing strengths
+- **Values Clarification (ACT)**: Connecting actions to core personal values
+
+### Expert Practitioner Wisdom
+Questions inspired by renowned coaches and researchers:
+- Tim Ferriss' fear-setting and simplification frameworks
+- Jerry Colonna's radical self-inquiry
+- Martha Beck's body compass methodology
+- Tony Robbins' reframing techniques
+- Arthur Brooks' failure integration
+
+### Cultural & Individual Adaptation
+- **Cultural Sensitivity**: Avoiding Western-centric assumptions about gratitude and individual achievement
+- **Personalization**: Adapting to user patterns, chronotype, and emotional states
+- **Developmental Considerations**: Age-appropriate approaches based on psychological development
+
+The system continuously analyzes your responses for emotional intensity, thought patterns, topic persistence, exhaustion signals, and readiness for change, adapting its questioning strategy based on session phase and your current needs.
+
+For an overview of all 30+ research areas and methodologies, see `docs/research/RESEARCH_TOPICS.md` and `docs/reference/SCIENTIFIC_RESEARCH_EVIDENCE_PRINCIPLES.md`.
+
+## Advanced options
+
+### Desktop app
+```bash
+healthyselfjournal desktop --voice-mode
+```
+
+### Different AI models
+```bash
+# Use a local model (requires Ollama)
 healthyselfjournal journal cli --llm-model ollama:gemma3:27b-instruct-q4_K_M
 ```
 
-Notes:
-- The init wizard helps you add keys and pick Cloud vs Privacy mode.
-- Default sessions directory is `./sessions` in your current folder.
-
-1. Activate the project virtualenv:
-   ```bash
-   source /Users/greg/.venvs/experim__healthyselfjournal/bin/activate
-   ```
-2. Export keys:
-   ```bash
-   export OPENAI_API_KEY=sk-...
-   export ANTHROPIC_API_KEY=ant-...
-   ```
-3. Start a session:
-   ```bash
-   uvx healthyselfjournal -- journal cli
-   ```
-
-Handy flags:
-- `--resume` – continue the most recent session
-- `--sessions-dir PATH` – store audio and markdown elsewhere
-
-Key behavior during recording:
-- Recording starts immediately
-- Press any key to stop
-- `ESC` cancels the take (audio discarded)
-- `Q` saves the take, transcribes it, then ends the session
-
-By default, sessions are saved under `./sessions/`. Each response is written immediately to `sessions/yyMMdd_HHmm_XX.wav` (and `.mp3` when `ffmpeg` is available) and appended to a matching markdown file with YAML frontmatter containing summaries and metadata.
-
-## Research & methodology
-
-This project is explicitly research‑informed. See:
-- `docs/reference/SCIENTIFIC_RESEARCH_EVIDENCE_PRINCIPLES.md` – search strategy, quality standards, implementation focus (effect sizes, RCTs, cultural nuance)
-- `docs/research/POTENTIAL_RESEARCH_TOPICS.md` – completed topics and prioritized pipeline
-- `docs/reference/DIALOGUE_FLOW.md` – conversation sequencing and safety considerations
-
-Highlights of the approach:
-- Emphasis on meta‑analyses and RCTs (2019–2025 for digital interventions)
-- Guardrails to avoid maladaptive rumination; preference for concrete, time‑bounded prompts
-- Implementation‑ready guidance that maps directly to CLI and prompt templates
-
-## Prompting and question design
-
-Follow‑up questions are generated using `healthyselfjournal/prompts/question.prompt.md.jinja`:
-- Analyzes emotional intensity, thought patterns, topic persistence, exhaustion, and change talk
-- Adapts strategy (validation, redirection, Socratic deepening, or implementation planning)
-- Uses clean‑language techniques (user’s exact words), single‑focus questions, and brevity
-
-If the model cannot confidently select an approach, it can select from embedded example questions for safe variety.
-
-## Storage, events, and formats
-
-- File layout and metadata: `docs/reference/FILE_FORMATS_ORGANISATION.md`
-- Append‑only event log: `sessions/events.log`
-- Audio and transcripts live per session under `./sessions/`
-
-## Testing
-
-Targeted tests can be run without network access:
-
+### Custom session location
 ```bash
-PYTHONPATH=. pytest tests/test_storage.py
+healthyselfjournal journal cli --sessions-dir ~/Documents/journal
 ```
 
-Running the full suite requires valid API keys exported in the environment.
+## Support & Documentation
 
-## See also
+- **Issues or questions**: [GitHub Issues](https://github.com/anthropics/healthyselfjournal/issues)
+- **Full documentation**: See the `docs/` folder
+- **Contributing**: Contributions welcome! See `CONTRIBUTING.md`
 
-- CLI usage and controls: `docs/reference/CLI_COMMANDS.md`
-- Dialogue flow: `docs/reference/DIALOGUE_FLOW.md`
-- Prompt templates: `docs/reference/LLM_PROMPT_TEMPLATES.md`
-- Product vision & features: `docs/reference/PRODUCT_VISION_FEATURES.md`
-- Whisper/STT notes: `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md`
+## Technical details
+
+For developers and technical users:
+- Built with Python, using FastHTML for the web interface and PyWebView for desktop
+- Transcription via OpenAI Whisper API (or local alternatives)
+- Questions generated by Anthropic Claude (or local Ollama models)
+- Either everything runs locally (your data never leaves your device), or choose cloud services
+- See `docs/reference/ARCHITECTURE.md` for system design
+- See `AGENTS.md` for development setup

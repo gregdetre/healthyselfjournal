@@ -26,12 +26,23 @@ Single source for command discovery. See linked pages for detailed flags.
   - If you set `[llm].local_model_url` and `local_model_sha256` in `user_config.toml`, you can omit flags.
   - If `--url` is omitted in a TTY, the CLI will offer to paste a URL interactively,
     optionally accept a SHA-256, and can save these to `user_config.toml` for reuse.
+  - You can also resolve from Hugging Face and auto-fetch SHA-256 with:
+    `--hf-repo <repo_id> --hf-file <filename> [--hf-revision <rev>]`.
   - Example:
 
 ```bash
 uv run --active healthyselfjournal init local-llm \
   --url https://huggingface.co/.../llama-3.1-8b-instruct-q4_k_m.gguf \
   --sha256 <expected_sha256>
+```
+
+```bash
+# Resolve from Hugging Face (auto-resolves URL and sha256)
+uv run --active healthyselfjournal init local-llm \
+  --model llama-3.1-8b-instruct-q4_k_m.gguf \
+  --hf-repo TheBloke/Llama-3.1-8B-Instruct-GGUF \
+  --hf-file llama-3.1-8b-instruct-q4_k_m.gguf \
+  --hf-revision main
 ```
 
 Related:

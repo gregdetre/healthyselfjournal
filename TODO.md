@@ -1,15 +1,19 @@
+desktop app local didn't seem to be transcribing but the mic levels were moving
+
 app
   250919d
-    session folder chooser
   cross-platform builds
   apple credentials/notarization
   ask someone else to test it
 
 better web interface
   make it look like a chat interface
-  optional type instead of voice input
+  optional typing instead of voice input
 
-local tts
+improve prompt caching
 
-test the fully private mode that uses a local model for the LLM questioning
+local
+  test, try the questions
+  tts
+
 

@@ -14,8 +14,8 @@ uvx healthyselfjournal -- session list [--sessions-dir PATH] [--nchars N]
 ## Related utilities
 
 - `summarise list|backfill|regenerate` – Manage summaries stored in frontmatter.
-- `reconcile` – Backfill STT JSON for recordings missing transcriptions.
-- `merge` – Merge two sessions, move assets, append Q&A, regenerate summary.
+- `fix stt` – Backfill STT JSON for recordings missing transcriptions.
+- `session merge` – Merge two sessions, move assets, append Q&A, regenerate summary.
 
 See `FILE_FORMATS_ORGANISATION.md` for layout details of markdown and audio artefacts.
 
