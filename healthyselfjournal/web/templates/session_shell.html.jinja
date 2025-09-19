@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Healthy Self Journal (Web)</title>
+    <link rel="stylesheet" href="/static/css/app.css" />
+  </head>
+  <body data-session-id="{{ session_id }}"
+        data-upload-url="/session/{{ session_id }}/upload"
+        data-short-duration="{{ short_duration }}"
+        data-short-voiced="{{ short_voiced }}"
+        data-voice-enabled="{{ voice_attr }}"
+        data-tts-endpoint="/session/{{ session_id }}/tts"
+        data-tts-mime="{{ tts_mime }}">
+
+    <main class="hsj-container">
+      <header class="hsj-header">
+        <h1>Healthy Self Journal</h1>
+        <p class="hsj-session-id">Session {{ session_id }}</p>
+      </header>
+
+      <section class="hsj-question">
+        <h2>Current prompt</h2>
+        <p id="current-question">{{ question }}</p>
+      </section>
+
+      <section class="hsj-controls">
+        <button id="record-button" data-state="idle">Start recording</button>
+        <div id="level-meter" aria-hidden="true">
+          <div class="bar"></div>
+        </div>
+        <p id="status-text">Click start to begin recording.</p>
+      </section>
+
+      <section class="hsj-history">
+        <h2>Session history</h2>
+        <div id="history-list"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/static/js/app.js"></script>
+  </body>
+</html>
+
+

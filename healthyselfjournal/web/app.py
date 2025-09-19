@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 import logging
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -105,7 +106,7 @@ class WebSessionState:
         return state.session_id
 
 
-def build_app(config: WebAppConfig) -> FastHTML:
+def build_app(config: WebAppConfig) -> Any:
     """Construct and configure a FastHTML app instance."""
 
     resolved = config.resolved()
@@ -115,7 +116,7 @@ def build_app(config: WebAppConfig) -> FastHTML:
     FastHTML = _get_fast_html_class()
     app = FastHTML()
     app.state.config = resolved
-    app.state.sessions: dict[str, WebSessionState] = {}
+    app.state.sessions = {}
     # Configure voice mode and TTS options for this app instance
     voice_enabled = bool(resolved.voice_enabled or CONFIG.speak_llm)
     app.state.voice_enabled = voice_enabled
@@ -145,8 +146,7 @@ def build_app(config: WebAppConfig) -> FastHTML:
             state = _start_session(app)
         except Exception as exc:  # pragma: no cover - surface to browser
             _LOGGER.exception("Failed to start web session")
-            return (
-                """
+            return """
                 <!doctype html>
                 <html lang=\"en\">
                   <head>
@@ -161,7 +161,6 @@ def build_app(config: WebAppConfig) -> FastHTML:
                   </body>
                 </html>
                 """
-            )
 
         # Resolve voice/TTS options for this app instance
         voice_enabled: bool = bool(getattr(app.state, "voice_enabled", False))
@@ -173,7 +172,7 @@ def build_app(config: WebAppConfig) -> FastHTML:
         )
         return body
 
-    @app.post("/session/{session_id}/upload")
+    @app.post("/session/{session_id}/upload")  # type: ignore[attr-defined]
     async def upload(session_id: str, request: Request):
         state = app.state.sessions.get(session_id)
         if state is None:
@@ -193,15 +192,30 @@ def build_app(config: WebAppConfig) -> FastHTML:
             )
 
         # Metadata provided by the browser recorder
-        mime = (form.get("mime") or upload.content_type or "audio/webm").lower()
-        try:
-            duration_ms = float(form.get("duration_ms", "0") or 0.0)
-        except (TypeError, ValueError):
-            duration_ms = 0.0
-        try:
-            voiced_ms = float(form.get("voiced_ms", duration_ms) or duration_ms)
-        except (TypeError, ValueError):
-            voiced_ms = duration_ms
+        mime_val = form.get("mime")
+        if isinstance(mime_val, bytes):
+            try:
+                mime_val = mime_val.decode()
+            except Exception:
+                mime_val = None
+        if not isinstance(mime_val, str):
+            mime_val = None
+        content_type = upload.content_type or "audio/webm"
+        mime = (mime_val or content_type).lower()
+
+        def _to_float(val: Any, default: float) -> float:
+            if isinstance(val, (int, float)):
+                return float(val)
+            if isinstance(val, (str, bytes)):
+                try:
+                    s = val.decode() if isinstance(val, bytes) else val
+                    return float(s)
+                except Exception:
+                    return default
+            return default
+
+        duration_ms = _to_float(form.get("duration_ms"), 0.0)
+        voiced_ms = _to_float(form.get("voiced_ms"), duration_ms)
 
         # Persist uploaded audio to the active session directory
         session_state = state.manager.state
@@ -313,7 +327,7 @@ def build_app(config: WebAppConfig) -> FastHTML:
         }
         return JSONResponse(response_payload, status_code=201)
 
-    @app.post("/session/{session_id}/tts")
+    @app.post("/session/{session_id}/tts")  # type: ignore[attr-defined]
     async def tts(session_id: str, request: Request):
         """Synthesize TTS for a given text and return audio bytes.
 
@@ -341,7 +355,15 @@ def build_app(config: WebAppConfig) -> FastHTML:
                 form = await request.form()
                 payload = {"text": form.get("text")}
 
-            text = (payload.get("text") or "").strip()
+            text_val = payload.get("text")
+            if isinstance(text_val, bytes):
+                try:
+                    text_val = text_val.decode()
+                except Exception:
+                    text_val = ""
+            if not isinstance(text_val, str):
+                text_val = ""
+            text = text_val.strip()
             if not text:
                 return JSONResponse(
                     {"status": "error", "error": "missing_text"}, status_code=400
@@ -407,7 +429,7 @@ def run_app(config: WebAppConfig) -> None:
     uvicorn.run(app, host=config.host, port=config.port, reload=config.reload)
 
 
-def _start_session(app: FastHTML) -> WebSessionState:
+def _start_session(app: Any) -> WebSessionState:
     """Initialise a new journaling session for the web client."""
 
     resolved: WebAppConfig = app.state.config
@@ -504,55 +526,13 @@ def _render_session_shell(
         )
     )
 
-    template = """
-    <!doctype html>
-    <html lang="en">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Healthy Self Journal (Web)</title>
-        <link rel="stylesheet" href="/static/css/app.css" />
-      </head>
-      <body data-session-id="{{ session_id }}"
-            data-upload-url="/session/{{ session_id }}/upload"
-            data-short-duration="{{ short_duration }}"
-            data-short-voiced="{{ short_voiced }}"
-            data-voice-enabled="{{ voice_attr }}"
-            data-tts-endpoint="/session/{{ session_id }}/tts"
-            data-tts-mime="{{ tts_mime }}">
-
-        <main class="hsj-container">
-          <header class="hsj-header">
-            <h1>Healthy Self Journal</h1>
-            <p class="hsj-session-id">Session {{ session_id }}</p>
-          </header>
-
-          <section class="hsj-question">
-            <h2>Current prompt</h2>
-            <p id="current-question">{{ question }}</p>
-          </section>
-
-          <section class="hsj-controls">
-            <button id="record-button" data-state="idle">Start recording</button>
-            <div id="level-meter" aria-hidden="true">
-              <div class="bar"></div>
-            </div>
-            <p id="status-text">Click start to begin recording.</p>
-          </section>
-
-          <section class="hsj-history">
-            <h2>Session history</h2>
-            <div id="history-list"></div>
-          </section>
-        </main>
-
-        <script type="module" src="/static/js/app.js"></script>
-      </body>
-    </html>
-    """
+    template_path = (
+        Path(__file__).resolve().parent / "templates" / "session_shell.html.jinja"
+    )
+    template_str = template_path.read_text(encoding="utf-8")
 
     return jinja_render(
-        template,
+        template_str,
         {
             "session_id": session_id,
             "question": question,
@@ -561,4 +541,5 @@ def _render_session_shell(
             "voice_attr": voice_attr,
             "tts_mime": tts_mime,
         },
+        filesystem_loader=template_path.parent,
     )

@@ -1,0 +1,161 @@
+:root {
+  color-scheme: light dark;
+  --hsj-bg: Canvas;
+  --hsj-text: CanvasText;
+  --hsj-accent: #2563eb;
+  --hsj-muted: color-mix(in srgb, CanvasText 60%, Canvas 40%);
+  --hsj-surface: color-mix(in srgb, Canvas 92%, CanvasText 8%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--hsj-bg);
+  color: var(--hsj-text);
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+main.hsj-container {
+  max-width: 720px;
+  margin: 2.5rem auto;
+  padding: 0 1.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.hsj-header h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 2.7vw, 2.5rem);
+}
+
+.hsj-session-id {
+  margin: 0.25rem 0 0;
+  color: var(--hsj-muted);
+  font-size: 0.95rem;
+}
+
+.hsj-question h2,
+.hsj-history h2 {
+  margin-bottom: 0.5rem;
+  font-size: 1.2rem;
+}
+
+#current-question {
+  background: var(--hsj-surface);
+  padding: 1rem;
+  border-radius: 0.75rem;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.hsj-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+#record-button {
+  align-self: flex-start;
+  font-size: 1rem;
+  padding: 0.85rem 1.75rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--hsj-accent);
+  color: white;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.2s ease;
+}
+
+#record-button[data-state='recording'] {
+  background: #dc2626;
+}
+
+#record-button[data-state='uploading'] {
+  background: color-mix(in srgb, var(--hsj-accent) 60%, Canvas 40%);
+  cursor: wait;
+}
+
+#record-button:disabled {
+  filter: opacity(0.75);
+  cursor: not-allowed;
+}
+
+#record-button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+#level-meter {
+  width: min(360px, 100%);
+  height: 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hsj-muted) 35%, Canvas 65%);
+  overflow: hidden;
+  position: relative;
+}
+
+#level-meter .bar {
+  --meter-level: 0;
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(var(--meter-level));
+  background: linear-gradient(90deg, #22c55e, #facc15, #ef4444);
+  transition: transform 0.05s linear;
+}
+
+#status-text {
+  margin: 0;
+  color: var(--hsj-muted);
+  font-size: 0.95rem;
+}
+
+#history-list {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1rem;
+}
+
+.hsj-exchange {
+  padding: 1rem;
+  background: var(--hsj-surface);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.hsj-exchange h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--hsj-muted);
+}
+
+.hsj-exchange p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.hsj-exchange-meta {
+  font-size: 0.85rem;
+  color: var(--hsj-muted);
+}
+
+@media (max-width: 640px) {
+  main.hsj-container {
+    margin: 1.5rem auto 2.5rem;
+    padding-inline: 1rem;
+  }
+
+  #record-button {
+    width: 100%;
+  }
+}
