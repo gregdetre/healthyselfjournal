@@ -11,7 +11,8 @@ dependencies = [
     "jinja2>=3.1.2",
     "numpy>=1.26",
     "openai>=1.44.0",
-    "python-fasthtml>=0.3,<0.4",
+    "fastcore>=1.6.7,<2.0",
+    "python-fasthtml>=0.12,<0.13",
     "python-dotenv>=1.0.1",
     "questionary>=2.0.1",
     "pyyaml>=6.0.1",
@@ -45,3 +46,5 @@ packages = ["healthyselfjournal"]
 [tool.hatch.build.targets.wheel.force-include]
 "healthyselfjournal/prompts/question.prompt.md.jinja" = "healthyselfjournal/prompts/question.prompt.md.jinja"
 "healthyselfjournal/prompts/summary.prompt.md.jinja" = "healthyselfjournal/prompts/summary.prompt.md.jinja"
+"healthyselfjournal/static/css/app.css" = "healthyselfjournal/static/css/app.css"
+"healthyselfjournal/static/js/app.js" = "healthyselfjournal/static/js/app.js"

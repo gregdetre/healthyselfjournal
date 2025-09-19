@@ -4,6 +4,8 @@
 
 FastHTML is a next-generation Python web framework designed to create modern interactive web applications with minimal, compact code. It allows developers to build full-stack web applications using only Python, eliminating the need for separate JavaScript frontend frameworks by leveraging HTMX for interactivity.
 
+Version used in this project: 0.12.x (pinned to `python-fasthtml>=0.12,<0.13`).
+
 ## See Also
 
 - Official Documentation: https://www.fastht.ml/docs/index.html - comprehensive guides and API reference
@@ -54,7 +56,7 @@ if __name__ == "__main__":
     app.run()
 ```
 
-This creates a web application at http://localhost:5001
+This starts a development server.
 
 ### HTMX Integration Example
 
@@ -73,13 +75,15 @@ def change():
 
 Elements with HTMX attributes trigger server requests that return HTML partials for DOM updates.
 
+In 0.12+, routes should return plain strings or FastHTML elements; avoid wrapping in Starlette `HTMLResponse`/`JSONResponse` since FastHTML now wraps responses appropriately. Annotating return types as `str`/`JSONResponse` can cause double-wrapping; prefer no explicit annotation or `-> str` only when returning strings.
+
 ## API Patterns and Best Practices
 
-### Route Handling
+### Route Handling (0.12+)
 
-- FastHTML routes handle only GET and POST by default (more idiomatic and simpler)
-- Use `FastHTML.add_route` for custom routing needs
-- Return HTML elements or strings directly from route functions
+- Routes handle GET/POST by default. Use `FastHTML.add_route` if needed.
+- Return HTML elements or strings directly; FastHTML generates the correct Starlette response.
+- For JSON, return Python dicts; FastHTML will emit a JSON response (or use Starlette responses directly if necessary for headers/streaming).
 
 ### Component Patterns
 
@@ -179,16 +183,17 @@ FastHTML uses Uvicorn as the ASGI server. Note that Apache doesn't support ASGI 
 }
 ```
 
-#### Breaking API Changes (2024)
+#### Breaking API Changes (2024–2025)
 FastHTML has undergone significant API changes since release. Code written for earlier versions may not work:
 
 **Major Breaking Changes**:
-- **Jupyter Integration**: `jupy_app` and `FastJupy` removed (functionality built into `fast_app`)
-- **Routing**: `RouteX` and `RouterX` removed (use `FastHTML.add_route`)
-- **Headers**: `ws_hdr` and `cts_hdr` replaced with `exts` parameter
-- **HTTP Verbs**: FT attribute names replaced with `hx-` prefixed versions
+- `jupy_app` and `FastJupy` removed (Jupyter support folded into `fast_app`).
+- `RouteX` and `RouterX` removed. Use `FastHTML.add_route`.
+- `ws_hdr` and `cts_hdr` removed; use `exts` (e.g., `exts='ws'`).
+- FT attribute names replaced with `hx-` prefixed versions.
+- Response handling changed: return plain strings/objects; avoid manually constructing Starlette `HTMLResponse`/`JSONResponse` for typical cases.
 
-**Mitigation**: Pin FastHTML version in requirements.txt and monitor changelog before updates.
+**Mitigation**: Pin FastHTML version in pyproject and monitor the FastHTML docs and releases before updates.
 
 ### Medium Priority Issues
 
