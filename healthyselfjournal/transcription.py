@@ -366,7 +366,7 @@ class FasterWhisperBackend(TranscriptionBackend):
                     # Try requested compute first, then progressively safer CPU fallbacks.
                     if compute_type not in cpu_candidates:
                         cpu_candidates.append(compute_type)
-                    for ct in ("int8", "float32"):
+                    for ct in ("int8_float32", "int8", "float32"):
                         if ct not in cpu_candidates:
                             cpu_candidates.append(ct)
                     model_obj, used_compute = _instantiate("cpu", cpu_candidates)
@@ -383,7 +383,7 @@ class FasterWhisperBackend(TranscriptionBackend):
                 cpu_candidates = []  # type: list[str]
                 if compute_type not in cpu_candidates:
                     cpu_candidates.append(compute_type)
-                for ct in ("int8", "float32"):
+                for ct in ("int8_float32", "int8", "float32"):
                     if ct not in cpu_candidates:
                         cpu_candidates.append(ct)
                 model_obj, used_compute = _instantiate("cpu", cpu_candidates)
