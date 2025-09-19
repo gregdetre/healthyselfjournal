@@ -26,6 +26,12 @@
         <span>Run <code>npm install</code> and <code>npm run build</code> to regenerate <code>static/js/app.js</code>.</span>
       </div>
       {% endif %}
+      {% if pending_count > 0 %}
+      <div class="hsj-warning-banner" style="background:#fef9c3;border:1px solid #f59e0b;padding:0.75rem 1rem;border-radius:6px;margin-bottom:1rem;">
+        <strong>{{ pending_count }} pending transcription{{ 's' if pending_count != 1 else '' }}.</strong>
+        <span>Run <code>{{ reconcile_command }}</code> to backfill.</span>
+      </div>
+      {% endif %}
       <header class="hsj-header">
         <h1>Healthy Self Journal</h1>
         <p class="hsj-session-id">Session <a id="reveal-session" href="/session/{{ session_id }}/reveal" title="Reveal in Finder">{{ session_id }}</a></p>

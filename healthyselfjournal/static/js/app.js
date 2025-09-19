@@ -415,7 +415,9 @@ class RecorderController {
                 this.setStatus('Session is no longer active. Refresh the page to resume.');
                 break;
             case 'processing_failed':
-                this.setStatus('Processing failed on the server. Check logs and try again.' + detail);
+                this.setStatus(payload.detail
+                    ? `Processing failed on the server. ${payload.detail}`
+                    : 'Processing failed on the server. Check logs and try again.');
                 break;
             case 'question_failed':
                 this.setStatus('Answer saved but the next question could not be generated. Check logs.' + detail);

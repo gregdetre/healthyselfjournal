@@ -36,7 +36,7 @@ from ..errors import (
     UNSUPPORTED_PLATFORM,
 )
 from ..events import log_event, init_event_logger, get_event_log_path
-from ..session import SessionConfig, SessionManager
+from ..session import PendingTranscriptionError, SessionConfig, SessionManager
 from ..storage import load_transcript
 from ..transcription import BackendNotAvailableError, resolve_backend_selection
 from ..tts import TTSOptions, TTSError, resolve_tts_options, synthesize_text
@@ -46,6 +46,7 @@ from ..utils.audio_utils import (
     normalize_mime,
     should_discard_short_answer,
 )
+from ..utils.pending import count_pending_for_session, reconcile_command_for_dir
 from ..utils.session_layout import build_segment_path, next_web_segment_name
 from ..utils.time_utils import format_hh_mm_ss, format_minutes_text
 from gjdutils.strings import jinja_render
@@ -57,11 +58,42 @@ _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_STATIC_DIR = _PACKAGE_ROOT / "static"
 
 
-def _error_response(error: str, status_code: int, detail: str | None = None) -> JSONResponse:
+def _error_response(
+    error: str, status_code: int, detail: str | None = None
+) -> JSONResponse:
     payload: dict[str, Any] = {"status": "error", "error": error}
     if detail:
         payload["detail"] = detail
     return JSONResponse(payload, status_code=status_code)
+
+
+def _apply_security_headers(response: Response) -> Response:
+    """Apply strict security headers suitable for the desktop shell."""
+
+    csp_directives = [
+        "default-src 'self'",
+        "img-src 'self' data:",
+        "style-src 'self' 'unsafe-inline'",
+        "script-src 'self'",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "media-src 'self' blob: data:",
+        "worker-src 'self' blob:",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "object-src 'none'",
+    ]
+    headers = response.headers
+    headers.setdefault("Content-Security-Policy", "; ".join(csp_directives))
+    headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    headers.setdefault("Cross-Origin-Embedder-Policy", "require-corp")
+    headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+    headers.setdefault("Referrer-Policy", "no-referrer")
+    headers.setdefault("X-Frame-Options", "DENY")
+    headers.setdefault("X-Content-Type-Options", "nosniff")
+    headers.setdefault("Permissions-Policy", "camera=(), geolocation=(), microphone=(self)")
+    return response
 
 
 @lru_cache(maxsize=1)
@@ -189,6 +221,11 @@ def build_app(config: WebAppConfig) -> Any:
         app.state.tts_options = resolve_tts_options(overrides)
     else:
         app.state.tts_options = None
+
+    @app.middleware("http")  # type: ignore[attr-defined]
+    async def _security_middleware(request: Request, call_next):
+        response = await call_next(request)
+        return _apply_security_headers(response)
 
     # Serve static files (JS, CSS, media) under /static/
     app.mount(
@@ -409,6 +446,17 @@ def build_app(config: WebAppConfig) -> Any:
                 capture,
                 segment_label=target_path.name,
             )
+        except PendingTranscriptionError as exc:
+            _LOGGER.exception("STT pending; placeholder recorded")
+            command = reconcile_command_for_dir(state.manager.config.base_dir)
+            detail = (
+                f"{exc.error}. Audio saved; run {command} to backfill."
+            )
+            return _error_response(
+                PROCESSING_FAILED,
+                status_code=503,
+                detail=detail,
+            )
         except BackendNotAvailableError as exc:
             session_state.response_index = previous_index
             _LOGGER.exception("STT backend rejected uploaded audio")
@@ -561,7 +609,9 @@ def build_app(config: WebAppConfig) -> Any:
                     return JSONResponse({"status": "ok"}, status_code=200)
                 except Exception as exc:  # pragma: no cover - runtime path
                     _LOGGER.exception("Reveal failed: %s", exc)
-                    return _error_response(REVEAL_FAILED, status_code=500, detail=str(exc))
+                    return _error_response(
+                        REVEAL_FAILED, status_code=500, detail=str(exc)
+                    )
             else:
                 return _error_response(UNSUPPORTED_PLATFORM, status_code=501)
         except Exception as exc:  # pragma: no cover - generic surfacing
@@ -642,6 +692,13 @@ def _render_session_page(
     total_hms = format_hh_mm_ss(total_seconds)
     total_minutes_text = format_minutes_text(total_seconds)
 
+    base_dir = state.manager.config.base_dir
+    try:
+        pending_count = count_pending_for_session(base_dir, state.session_id)
+    except Exception:  # pragma: no cover - defensive fallback
+        pending_count = 0
+    reconcile_cmd = reconcile_command_for_dir(base_dir)
+
     # Server/runtime context for debug panel
     resolved_cfg = getattr(app.state, "config", None)
     server_host = (
@@ -700,6 +757,8 @@ def _render_session_page(
         stt_warnings=stt_warnings,
         voice_rms_dbfs_threshold=voice_rms_dbfs_threshold,
         static_assets_ready=static_assets_ready,
+        pending_count=pending_count,
+        reconcile_command=reconcile_cmd,
     )
     return body
 
