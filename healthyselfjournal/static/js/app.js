@@ -14,6 +14,8 @@ class RecorderController {
         this.lastMeterSample = 0;
         this.cancelFlag = false;
         this.voicedThreshold = 0.07; // heuristic amplitude threshold 0-1
+        this.recordingStartMs = 0;
+        this.accumulatedMs = 0;
         this.handleDataAvailable = (event) => {
             if (event.data && event.data.size > 0) {
                 this.chunks.push(event.data);
@@ -33,7 +35,7 @@ class RecorderController {
                 this.sourceNode.disconnect();
                 this.sourceNode = undefined;
             }
-            const durationMs = Math.max(performance.now() - this.startTimestamp, 0);
+            const durationMs = Math.max(this.getCurrentElapsedMs(), 0);
             const voicedMs = this.voicedMs;
             this.voicedMs = 0;
             this.lastMeterSample = 0;
@@ -42,6 +44,9 @@ class RecorderController {
                 this.resetButton();
                 this.setStatus('Recording cancelled.');
                 this.state = 'idle';
+                this.accumulatedMs = 0;
+                this.recordingStartMs = 0;
+                this.stopTimerLoop(true);
                 return;
             }
             if (durationMs < this.config.shortDurationMs || voicedMs < this.config.shortVoicedMs) {
@@ -69,9 +74,19 @@ class RecorderController {
             finally {
                 this.resetButton();
                 this.state = 'idle';
+                this.accumulatedMs = 0;
+                this.recordingStartMs = 0;
             }
         };
         this.elements.recordButton.addEventListener('click', () => {
+            // If TTS is playing, stop it and immediately start recording
+            if (this.audioEl && !this.audioEl.paused) {
+                try {
+                    this.audioEl.pause();
+                    this.audioEl.currentTime = 0;
+                }
+                catch { }
+            }
             void this.toggleRecording();
         });
         window.addEventListener('keydown', (event) => {
@@ -103,6 +118,25 @@ class RecorderController {
         }
         if (typeof MediaRecorder === 'undefined') {
             this.fail('MediaRecorder is unavailable. Please use a modern Chromium-based browser.');
+        }
+        // Optional voice mode toggle (runtime on/off)
+        if (this.elements.voiceToggle) {
+            this.elements.voiceToggle.checked = !!this.config.voiceEnabled;
+            this.elements.voiceToggle.addEventListener('change', () => {
+                const enabled = !!this.elements.voiceToggle?.checked;
+                this.config.voiceEnabled = enabled;
+                if (!enabled && this.audioEl && !this.audioEl.paused) {
+                    try {
+                        this.audioEl.pause();
+                        this.audioEl.currentTime = 0;
+                    }
+                    catch { }
+                    // If we had been waiting for TTS to finish before recording, proceed now
+                    if (this.state === 'idle') {
+                        this.autoStartAfterQuestion();
+                    }
+                }
+            });
         }
         // Optionally speak the initial question, then auto-start recording
         if (this.config.voiceEnabled && this.config.ttsEndpoint) {
@@ -153,6 +187,8 @@ class RecorderController {
             this.voicedMs = 0;
             this.lastMeterSample = performance.now();
             this.startTimestamp = performance.now();
+            this.recordingStartMs = performance.now();
+            this.accumulatedMs = 0;
             this.mediaRecorder.start();
             this.state = 'recording';
             this.elements.recordButton.disabled = false;
@@ -160,6 +196,7 @@ class RecorderController {
             this.elements.recordButton.dataset.state = 'recording';
             this.setStatus('Recording… Press SPACE to pause, ENTER to stop.');
             this.startMeterLoop();
+            this.startTimerLoop();
         }
         catch (error) {
             console.error('Failed to start recording', error);
@@ -178,6 +215,7 @@ class RecorderController {
         this.elements.recordButton.dataset.state = 'uploading';
         this.setStatus('Processing audio…');
         this.stopMeterLoop();
+        this.stopTimerLoop(true);
         this.mediaRecorder.stop();
     }
     cancelRecording() {
@@ -187,6 +225,7 @@ class RecorderController {
         this.cancelFlag = true;
         this.state = 'idle';
         this.stopMeterLoop();
+        this.stopTimerLoop(true);
         this.mediaRecorder.stop();
     }
     togglePause() {
@@ -201,6 +240,12 @@ class RecorderController {
             catch { }
             this.state = 'paused';
             this.stopMeterLoop();
+            // Accumulate elapsed and pause timer updates
+            if (this.recordingStartMs > 0) {
+                this.accumulatedMs += Math.max(performance.now() - this.recordingStartMs, 0);
+                this.recordingStartMs = 0;
+            }
+            this.stopTimerLoop(false);
             this.elements.recordButton.textContent = 'Resume recording';
             this.elements.recordButton.dataset.state = 'paused';
             this.setStatus('Paused. Press SPACE to resume, ENTER to stop.');
@@ -218,6 +263,9 @@ class RecorderController {
             this.elements.recordButton.dataset.state = 'recording';
             this.setStatus('Recording… Press SPACE to pause, ENTER to stop.');
             this.startMeterLoop();
+            // Resume timer updates
+            this.recordingStartMs = performance.now();
+            this.startTimerLoop();
             return;
         }
     }
@@ -299,6 +347,10 @@ class RecorderController {
         meta.textContent = `Segment ${payload.segment_label} · ${(durationMs / 1000).toFixed(1)}s`;
         historyItem.append(qHeading, qBody, aHeading, aBody, meta);
         this.elements.historyList.prepend(historyItem);
+        // Update cumulative duration display
+        if (this.elements.totalDuration) {
+            this.elements.totalDuration.textContent = payload.total_duration_hms;
+        }
         // Optionally speak the next question using server-side TTS, then auto-start recording
         if (this.config.voiceEnabled && this.config.ttsEndpoint) {
             void this.playTts(payload.next_question).finally(() => {
@@ -312,6 +364,8 @@ class RecorderController {
     async playTts(text) {
         try {
             if (!text.trim())
+                return;
+            if (!this.config.voiceEnabled)
                 return;
             const endpoint = this.config.ttsEndpoint;
             const response = await fetch(endpoint, {
@@ -328,7 +382,9 @@ class RecorderController {
                 this.audioEl = new Audio();
             }
             this.audioEl.src = url;
-            await this.audioEl.play().catch(() => { });
+            if (this.config.voiceEnabled) {
+                await this.audioEl.play().catch(() => { });
+            }
             // Revoke after some delay to ensure playback is not interrupted
             setTimeout(() => URL.revokeObjectURL(url), 10000);
         }
@@ -371,6 +427,49 @@ class RecorderController {
         this.elements.recordButton.textContent = 'Start recording';
         this.elements.recordButton.dataset.state = 'idle';
     }
+    startTimerLoop() {
+        const container = this.elements.recordTimer;
+        const valueEl = this.elements.recordTimerValue;
+        if (!container || !valueEl)
+            return;
+        container.hidden = false;
+        const update = () => {
+            const elapsed = this.getCurrentElapsedMs();
+            valueEl.textContent = this.formatElapsed(elapsed);
+            if (this.state === 'recording') {
+                this.timerRafId = requestAnimationFrame(update);
+            }
+        };
+        // Immediate update, then animate
+        valueEl.textContent = this.formatElapsed(this.getCurrentElapsedMs());
+        this.timerRafId = requestAnimationFrame(update);
+    }
+    stopTimerLoop(hide) {
+        if (this.timerRafId !== undefined) {
+            cancelAnimationFrame(this.timerRafId);
+            this.timerRafId = undefined;
+        }
+        if (hide && this.elements.recordTimer) {
+            this.elements.recordTimer.hidden = true;
+        }
+    }
+    getCurrentElapsedMs() {
+        const running = this.state === 'recording' && this.recordingStartMs > 0;
+        const current = running ? Math.max(performance.now() - this.recordingStartMs, 0) : 0;
+        return this.accumulatedMs + current;
+    }
+    formatElapsed(ms) {
+        const totalSeconds = Math.floor(ms / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds
+                .toString()
+                .padStart(2, '0')}`;
+        }
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
 }
 function bootstrap() {
     const body = document.body;
@@ -391,6 +490,10 @@ function bootstrap() {
         meterBar: document.querySelector('#level-meter .bar'),
         currentQuestion: document.getElementById('current-question'),
         historyList: document.getElementById('history-list'),
+        totalDuration: document.getElementById('total-duration') || undefined,
+        recordTimer: document.getElementById('record-timer') || undefined,
+        recordTimerValue: document.getElementById('record-timer-value') || undefined,
+        voiceToggle: document.getElementById('voice-toggle') || undefined,
     };
     if (!elements.recordButton || !elements.statusText || !elements.meterBar) {
         console.error('Missing critical DOM elements.');

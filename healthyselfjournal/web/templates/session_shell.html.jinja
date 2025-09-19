@@ -8,16 +8,26 @@
   </head>
   <body data-session-id="{{ session_id }}"
         data-upload-url="/session/{{ session_id }}/upload"
+        data-reveal-endpoint="/session/{{ session_id }}/reveal"
         data-short-duration="{{ short_duration }}"
         data-short-voiced="{{ short_voiced }}"
         data-voice-enabled="{{ voice_attr }}"
         data-tts-endpoint="/session/{{ session_id }}/tts"
-        data-tts-mime="{{ tts_mime }}">
+        data-tts-mime="{{ tts_mime }}"
+        data-total-seconds="{{ total_seconds }}"
+        data-total-hms="{{ total_hms }}">
 
     <main class="hsj-container">
       <header class="hsj-header">
         <h1>Healthy Self Journal</h1>
-        <p class="hsj-session-id">Session {{ session_id }}</p>
+        <p class="hsj-session-id">Session <a id="reveal-session" href="#" title="Reveal in Finder">{{ session_id }}</a></p>
+        <p class="hsj-total-duration">Total duration so far: <span id="total-duration">{{ total_hms }}</span></p>
+        <div class="hsj-voice-toggle">
+          <label>
+            <input type="checkbox" id="voice-toggle" {% if voice_attr == 'true' %}checked{% endif %} />
+            Voice mode
+          </label>
+        </div>
       </header>
 
       <section class="hsj-question">
@@ -30,6 +40,7 @@
         <div id="level-meter" aria-hidden="true">
           <div class="bar"></div>
         </div>
+        <p id="record-timer" class="hsj-record-timer" hidden>Recording: <span id="record-timer-value">0:00</span></p>
         <p id="status-text">Click start to begin recording.</p>
       </section>
 
