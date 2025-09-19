@@ -78,5 +78,3 @@ def mic_check(
         seconds=seconds,
         sample_rate=sample_rate,
     )
-
-

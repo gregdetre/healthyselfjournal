@@ -722,14 +722,10 @@ def build_app() -> typer.Typer:
         for session_id in sorted(grouped):
             segments = grouped[session_id]
             ext_counts = Counter(
-                seg.audio_path.suffix.lower().lstrip(".") or "audio"
-                for seg in segments
+                seg.audio_path.suffix.lower().lstrip(".") or "audio" for seg in segments
             )
             errors = sum(1 for seg in segments if seg.has_error)
-            ext_parts = [
-                f"{count} {ext}"
-                for ext, count in sorted(ext_counts.items())
-            ]
+            ext_parts = [f"{count} {ext}" for ext, count in sorted(ext_counts.items())]
             lines = [
                 f"{len(segments)} pending segment{'s' if len(segments) != 1 else ''}",
             ]

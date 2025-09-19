@@ -72,5 +72,3 @@ def build_app() -> typer.Typer:
                 )
 
     return app
-
-
