@@ -268,3 +268,35 @@ def test_resume_latest_session_when_enabled(tmp_path: Path, monkeypatch):
     second_response = client2.get("/")
     resumed_sid = _extract_session_id(second_response.text)
     assert resumed_sid == first_sid
+
+
+def test_setup_page_renders_without_surplus_context(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "healthyselfjournal.web.app.resolve_backend_selection",
+        lambda *_, **__: BackendSelection(
+            backend_id="stub",
+            model="stub-model",
+            compute=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "healthyselfjournal.session.create_transcription_backend",
+        lambda *_, **__: StubTranscriptionBackend(),
+    )
+    monkeypatch.setattr(
+        "healthyselfjournal.session.generate_followup_question",
+        lambda _: stub_followup_question(),
+    )
+
+    app = build_app(
+        WebAppConfig(
+            sessions_dir=tmp_path,
+            static_dir=tmp_path / "static",
+            desktop_setup=True,
+        )
+    )
+    client = TestClient(app, follow_redirects=True)
+
+    r = client.get("/setup")
+    assert r.status_code == 200
+    assert "Welcome" in r.text

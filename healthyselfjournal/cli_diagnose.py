@@ -38,6 +38,7 @@ from .llm import (
 )
 from .model_manager import get_model_manager
 from .tts import resolve_tts_options, synthesize_text, TTSError
+from .web.app import WebAppConfig as WebServerConfig, build_app as build_web_app
 
 
 console = Console()
@@ -439,5 +440,64 @@ def build_app() -> typer.Typer:
 
     app.add_typer(local_app, name="local")
     app.add_typer(cloud_app, name="cloud")
+
+    @app.command("desktop")
+    def desktop(
+        sessions_dir: Optional[Path] = typer.Option(
+            None,
+            "--sessions-dir",
+            help="Diagnostics log directory (defaults to sandbox temp dir).",
+        ),
+        sandbox: bool = typer.Option(
+            True,
+            "--sandbox/--no-sandbox",
+            help="Write logs to a temp dir instead of your real sessions dir.",
+        ),
+    ) -> None:
+        """Probe the desktop shell pages and report common issues.
+
+        - Builds the embedded web app in-memory and performs GET / and /setup
+        - Flags template context errors (e.g., surplus context) and 500s
+        """
+
+        try:
+            from starlette.testclient import TestClient  # type: ignore
+        except Exception:
+            console.print("[red]starlette is required for desktop diagnostics.[/]")
+            raise typer.Exit(code=2)
+
+        base = _maybe_init_events(sessions_dir, sandbox)
+        _print_header("Desktop Shell")
+        console.print(Text(f"events.log: {base / 'events.log'}", style="dim"))
+
+        cfg = WebServerConfig(sessions_dir=base, desktop_setup=True)
+        web = build_web_app(cfg)
+        client = TestClient(web, follow_redirects=False)
+
+        # Check /setup renders
+        r_setup = client.get("/setup")
+        if r_setup.status_code != 200:
+            msg = "Setup page failed to render (status {code}).".format(
+                code=r_setup.status_code
+            )
+            if "Surplus context" in (r_setup.text or ""):
+                msg += " Possible template context mismatch (surplus context)."
+            console.print(Panel.fit(Text(msg, style="red"), title="/setup", border_style="red"))
+            raise typer.Exit(code=2)
+        else:
+            console.print(Panel.fit(Text("OK", style="green"), title="/setup", border_style="green"))
+
+        # Check landing route
+        r_root = client.get("/")
+        if r_root.status_code not in {200, 307, 303}:
+            console.print(
+                Panel.fit(
+                    Text(f"Unexpected status: {r_root.status_code}", style="yellow"),
+                    title="/",
+                    border_style="yellow",
+                )
+            )
+        else:
+            console.print(Panel.fit(Text("OK", style="green"), title="/", border_style="green"))
 
     return app

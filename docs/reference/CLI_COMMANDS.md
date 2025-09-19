@@ -16,6 +16,7 @@ Single source for command discovery. See linked pages for detailed flags.
 - `session merge` – Merge two sessions into the earlier one.
 - `init` – Setup wizard for first-time configuration.
 - `diagnose` – Diagnostics for mic/STT, local/cloud LLM, and TTS.
+  - `diagnose desktop` – Probe desktop web shell routes (`/setup`, `/`) to catch template/context errors.
 
 ### Local LLM bootstrap
 
@@ -62,6 +63,9 @@ uvx healthyselfjournal -- session list --sessions-dir ./sessions --nchars 200
 uvx healthyselfjournal -- session summaries --missing-only
 uvx healthyselfjournal -- fix backfill --limit 10
 uvx healthyselfjournal -- fix regenerate 250918_0119.md
+
+# Desktop diagnostics
+uvx healthyselfjournal -- diagnose desktop
 ```
 
 ## See also

@@ -41,7 +41,7 @@
 
         <div class="hsj-field">
           <label>
-            <input id="resume" name="resume" type="checkbox" />
+            <input id="resume" name="resume" type="checkbox" {% if resume == 'true' %}checked{% endif %} />
             Resume last session on launch
           </label>
         </div>
