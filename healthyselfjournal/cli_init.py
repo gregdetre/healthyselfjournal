@@ -199,7 +199,7 @@ def _prompt_anthropic_key() -> str:
         # Fallback to plain input if Questionary failed (should not happen here)
         questionary = None  # type: ignore
 
-    url = "https://console.anthropic.com/settings/api-keys"
+    url = "https://console.anthropic.com/settings/keys"
     try:
         webbrowser.open(url)
     except Exception:
