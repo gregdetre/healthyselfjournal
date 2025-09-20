@@ -216,7 +216,11 @@ uv run --active pyinstaller packaging/HealthySelfJournal.spec
 
 CI packaging (GitHub Actions):
 
-- A CI workflow for desktop builds is not included yet. When adding one, use a matrix to build per‑OS and per‑arch, and invoke the PyInstaller spec. Update this section with the workflow path once added.
+- A macOS workflow is included: `.github/workflows/desktop-macos.yml`.
+  - Triggers on tags `v*` and manual dispatch.
+  - Steps: checkout, setup Python 3.12, setup `uv`, build web static assets, run PyInstaller with `packaging/HealthySelfJournal.spec`.
+  - Uploads unsigned app bundle artifact: `Healthy Self Journal.app`.
+  - Notarization/signing is not performed in CI yet; see macOS distribution notes below.
 
 References:
 

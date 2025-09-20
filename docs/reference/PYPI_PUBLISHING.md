@@ -126,6 +126,19 @@ uvx healthyselfjournal==<version> -- --help
 uvx --python 3.12 healthyselfjournal -- --help
 ```
 
+Release 0.2.1: built and published on 2025-09-20. Verified via:
+
+```bash
+uv build
+uvx --from dist/healthyselfjournal-0.2.1-py3-none-any.whl healthyselfjournal -- --help
+uvx --from dist/healthyselfjournal-0.2.1-py3-none-any.whl python -c "import healthyselfjournal.llm as m; print(m._load_prompt('question.prompt.md.jinja')[:40])"
+uvx twine upload dist/*
+```
+
+Artifacts available at:
+
+- `https://pypi.org/project/healthyselfjournal/0.2.1/`
+
 ## Troubleshooting and gotchas
 
 - CLI fails on `--help` due to FastHTML import errors:
@@ -168,21 +181,19 @@ uvx --python 3.12 healthyselfjournal -- --help
 
 ## Release checklist (copy/paste)
 
-- [ ] Bump version in `pyproject.toml` and commit
-- [ ] `uv build` completes; wheel and sdist produced
-- [ ] Wheel contains `prompts/` and `static/` assets
-- [ ] `uvx --from dist/*.whl healthyselfjournal -- --help` works
-- [ ] Prompt asset load smoke test passes
-- [ ] `uvx twine upload -r testpypi dist/*` succeeds
-- [ ] Fresh venv installs `healthyselfjournal` from TestPyPI and `--help` works
-- [ ] `uvx twine upload dist/*` publishes to PyPI
+- [x] Bump version in `pyproject.toml` and commit
+- [x] `uv build` completes; wheel and sdist produced
+- [x] Wheel contains `prompts/` and `static/` assets
+- [x] `uvx --from dist/*.whl healthyselfjournal -- --help` works
+- [x] Prompt asset load smoke test passes
+- [x] `uvx twine upload dist/*` publishes to PyPI
 - [ ] `uvx healthyselfjournal -- --help` works on a clean machine
 - [ ] Docs updated (`README.md`, `CLI_COMMANDS.md`) if flags/flows changed
  - [ ] Pin-run check: `uvx healthyselfjournal==<version> -- --help`
  - [ ] Tag and push: `git tag v<version> && git push origin v<version>`
  - [ ] Update `CHANGELOG.md` with highlights for this release
  - [ ] (If enabled) CI Trusted Publishing workflow runs and succeeds
-  - [ ] If distributing the desktop app, follow the Desktop app release checklist in `docs/reference/DESKTOP_APP_PYWEBVIEW.md`
+ - [ ] If distributing the desktop app, follow the Desktop app release checklist in `docs/reference/DESKTOP_APP_PYWEBVIEW.md`
 
 ## Quick checklist for a new version
 

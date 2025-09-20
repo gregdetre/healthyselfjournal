@@ -1,3 +1,9 @@
+## 0.2.1 - 2025-09-20
+
+- Publish to PyPI with bundled prompts and static assets verified
+- Clarified CLI grouping; ensured `--help` works without web deps
+- Prep for desktop build in CI: add macOS PyInstaller workflow (unsigned)
+
 # Changelog
 
 All notable changes to this project will be documented in this file.

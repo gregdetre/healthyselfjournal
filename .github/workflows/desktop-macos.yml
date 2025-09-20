@@ -1,0 +1,48 @@
+name: desktop-macos
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos:
+    name: Build macOS app (PyInstaller)
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Sync dependencies
+        run: |
+          uv sync
+
+      - name: Build web static assets
+        run: |
+          corepack enable
+          npm ci --no-audit --fund=false --loglevel=error
+          npm run build
+
+      - name: Package desktop app (PyInstaller)
+        run: |
+          uv run pyinstaller packaging/HealthySelfJournal.spec
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HealthySelfJournal-macos-unsigned
+          path: dist/Healthy Self Journal.app
+          if-no-files-found: error
+
+
