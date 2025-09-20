@@ -126,19 +126,6 @@ uvx healthyselfjournal==<version> -- --help
 uvx --python 3.12 healthyselfjournal -- --help
 ```
 
-Release 0.2.1: built and published on 2025-09-20. Verified via:
-
-```bash
-uv build
-uvx --from dist/healthyselfjournal-0.2.1-py3-none-any.whl healthyselfjournal -- --help
-uvx --from dist/healthyselfjournal-0.2.1-py3-none-any.whl python -c "import healthyselfjournal.llm as m; print(m._load_prompt('question.prompt.md.jinja')[:40])"
-uvx twine upload dist/*
-```
-
-Artifacts available at:
-
-- `https://pypi.org/project/healthyselfjournal/0.2.1/`
-
 ## Troubleshooting and gotchas
 
 - CLI fails on `--help` due to FastHTML import errors:
