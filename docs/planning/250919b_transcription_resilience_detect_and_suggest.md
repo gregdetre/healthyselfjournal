@@ -57,7 +57,7 @@
 
 ### Stage: Surface “pending” counts consistently (detect and suggest)
 - [ ] CLI: keep startup/resume/finalize pending hints; unify wording; ensure count includes web media.
-- [ ] Add `journal list --pending` to show sessions with outstanding segments and totals.
+- [ ] Consider a future `session pending` view; for now rely on `fix stt` output.
 - [ ] Web: compute pending count server-side and render a passive banner in the session page if `> 0` with exact suggested command.
 - [ ] Web: on upload failure, include the suggested command in error detail (server) so client can display a helpful message.
 - Acceptance:
@@ -108,7 +108,7 @@
 - [ ] Update `FILE_FORMATS_ORGANISATION.md` to document placeholder semantics and error sentinel.
 - [ ] Update `WEB_ARCHITECTURE.md` to note pending-banner and reconcile coverage for `.webm/.ogg`.
 - [ ] Update `AUDIO_VOICE_RECOGNITION_WHISPER.md` to mention broadened reconcile and atomic writes.
-- [ ] Update `COMMAND_LINE_INTERFACE.md` to include `journal list --pending` and the broadened reconcile scope.
+- [ ] Update `COMMAND_LINE_INTERFACE.md` to remove `journal list` mention and reflect `fix stt`.
 
 ### Stage: Create RESILIENCE.md (reference doc)
 - [ ] Add `docs/reference/RESILIENCE.md` capturing:
@@ -152,8 +152,8 @@
 ```bash
 uv run --active healthyselfjournal reconcile --sessions-dir '/Users/greg/Dropbox/dev/experim/healthyselfjournal/sessions'
 
-# Optional: list sessions with pending segments (to be added)
-uv run --active healthyselfjournal journal list --pending --sessions-dir '/Users/greg/Dropbox/dev/experim/healthyselfjournal/sessions'
+# Optional: backfill pending segments
+uv run --active healthyselfjournal fix stt --sessions-dir '/Users/greg/Dropbox/dev/experim/healthyselfjournal/sessions'
 ```
 
 

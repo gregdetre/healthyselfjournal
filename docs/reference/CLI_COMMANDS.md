@@ -9,7 +9,6 @@ Single source for command discovery. See linked pages for detailed flags.
 - `journal web` – Launch local browser interface. See `WEB_RECORDING_INTERFACE.md`.
 - `journal desktop` – Launch PyWebView desktop shell. See `DESKTOP_APP_PYWEBVIEW.md`.
 - `session list` – Show sessions with summary snippets. See `SESSIONS.md`.
-- `session list` – Show sessions with summary snippets. See `SESSIONS.md`.
 - `session summaries` – Show which sessions are missing summaries (moved from summarise list).
 - `fix stt` – Backfill missing STT for saved WAV/webm/ogg files, replace markdown placeholders, and remove error sentinels.
 - `fix backfill` – Generate summaries where missing.

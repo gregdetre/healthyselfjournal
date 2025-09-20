@@ -29,6 +29,7 @@ from .mic_check import run_interactive_mic_check
 from .tts import TTSOptions, speak_text
 from .utils.pending import (
     count_pending_segments,
+    count_pending_for_session,
     pending_segments_by_session,
     reconcile_command_for_dir,
 )
@@ -415,12 +416,13 @@ def start_or_resume_session(
                 )
             )
             # Surface pending transcription work, but don't auto-run.
-            pending = _count_missing_stt(sessions_dir)
+            pending = count_pending_for_session(sessions_dir, state.session_id)
             if pending:
                 cmd = reconcile_command_for_dir(sessions_dir)
                 console.print(
-                    f"[yellow]{pending} recording(s) pending transcription.[/] "
-                    f"Run [cyan]{cmd}[/] to backfill."
+                    f"[yellow]{pending} recording(s) pending transcription in this session.[/] "
+                    f"Run [cyan]{cmd}[/] to backfill. "
+                    f"[dim]Tip: add --min-duration 0.6 --too-short mark[/]"
                 )
     else:
         state = manager.start()
@@ -442,12 +444,13 @@ def start_or_resume_session(
             )
         )
         question = opening_question
-        pending = _count_missing_stt(sessions_dir)
+        pending = count_pending_for_session(sessions_dir, state.session_id)
         if pending:
             cmd = reconcile_command_for_dir(sessions_dir)
             console.print(
-                f"[yellow]{pending} recording(s) pending transcription.[/] "
-                f"Run [cyan]{cmd}[/] to backfill."
+                f"[yellow]{pending} recording(s) pending transcription in this session.[/] "
+                f"Run [cyan]{cmd}[/] to backfill. "
+                f"[dim]Tip: add --min-duration 0.6 --too-short mark[/]"
             )
 
     return state, question
@@ -697,12 +700,13 @@ def finalize_or_cleanup(*, manager: SessionManager, state, sessions_dir: Path) -
                 border_style="magenta",
             )
         )
-        pending = _count_missing_stt(sessions_dir)
+        pending = count_pending_for_session(sessions_dir, state.session_id)
         if pending:
             cmd = reconcile_command_for_dir(sessions_dir)
             console.print(
-                f"[yellow]{pending} recording(s) still pending transcription.[/] "
-                f"Use [cyan]{cmd}[/] to process them."
+                f"[yellow]{pending} recording(s) still pending transcription in this session.[/] "
+                f"Use [cyan]{cmd}[/] to process them. "
+                f"[dim]Tip: add --min-duration 0.6 --too-short mark[/]"
             )
 
 
