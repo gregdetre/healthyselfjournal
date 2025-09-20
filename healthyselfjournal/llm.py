@@ -57,7 +57,7 @@ class SummaryRequest:
     transcript_markdown: str
     recent_summaries: Sequence[str]
     model: str
-    max_tokens: int = 512
+    max_tokens: int = 1200
 
 
 @dataclass
