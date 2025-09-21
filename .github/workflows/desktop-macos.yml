@@ -17,7 +17,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0        # needed for tools that rely on git history/tags
-          submodules: recursive # ensure local gjdutils path is populated in CI
+          # No submodules needed; use PyPI for gjdutils in CI
+          ref: ${{ github.sha }}
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
