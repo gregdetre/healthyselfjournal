@@ -15,6 +15,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # needed for tools that rely on git history/tags
+          submodules: recursive # ensure local gjdutils path is populated in CI
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -25,6 +28,8 @@ jobs:
         uses: astral-sh/setup-uv@v3
 
       - name: Sync dependencies
+        env:
+          UV_NO_PROJECT_SOURCES: "1"  # ignore [tool.uv.sources] so CI uses PyPI gjdutils
         run: |
           uv sync
 
