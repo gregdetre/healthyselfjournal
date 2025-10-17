@@ -51,6 +51,9 @@ The following topics have been researched and documented:
   - ICF competencies research, Socratic questioning RCTs, GROW model studies
   - Solution-Focused Brief Therapy evidence, motivational interviewing data
 
+- ✅ MI/SDT autonomy support for journaling → `AUTONOMY_SUPPORT_MI_SDT_FOR_JOURNALING.md`
+  - Autonomy-supportive language patterns; avoid cheerleading; permission-based advice
+
 #### Expert-Endorsed (Moderate Evidence)
 - ✅ Daily reflection questions → `DAILY_REFLECTION_QUESTIONS.md`
   - Neil Pasricha framework, Rangan Chatterjee protocol, morning/evening routines
@@ -213,6 +216,9 @@ The following topics have been researched and documented:
     - Music/mood tracking
 
 ## Tier 6: Risk Mitigation Research (Preventing harm)
+
+- ✅ Anti-sycophancy and parasocial risk guardrails → `ANTI_SYCOPHANCY_AND_PARASOCIAL_RISK_GUARDRAILS.md`
+  - Neutral language, anti-praise, break nudges, boundaries; WHO/NICE-aligned
 
 26. **Identifying at-risk users**
     - Crisis detection without diagnosis
