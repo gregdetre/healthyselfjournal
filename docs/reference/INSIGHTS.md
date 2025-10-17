@@ -112,6 +112,20 @@ Clean Language research and Rogers' person-centered therapy emphasize using the 
 - Provide crisis resources when relevant
 - Professional referral pathways clearly documented
 
+### 8. Connections Across Sessions
+
+**Implementation:**
+- Show connections across sessions when relevant, linking themes without over-generalizing
+- Use brief quotes and dates to anchor connections
+- Prefer concrete juxtaposition over abstract synthesis
+
+### 9. Hold Complexity (No Premature Resolution)
+
+**Implementation:**
+- Acknowledge tensions, ambivalence, and mixed feelings without trying to resolve them
+- Avoid forced positivity or simplification
+- Mirror the user's language about uncertainty or paradox
+
 ## Data Inputs and Typical Ranges
 
 ### Default Two-Range Context (v1)
@@ -225,6 +239,9 @@ Clean Language research and Rogers' person-centered therapy emphasize using the 
 - One core observation or pattern
 - 1-2 brief quotes
 - One open question at end
+
+**Surprise Noticing (Optional):**
+- You may include a brief, tentative "you might also notice..." sentence if it reflects a grounded observation that wasn't explicitly stated, and only when supported by quotes and framed non-prescriptively. Keep this optional and subordinate to the user's own observations.
 
 ### Language Patterns to Use
 
@@ -441,7 +458,10 @@ Format:
 - One core observation or pattern
 - Ground in user's own words with 1-2 brief quotes
 - Use tentative, curious language
-- End with one open question inviting reflection
+- When helpful, make one explicit connection across sessions without overgeneralizing
+- Acknowledge tensions or ambiguity without trying to resolve them
+- Optionally include one brief "you might also notice..." sentence if it surfaces a grounded, tentative observation not directly stated
+- End with one open question inviting reflection (ensure the final sentence is the open question)
 
 Tone:
 - Curious, not authoritative

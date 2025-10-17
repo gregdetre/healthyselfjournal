@@ -18,6 +18,22 @@ Single source for command discovery. See linked pages for detailed flags.
 - `diagnose` – Diagnostics for mic/STT, local/cloud LLM, and TTS.
   - `diagnose desktop` – Probe desktop web shell routes (`/setup`, `/`) to catch template/context errors.
 
+### Insights
+
+- `insights list` – List existing insights files (newest first).
+- `insights generate` – Generate one or more reflective insights using the two-range default.
+
+Examples:
+
+```bash
+uv run --active healthyselfjournal insights list --sessions-dir ./sessions
+uv run --active healthyselfjournal insights generate --sessions-dir ./sessions --llm-model anthropic:claude-sonnet-4:20250514:thinking
+# Let the model decide the number (default)
+uv run --active healthyselfjournal insights generate --sessions-dir ./sessions
+# Explicit count
+uv run --active healthyselfjournal insights generate --sessions-dir ./sessions --count 3
+```
+
 ### Local LLM bootstrap
 
 - `init local-llm --url <gguf_url> [--sha256 <checksum>] [--model <filename>]`
