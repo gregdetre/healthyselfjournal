@@ -90,7 +90,7 @@ Raise reliability and portability for a shareable “friends can run it” relea
   - Acceptance: Users can resolve basic audio prereqs quickly.
 
 #### Venv‑less development via uv
-- [ ] Document venv‑less dev
+- [x] Document venv‑less dev
   - Examples: `uv run --active pytest -q tests/test_*.py`, `uv run --active healthyselfjournal journal cli`, `uvx healthyselfjournal -- --help`.
   - Acceptance: Devs can work without manually activating a venv.
 
