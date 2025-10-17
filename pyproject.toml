@@ -1,6 +1,6 @@
 [project]
 name = "healthyselfjournal"
-version = "0.2.3"
+version = "0.2.4"
 description = "Voice journaling CLI with Whisper transcription and Claude follow-ups"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -53,6 +53,7 @@ packages = ["healthyselfjournal"]
 [tool.hatch.build.targets.wheel.force-include]
 "healthyselfjournal/prompts/question.prompt.md.jinja" = "healthyselfjournal/prompts/question.prompt.md.jinja"
 "healthyselfjournal/prompts/summary.prompt.md.jinja" = "healthyselfjournal/prompts/summary.prompt.md.jinja"
+"healthyselfjournal/prompts/insights.prompt.md.jinja" = "healthyselfjournal/prompts/insights.prompt.md.jinja"
 "healthyselfjournal/static/css/app.css" = "healthyselfjournal/static/css/app.css"
 "healthyselfjournal/static/js/app.js" = "healthyselfjournal/static/js/app.js"
 "healthyselfjournal/web/templates/session_shell.html.jinja" = "healthyselfjournal/web/templates/session_shell.html.jinja"
