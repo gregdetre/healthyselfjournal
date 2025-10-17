@@ -29,6 +29,9 @@ The following topics have been researched and documented:
 - ✅ Structured reflection vs rumination → `STRUCTURED_REFLECTION_VS_RUMINATION.md`
 - ✅ Cognitive-emotional integration → `COGNITIVE_EMOTIONAL_INTEGRATION.md`
 - ✅ Implementation intentions → `IMPLEMENTATION_INTENTIONS_HABITS.md`
+- ✅ Self-generated insight and memory advantage → `SELF_GENERATED_INSIGHT_MEMORY_ADVANTAGE.md`
+  - Duke University 2025: Neuroscience of "aha moments"; cortical representational changes
+  - AI impact on cognitive effort and critical thinking; facilitated vs. provided insights
 
 ### Tier 2 (Completed)
 - ✅ Gratitude practice optimization → `GRATITUDE_PRACTICE_OPTIMIZATION.md`
@@ -36,6 +39,9 @@ The following topics have been researched and documented:
 - ✅ Opening questions → `OPENING_QUESTIONS_FRICTION_REDUCTION.md`
 - ✅ Progress tracking → `PROGRESS_TRACKING_STREAK_DESIGN.md`
 - ✅ Socratic questioning → `SOCRATIC_QUESTIONING_TECHNIQUES.md`
+- ✅ Session closure and consolidation → `SESSION_CLOSURE_CONSOLIDATION.md`
+  - Psychotherapy termination research 2025; consolidation vs. termination terminology
+  - Progress review reinforces growth; patient involvement predicts success
 
 ### Contemplative Practices (Completed)
 - ✅ Mindful reflection (Plum Village tradition) → `MINDFUL_REFLECTION_PLUM_VILLAGE.md`
@@ -219,6 +225,9 @@ The following topics have been researched and documented:
 
 - ✅ Anti-sycophancy and parasocial risk guardrails → `ANTI_SYCOPHANCY_AND_PARASOCIAL_RISK_GUARDRAILS.md`
   - Neutral language, anti-praise, break nudges, boundaries; WHO/NICE-aligned
+- ✅ AI therapy chatbot risks and safety → `AI_THERAPY_CHATBOT_RISKS.md`
+  - Stanford research on AI mental health dangers; AI psychosis; hallucination risks; suicide detection failures
+  - Regulatory response; contraindications; safe vs. dangerous contexts for AI
 
 26. **Identifying at-risk users**
     - Crisis detection without diagnosis
