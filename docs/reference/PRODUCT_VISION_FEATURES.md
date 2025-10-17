@@ -4,6 +4,8 @@
 
 A command-line journaling app using voice input to lower friction and dialogue-based questioning to maintain engagement while avoiding common pitfalls identified in research.
 
+We prioritize evidence-based design and the long-term wellbeing of users and society over engagement.
+
 ## See also
 
 - `ARCHITECTURE.md` - System architecture, components, and data flow
@@ -16,6 +18,8 @@ A command-line journaling app using voice input to lower friction and dialogue-b
 - `../conversations/250117a_journaling_app_ui_technical_decisions.md` - Technical decisions
 - `../conversations/250916a_journaling_app_dialogue_design.md` - Dialogue design rationale
 - `../research/JOURNALLING_SCIENTIFIC_EVIDENCE_RESEARCH.md` - Evidence base
+- `../research/AUTONOMY_SUPPORT_MI_SDT_FOR_JOURNALING.md` - MI/SDT autonomy‑support guidance
+- `../research/ANTI_SYCOPHANCY_AND_PARASOCIAL_RISK_GUARDRAILS.md` - Guardrails to avoid sycophancy/parasocial risks
 
 ## Core Features
 
