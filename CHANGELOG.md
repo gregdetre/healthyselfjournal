@@ -1,3 +1,9 @@
+## 0.2.5 - 2025-10-17
+
+- Add `version` command to CLI (`healthyselfjournal -- version`)
+- Publish to PyPI; wheel verified and prompt/static assets intact
+- Validation note: pin to `==0.2.5` once PyPI indexing completes
+
 ## 0.2.4 - 2025-10-17
 
 - Publish to PyPI; `uvx healthyselfjournal -- --help` validated

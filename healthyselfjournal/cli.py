@@ -16,11 +16,13 @@ from .cli_journal_cli import build_app as build_journal_app
 from .cli_session import build_app as build_session_app
 from .cli_insights import build_app as build_insights_app
 from .cli_diagnose import build_app as build_diagnose_app
+from . import __version__
 
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
+    help=f"HealthySelfJournal {__version__}\n\nVoice-first journaling CLI.",
 )
 
 console = Console()
@@ -90,6 +92,14 @@ app.add_typer(build_diagnose_app(), name="diagnose")
 app.add_typer(build_init_app(), name="init")
 
 # Top-level commands
+
+
+# Version command
+@app.command("version")
+def version() -> None:
+    """Show installed package version."""
+    typer.echo(__version__)
+
 
 # Session utilities group (moved out to cli_session.py)
 app.add_typer(build_session_app(), name="session")
@@ -186,3 +196,7 @@ app.add_typer(build_insights_app(), name="insights")
 
 
 # mic-check is now part of the diagnose subcommands
+@app.command("version", help="Print the installed package version.")
+def version_command() -> None:
+    from . import __version__ as pkg_version
+    console.print(pkg_version)
