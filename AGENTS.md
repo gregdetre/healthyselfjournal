@@ -61,12 +61,16 @@ See: `docs/reference/PRODUCT_VISION_FEATURES.md`
 ## Key reference docs
 
 - Architecture: `docs/reference/ARCHITECTURE.md`
-- CLI usage: `docs/reference/COMMAND_LINE_INTERFACE.md`
+- CLI overview: `docs/reference/COMMAND_LINE_INTERFACE.md`
+- CLI commands: `docs/reference/CLI_COMMANDS.md`
 - Recording controls: `docs/reference/RECORDING_CONTROLS.md`
 - Dialogue flow: `docs/reference/DIALOGUE_FLOW.md`
 - Prompt templates: `docs/reference/LLM_PROMPT_TEMPLATES.md`
 - File formats: `docs/reference/FILE_FORMATS_ORGANISATION.md`
 - Whisper/STT: `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md`
+- Privacy: `docs/reference/PRIVACY.md`
+- Safeguarding: `docs/reference/SAFEGUARDING.md`
+- Doc index: `docs/reference/DOCUMENTATION_ORGANISATION.md`
 - see others in `docs/reference/`
 
 ## Planning & research

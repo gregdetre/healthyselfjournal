@@ -7,7 +7,6 @@ This page is a high-level index. For detailed usage, see:
 - `WEB_RECORDING_INTERFACE.md` – Web recording (`journal web`)
 - `DESKTOP_APP_PYWEBVIEW.md` – PyWebView desktop shell (`healthyselfjournal journal desktop`)
 - `SESSIONS.md` – Session utilities (`session list`, `session merge`, `session summaries`)
-- `CLI_COMMANDS.md` – Command index and examples
 - `PRIVACY.md` – Privacy controls and how to operate fully local
 
  Diagnostics:
@@ -24,6 +23,5 @@ Repair utilities:
 - `fix regenerate <file>` – Regenerate a summary for one session
 
 See also:
-- `CLI_COMMANDS.md` – Command catalogue
 - `CLI_COMMANDS.md` – Command catalogue
 - `RESILIENCE.md` – Detect-and-suggest behaviour, placeholders, and fix guidance
