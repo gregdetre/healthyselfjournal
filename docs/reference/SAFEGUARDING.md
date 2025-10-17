@@ -8,6 +8,7 @@ Concise principles and practices to prevent harm in a voice‑first journaling a
 
 - `PRODUCT_VISION_FEATURES.md` – values (evidence, long‑term wellbeing)
 - `SCIENTIFIC_RESEARCH_EVIDENCE_PRINCIPLES.md` – research standards
+- `GLOBAL_CRISIS_RESOURCES.md` – comprehensive verified crisis helplines globally
 - `../research/AUTONOMY_SUPPORT_MI_SDT_FOR_JOURNALING.md` – MI/SDT autonomy support
 - `../research/ANTI_SYCOPHANCY_AND_PARASOCIAL_RISK_GUARDRAILS.md` – anti‑sycophancy guardrails
 - `PRIVACY.md` – local‑first data boundaries
@@ -26,7 +27,7 @@ Concise principles and practices to prevent harm in a voice‑first journaling a
 
 - Prompt rules: anti‑praise/anti‑sycophancy; neutrality; rumination pivots
 - Break pacing: non‑blocking reminder around ~20 minutes; weekly usage reflection
-- Boundaries footer: brief reminder of scope + help resources
+- Boundaries footer: brief reminder of scope + verified crisis resources (see `GLOBAL_CRISIS_RESOURCES.md`)
 - Summary style: concise, action‑oriented highlights; avoid valence‑laden approval
 - Optional runtime checks: flag exclamation/superlatives; cap affect‑only loops
 
@@ -34,6 +35,8 @@ Concise principles and practices to prevent harm in a voice‑first journaling a
 
 - See `healthyselfjournal/prompts/question.prompt.md.jinja` for exact rules
 - CLI should expose break‑nudge configuration and referral text source
+- Crisis resources: comprehensive verified catalogue in `GLOBAL_CRISIS_RESOURCES.md` (verified quarterly)
+- Research found 9% of mental health apps provided erroneous crisis numbers; our catalogue uses authoritative sources
 - Tests: add cases for short‑take discards, rumination pivot triggers, boundary text presence
 
 ## References (selected)
