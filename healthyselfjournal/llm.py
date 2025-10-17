@@ -66,6 +66,33 @@ class SummaryResponse:
     model: str
 
 
+@dataclass
+class InsightsRequest:
+    """Inputs for generating a single reflective insight.
+
+    historical_summaries: Oldest→newest list of summaries that provide broad context.
+    recent_transcripts: Full transcript bodies for the recent window since last insights.
+    prior_insights_excerpt: Optional excerpt from the latest prior insights to reduce repetition.
+    range_text: Human-readable description of the covered range (e.g., dates and counts).
+    guidelines: Minimal guardrails and style guidance included in the prompt.
+    """
+
+    historical_summaries: Sequence[str]
+    recent_transcripts: Sequence[str]
+    prior_insights_excerpt: str | None
+    range_text: str
+    guidelines: str
+    model: str
+    count: int | None = None
+    max_tokens: int = 1200
+
+
+@dataclass
+class InsightsResponse:
+    insight_markdown: str
+    model: str
+
+
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 
@@ -271,6 +298,72 @@ def stream_followup_question(
     response = QuestionResponse(question=question, model=request.model)
     log_event(
         "llm.question.streaming.success",
+        {
+            "provider": provider,
+            "model": model_name,
+            "max_tokens": request.max_tokens,
+        },
+    )
+    return response
+
+
+def generate_insight(request: InsightsRequest) -> InsightsResponse:
+    provider, model_name, thinking_enabled = _split_model_spec(request.model)
+    if thinking_enabled and provider != "anthropic":
+        raise ValueError(f"Thinking mode is not supported for provider '{provider}'")
+
+    template = _load_prompt("insights.prompt.md.jinja")
+    rendered = jinja_render(
+        template,
+        {
+            "historical_summaries": list(request.historical_summaries),
+            "recent_transcripts": list(request.recent_transcripts),
+            "prior_insights_excerpt": request.prior_insights_excerpt or "",
+            "range_text": request.range_text,
+            "guidelines": request.guidelines,
+            "insight_count": request.count,
+        },
+        filesystem_loader=PROMPTS_DIR,
+    )
+
+    if CONFIG.llm_cloud_off and provider not in {"local", "ollama"}:
+        raise RuntimeError(
+            "Cloud LLM access is disabled (cloud_off); switch to local_llama mode."
+        )
+
+    if provider == "local":
+        text = _call_local_llama(
+            rendered,
+            max_tokens=request.max_tokens,
+            temperature=CONFIG.llm_temperature_summary,
+            top_p=CONFIG.llm_top_p,
+            top_k=CONFIG.llm_top_k,
+        )
+    elif provider == "anthropic":
+        text = _call_anthropic(
+            model_name,
+            rendered,
+            max_tokens=request.max_tokens,
+            temperature=CONFIG.llm_temperature_summary,
+            top_p=CONFIG.llm_top_p,
+            top_k=CONFIG.llm_top_k,
+            thinking_enabled=thinking_enabled,
+        )
+    elif provider == "ollama":
+        text = _call_ollama(
+            model_name,
+            rendered,
+            max_tokens=request.max_tokens,
+            temperature=CONFIG.llm_temperature_summary,
+            top_p=CONFIG.llm_top_p,
+            top_k=CONFIG.llm_top_k,
+        )
+    else:
+        raise ValueError(f"Unsupported provider '{provider}' for insights generation")
+
+    response = InsightsResponse(insight_markdown=text.strip(), model=request.model)
+    log_event(
+        "llm.insight.success",
         {
             "provider": provider,
             "model": model_name,
