@@ -14,6 +14,7 @@ from healthyselfjournal.storage import (
 from healthyselfjournal.transcription import TranscriptionResult
 from healthyselfjournal.config import CONFIG
 from healthyselfjournal import llm as llm_module
+from healthyselfjournal import __version__ as HSJ_VERSION
 
 
 def test_short_answer_discard_sets_quit_and_skips_transcription(tmp_path, monkeypatch):
@@ -77,7 +78,7 @@ def test_session_start_carries_recent_history(tmp_path):
         opening_question="How are you arriving today?",
         max_history_tokens=1000,
         recent_summaries_limit=2,
-        app_version="test-app",
+        app_version=HSJ_VERSION or "0.0.0+local",
     )
     manager = SessionManager(config)
     state = manager.start()
@@ -109,7 +110,7 @@ def test_session_complete_updates_frontmatter(tmp_path):
         opening_question="What is present?",
         max_history_tokens=800,
         recent_summaries_limit=3,
-        app_version="test-app",
+        app_version=HSJ_VERSION or "0.0.0+local",
     )
     manager = SessionManager(config)
     state = manager.start()
@@ -192,7 +193,7 @@ def test_generate_next_question_handles_give_me_a_question_via_llm(
         opening_question="What would you like to explore?",
         max_history_tokens=800,
         recent_summaries_limit=3,
-        app_version="test-app",
+        app_version=HSJ_VERSION or "0.0.0+local",
     )
     manager = SessionManager(config)
     state = manager.start()
@@ -250,8 +251,23 @@ def test_generate_next_question_streams_with_callback(tmp_path, monkeypatch):
         llm_model="anthropic:test",
         stt_model="whisper-test",
         opening_question="What would you like to explore?",
-        app_version="test-app",
+        app_version=HSJ_VERSION or "0.0.0+local",
     )
+
+
+def test_app_version_non_empty_default(tmp_path):
+    base_dir = tmp_path / "session"
+    config = SessionConfig(
+        base_dir=base_dir,
+        llm_model="anthropic:test",
+        stt_model="whisper-test",
+        opening_question="What is present?",
+        app_version=HSJ_VERSION or "0.0.0+local",
+    )
+    manager = SessionManager(config)
+    state = manager.start()
+    doc = load_transcript(state.markdown_path)
+    assert str(doc.frontmatter.data.get("app_version", "")).strip() != ""
     manager = SessionManager(config)
     state = manager.start()
 
@@ -474,6 +490,7 @@ def test_thinking_budget_respects_minimum_1024(monkeypatch):
 
     sent = captured.get("payload", {})
     assert sent.get("thinking", {}).get("budget_tokens", 0) >= 1024
+
 
 def test_resume_counts_browser_segments(tmp_path):
     base_dir = tmp_path / "sessions"

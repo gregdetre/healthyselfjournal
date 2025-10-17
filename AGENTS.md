@@ -24,7 +24,9 @@ See: `docs/reference/PRODUCT_VISION_FEATURES.md`
 
 - Developers: `docs/reference/SETUP_DEV.md` (uv + external venv workflow)
 - Users: `docs/reference/SETUP_USER.md` (install and quickstart)
-- Preferred venv: `/Users/greg/.venvs/experim__healthyselfjournal` (source it first)
+- Preferred venv: use a project-local `.venv` or your own path; avoid user-specific examples. Example:
+  - `python -m venv .venv && source .venv/bin/activate && uv sync`
+  - Or venv-less: `uvx healthyselfjournal -- --help`
 - `gjdutils` is a local editable dep via `[tool.uv.sources]`
 - `ffmpeg` on PATH enables background MP3 conversion (optional)
 

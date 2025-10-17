@@ -17,7 +17,7 @@ This document explains how configuration is loaded, what can be customized via e
 
 ## Configuration sources and precedence
 
-At import time, the package loads environment variables from `.env` then `.env.local` and also from XDG (`~/.config/healthyselfjournal/.env` and `.env.local`) for desktop users, without overriding existing OS environment variables.
+At import time, the package loads environment variables from `.env` then `.env.local` and also from XDG (`~/.config/healthyselfjournal/.env` and `.env.local`) for desktop users, without overriding existing OS environment variables. The CLI init wizard writes to the current working directory by default; pass `--xdg` to persist under XDG.
 
 Runtime precedence (highest to lowest):
 

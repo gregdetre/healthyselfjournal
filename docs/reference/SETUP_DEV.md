@@ -11,12 +11,12 @@ This guide explains how to set up a development environment for Healthy Self Jou
 - `AUDIO_VOICE_RECOGNITION_WHISPER.md` – STT backends and requirements (e.g., optional `ffmpeg`)
 
 ## Principles and decisions
-- Prefer the external virtual environment at `/Users/greg/.venvs/experim__healthyselfjournal`.
-- Use uv for dependency management and execution; when targeting the external venv, pass `--active` to uv project commands.
+- Prefer uv/uvx; use a project-local `.venv` or your own external venv path.
+- Use uv for dependency management and execution; when targeting an external venv, pass `--active` to uv project commands.
 - Keep a local editable clone of `gjdutils` at `./gjdutils` and track it in `pyproject.toml` via `[tool.uv.sources]`.
 
 ## Requirements
-- Python >= 3.12
+- Python >= 3.10
 - uv installed and on PATH
 
 ## Project layout
@@ -28,10 +28,11 @@ healthyselfjournal/
   └─ docs/reference/
 ```
 
-## Setup using the external venv (recommended)
-1) Activate the external virtual environment
+## Setup using an external venv (optional)
+1) Activate your external virtual environment (example path; adjust to your system)
 ```bash
-source /Users/greg/.venvs/experim__healthyselfjournal/bin/activate
+python -m venv /path/to/venv
+source /path/to/venv/bin/activate
 python -V
 ```
 
@@ -92,7 +93,7 @@ npm run watch
 ```toml
 [project]
 name = "healthyselfjournal"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "gjdutils",
 ]

@@ -9,7 +9,20 @@ __all__ = [
     "__version__",
 ]
 
-__version__ = "0.1.0"
+# Resolve package version from installed metadata; fall back for editable/dev
+try:  # Python stdlib importlib.metadata
+    from importlib.metadata import PackageNotFoundError, version as _pkg_version
+except Exception:  # pragma: no cover - extremely defensive
+    PackageNotFoundError = Exception  # type: ignore[assignment]
+
+    def _pkg_version(_: str) -> str:  # type: ignore[no-redef]
+        return "0.0.0+local"
+
+
+try:
+    __version__ = _pkg_version("healthyselfjournal")
+except PackageNotFoundError:
+    __version__ = "0.0.0+local"
 
 
 def _autoload_env() -> None:

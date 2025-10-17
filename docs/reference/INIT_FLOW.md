@@ -9,7 +9,7 @@ This document describes the initialization flow for non‑technical users. The `
 - `../reference/CLI_COMMANDS.md` – how to run commands (`journal cli`, `journal web`, `reconcile`, `summarise/*`).
 - `../reference/SETUP_DEV.md` – development/venv setup; context for env variables and uv workflow.
 - `../reference/libraries/QUESTIONARY.md` – prompt library usage patterns and tips.
-- `../../healthyselfjournal/cli.py` – Typer CLI including `init` and auto‑init in `journal cli`.
+- `../../healthyselfjournal/cli.py` – Typer CLI including `init` (supports `--xdg`) and auto‑init in `journal cli`.
 - `../../healthyselfjournal/__init__.py` – `.env`/`.env.local` autoloading at import time.
 - `../../healthyselfjournal/config.py` – defaults and env‑driven configuration (e.g., `SESSIONS_DIR`, `STT_*`).
 - `../../healthyselfjournal/transcription.py` – STT backends and selection logic.
@@ -23,7 +23,7 @@ This document describes the initialization flow for non‑technical users. The `
 - Optimize for a successful first run with minimal friction; offer sensible defaults.
 - Prefer Cloud mode initially for best accuracy/latency; Privacy mode is available but early‑stage.
 - Never block recording due to STT/LLM errors; degrade gracefully and allow backfill.
-- Persist user choices in simple `.env.local` so non‑technical users can edit later.
+- Persist user choices in simple `.env.local` so non‑technical users can edit later. Defaults to CWD; pass `--xdg` to save under `~/.config/healthyselfjournal/.env.local`.
 - Autoload env from `.env` then `.env.local`, without overriding explicitly set OS env.
 - Keep the default sessions directory at `./sessions` (CWD) to match `uvx` usage.
 

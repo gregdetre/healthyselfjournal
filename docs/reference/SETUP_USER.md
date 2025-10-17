@@ -12,8 +12,12 @@ This guide helps end users install and run Healthy Self Journal with minimal eff
 - `CONFIGURATION.md` – Runtime configuration, env vars, and precedence rules
 
 ## Prerequisites
-- Python 3.12+
+- Python 3.10+
 - Optional: `ffmpeg` on PATH (for background MP3 conversion)
+- Audio notes:
+  - Windows: usually works out of the box. If mic access is blocked, enable Microphone permission for your terminal.
+  - macOS: grant Microphone permission to your terminal (System Settings → Privacy & Security → Microphone).
+  - Linux: ensure PortAudio/libsndfile are available (e.g., `sudo apt install portaudio19-dev libsndfile1`).
 
 ## Install
 
@@ -33,7 +37,7 @@ Run the interactive first‑run setup to collect keys and preferences:
 ```bash
 uvx healthyselfjournal -- init
 ```
-The wizard helps you choose between Cloud (recommended) and Privacy (local/offline) modes, gathers API keys when needed, sets your sessions directory, and writes `.env.local` so future runs work without extra flags.
+The wizard helps you choose between Cloud (recommended) and Privacy (local/offline) modes, gathers API keys when needed, sets your sessions directory, and writes `.env.local` so future runs work without extra flags. By default it writes to your current directory; pass `--xdg` to save under `~/.config/healthyselfjournal/.env.local`.
 On desktop, a built‑in Setup wizard appears on first launch and saves keys under `~/.config/healthyselfjournal/.env.local` and preferences under `~/.config/healthyselfjournal/settings.toml`.
 
 ## Keys and modes

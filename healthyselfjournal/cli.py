@@ -14,6 +14,7 @@ from .cli_init import init as init_cmd
 from .cli_init_app import build_app as build_init_app
 from .cli_journal_cli import build_app as build_journal_app
 from .cli_session import build_app as build_session_app
+from .cli_insights import build_app as build_insights_app
 from .cli_diagnose import build_app as build_diagnose_app
 
 app = typer.Typer(
@@ -62,14 +63,14 @@ def _verify_runtime_deps_for_command(command_name: str) -> None:
                 "[yellow]This often happens when running in the wrong virtualenv.[/]"
             )
             console.print(f"Python: {sys.executable}")
-            console.print("Activate the recommended venv and install deps, then retry:")
-            console.print(
-                "  source /Users/greg/.venvs/experim__healthyselfjournal/bin/activate"
-            )
-            console.print("  uv sync --active")
-            console.print()
-            console.print("Or run without activating the venv using uv:")
-            console.print("  uv run --active healthyselfjournal journal cli")
+            console.print("How to proceed:")
+            console.print("- Recommended: run without activating a venv using uvx:")
+            console.print("    uvx healthyselfjournal -- journal cli")
+            console.print("")
+            console.print("- Or use uv with an active venv (no user-specific paths):")
+            console.print("    python -m venv .venv && source .venv/bin/activate")
+            console.print("    uv sync")
+            console.print("    uv run healthyselfjournal journal cli")
             raise typer.Exit(code=3)
 
 
@@ -179,6 +180,9 @@ fix_app.add_typer(_summaries_app, name="summaries")
 
 
 app.add_typer(fix_app, name="fix")
+
+# Insights sub-app (v1): list and generate
+app.add_typer(build_insights_app(), name="insights")
 
 
 # mic-check is now part of the diagnose subcommands

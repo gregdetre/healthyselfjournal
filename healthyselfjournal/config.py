@@ -9,8 +9,11 @@ from typing import List, Tuple
 
 try:  # Python 3.11+
     import tomllib as _toml
-except Exception:  # pragma: no cover - fallback
-    _toml = None  # type: ignore
+except Exception:  # pragma: no cover - fallback to tomli on <3.11
+    try:
+        import tomli as _toml  # type: ignore
+    except Exception:  # pragma: no cover - missing toml reader entirely
+        _toml = None  # type: ignore
 
 
 def _env_int(name: str, default: int) -> int:

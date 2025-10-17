@@ -22,7 +22,7 @@ This document describes the end‑to‑end process for packaging and publishing 
   - Static assets for the web UI: `healthyselfjournal/static/{css,js}/*`
 - CLI entry point: `healthyselfjournal` → `healthyselfjournal.__main__:app` (Typer app defined in `healthyselfjournal/cli.py`).
 - Dependencies: pinned lower bounds; notable constraints include `python-fasthtml>=0.3,<0.4` and `fastcore` (kept compatible with `python-fasthtml`).
-- Python requirement: `>=3.12`.
+- Python requirement: `>=3.10` (with `tomli` fallback for TOML parsing on <3.11).
 - Dev convenience: `[tool.uv.sources] gjdutils = { path = "./gjdutils", editable = true }` for local work; published wheels depend on the public `gjdutils` (`>=0.6.1`).
 - Verified: build + smoke tests pass; published to TestPyPI and validated via a fresh venv.
 
@@ -39,7 +39,7 @@ This document describes the end‑to‑end process for packaging and publishing 
 ### 1) Preflight checks
 
 - Ensure a clean working tree and passing tests.
-- Confirm version bump in `pyproject.toml` → `[project] version`.
+- Confirm version bump in `pyproject.toml` → `[project] version` (single source of truth).
 - Verify dependencies are correct (no local path deps in `[project.dependencies]`).
 - Optional: update `README.md` and relevant reference docs.
 
@@ -151,7 +151,7 @@ uvx --python 3.12 healthyselfjournal -- --help
 
 ## Versioning and release hygiene
 
-- Version lives in `pyproject.toml` → `[project] version`. Bump before building.
+- Version lives in `pyproject.toml` → `[project] version`. Code reads it at runtime via `importlib.metadata` (computed `__version__`), with a local fallback like `0.0.0+local` when not installed. Bump before building.
 - Tagging: `git tag v<version>` after a successful release (optional but recommended).
 - Changelog: keep concise release notes (consider adding `CHANGELOG.md`).
 - Commits: follow `gjdutils/docs/instructions/GIT_COMMIT_CHANGES.md` guidance for clean, typed messages.
@@ -177,7 +177,7 @@ uvx --python 3.12 healthyselfjournal -- --help
 - [ ] `uvx healthyselfjournal -- --help` works on a clean machine
 - [ ] Docs updated (`README.md`, `CLI_COMMANDS.md`) if flags/flows changed
  - [ ] Pin-run check: `uvx healthyselfjournal==<version> -- --help`
- - [ ] Tag and push: `git tag v<version> && git push origin v<version>`
+ - [ ] Tag and push (triggers desktop CI build): `git tag v<version> && git push origin v<version>`
  - [ ] Update `CHANGELOG.md` with highlights for this release
  - [ ] (If enabled) CI Trusted Publishing workflow runs and succeeds
  - [ ] If distributing the desktop app, follow the Desktop app release checklist in `docs/reference/DESKTOP_APP_PYWEBVIEW.md`
@@ -198,6 +198,6 @@ Short, practical steps for routine releases (example bumps 0.2.0 → 0.2.1):
 6. Validate from PyPI:
    - `uvx healthyselfjournal==0.2.1 -- --help`
    - Optional: `uvx --python 3.12 healthyselfjournal==0.2.1 -- --help`
-7. Commit/tag (optional): `git tag v0.2.1` and push
+7. Commit/tag (triggers desktop build): `git tag v0.2.1 && git push origin v0.2.1`
 8. Update `CHANGELOG.md` and docs if user‑facing changes were made
 9. If shipping the desktop app, follow the Desktop app release checklist in `docs/reference/DESKTOP_APP_PYWEBVIEW.md`

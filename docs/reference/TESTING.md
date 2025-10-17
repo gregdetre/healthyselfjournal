@@ -24,8 +24,8 @@ This document describes how we run and structure tests for Healthy Self Journal:
 Activate the preferred venv and sync dependencies:
 
 ```
-source /Users/greg/.venvs/experim__healthyselfjournal/bin/activate
-uv sync --active
+python -m venv .venv && source .venv/bin/activate
+uv sync
 ```
 
 Load `.env.local` (contains API keys used by integration tests), then run pytest. Due to a `tests` package present in some site-packages, always invoke tests by explicit file paths to avoid import shadowing:

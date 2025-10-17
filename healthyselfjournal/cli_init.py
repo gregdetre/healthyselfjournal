@@ -37,13 +37,19 @@ def needs_init(stt_backend_value: str | None) -> bool:
     return False
 
 
-def init() -> None:
+def init(
+    xdg: bool = typer.Option(
+        False,
+        "--xdg/--no-xdg",
+        help="Persist keys to XDG config (~/.config/healthyselfjournal/.env.local) instead of CWD.",
+    )
+) -> None:
     """Interactive setup wizard to configure keys, backend, and storage."""
 
-    run_init_wizard()
+    run_init_wizard(xdg=xdg)
 
 
-def run_init_wizard() -> None:
+def run_init_wizard(*, xdg: bool = False) -> None:
     """Run the interactive Questionary-based setup flow.
 
     Writes results to .env.local in the current working directory and updates
@@ -122,13 +128,27 @@ def run_init_wizard() -> None:
     if openai_key:
         updates["OPENAI_API_KEY"] = openai_key
 
-    _update_env_local(Path.cwd() / ".env.local", updates)
+    # Choose persistence target: CWD (default) or XDG when --xdg is set
+    if xdg:
+        try:
+            from platformdirs import user_config_dir  # type: ignore
+        except Exception:
+            target_path = Path.cwd() / ".env.local"
+        else:
+            xdg_dir = Path(user_config_dir("healthyselfjournal", "experim"))
+            xdg_dir.mkdir(parents=True, exist_ok=True)
+            target_path = xdg_dir / ".env.local"
+    else:
+        target_path = Path.cwd() / ".env.local"
+
+    _update_env_local(target_path, updates)
     for k, v in updates.items():
         os.environ[k] = v
 
+    saved_where = str(target_path)
     console.print(
         Panel.fit(
-            f"Configuration saved to .env.local in {Path.cwd()}\nSessions directory: {sessions_dir}",
+            f"Configuration saved: {saved_where}\nSessions directory: {sessions_dir}",
             title="Setup Complete",
             border_style="green",
         )
