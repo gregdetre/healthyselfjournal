@@ -15,12 +15,9 @@ A voice-based journaling tool that makes self-reflection as easy as thinking out
 ## Quick start
 
 ```bash
-# Install and set up (one time)
-pip install healthyselfjournal
-healthyselfjournal init
-
-# Start journaling
-healthyselfjournal journal cli
+# Recommended: run without installing (uvx)
+uvx healthyselfjournal -- init
+uvx healthyselfjournal -- journal cli
 ```
 
 That's it. Recording starts immediately. Press any key to stop and get your next question.
@@ -61,18 +58,18 @@ AI: "There's something powerful in how you describe building something together 
 ## Installation & Setup
 
 ### Requirements
-- Python 3.12 or newer
+- Python 3.10 or newer
 - Optional: an API key from OpenAI (for voice transcription) and Anthropic (for questions)
 - Optional: ffmpeg for audio compression
 
 ### Install
 
 ```bash
-# Option 1: Install with pip
-pip install healthyselfjournal
-
-# Option 2: Run without installing (using uvx)
+# Option 1: Run without installing (recommended)
 uvx healthyselfjournal -- init
+
+# Option 2: Install with pip
+pip install healthyselfjournal
 ```
 
 ### First-time setup
@@ -83,6 +80,10 @@ The setup wizard will help you:
 - Pick where to save your journal sessions
 
 ```bash
+# Recommended
+uvx healthyselfjournal -- init
+
+# Or if installed via pip
 healthyselfjournal init
 ```
 
@@ -97,6 +98,18 @@ healthyselfjournal journal cli --resume
 
 # Use the web interface instead
 healthyselfjournal journal web
+```
+
+### Insights (v1)
+
+Generate reflective insights based on your past summaries and recent transcripts, saved under `sessions/insights/`:
+
+```bash
+# List existing insights
+healthyselfjournal insights list --sessions-dir ./sessions
+
+# Generate multiple insights in a single file
+healthyselfjournal insights generate --sessions-dir ./sessions --count 3
 ```
 
 ### Controls
