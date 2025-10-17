@@ -70,8 +70,8 @@ uv run --active healthyselfjournal journal cli --voice-mode
 ## Troubleshooting
 
 - “attempted relative import with no known parent package” when launching:
-  - Prefer running the package as a module: `uv run --active python -m healthyselfjournal journal cli ...`.
-  - Or ensure the package is run via its CLI entrypoint once defined.
+  - Prefer running via `uvx`: `uvx healthyselfjournal -- journal cli ...`.
+  - Or, inside an active virtualenv, use: `uv run --active healthyselfjournal journal cli ...`.
 
 - “No audio player found (tried afplay, ffplay)”:
   - On macOS, `afplay` should exist; otherwise install `ffmpeg` to get `ffplay` on PATH.
