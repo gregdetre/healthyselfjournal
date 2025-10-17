@@ -460,7 +460,7 @@ User then requested:
 2. **Planning document**: `docs/planning/251017d_global_crisis_resources_catalogue.md`
    - Comprehensive plan for researching and documenting global crisis resources
    - Structured stages for verification methodology, web research by region, quality assurance
-   - Includes stage to write `gjdutils/docs/instructions/UPDATE_CRISIS_RESOURCES.md` for ongoing verification
+   - Includes stage to write `docs/reference/UPDATE_CRISIS_RESOURCES.md` for ongoing verification
    - References WRITE_EVERGREEN_DOC.md and WRITE_DEEP_DIVE_AS_DOC.md standards
 
 ## Assistant's Follow-Up Questions (Sounding Board Mode)

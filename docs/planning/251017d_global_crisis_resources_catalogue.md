@@ -274,7 +274,7 @@ Following WRITE_EVERGREEN_DOC.md structure:
 
 ### Stage: Create Verification Update Instructions
 
-- [ ] Write `gjdutils/docs/instructions/UPDATE_CRISIS_RESOURCES.md`
+- [ ] Write `docs/reference/UPDATE_CRISIS_RESOURCES.md`
   - [ ] Purpose: prompt/instructions for checking and updating crisis resources
   - [ ] Verification schedule (suggest quarterly)
   - [ ] Step-by-step verification process

@@ -15,7 +15,7 @@ This document provides a comprehensive, verified catalogue of crisis helpline nu
 - `PRODUCT_VISION_FEATURES.md` – Evidence-based product approach
 - `../conversations/251017a_safeguarding_crisis_resources_research.md` – Research findings on crisis resources
 - `../planning/251017d_global_crisis_resources_catalogue.md` – Planning and research methodology
-- `../../gjdutils/docs/instructions/UPDATE_CRISIS_RESOURCES.md` – Quarterly verification procedures
+- `UPDATE_CRISIS_RESOURCES.md` – Quarterly verification procedures
 
 ## How to Use This Resource
 
@@ -53,7 +53,7 @@ If you're experiencing a crisis or need immediate support:
 
 **Next Verification Due**: January 2026 (quarterly schedule)
 
-**Update Process**: See `gjdutils/docs/instructions/UPDATE_CRISIS_RESOURCES.md`
+**Update Process**: See `UPDATE_CRISIS_RESOURCES.md`
 
 ---
 
@@ -551,7 +551,7 @@ Find A Helpline (150+ countries): https://findahelpline.com
 - Check for service changes or discontinuations
 - Review hours of operation
 
-**Process**: See `gjdutils/docs/instructions/UPDATE_CRISIS_RESOURCES.md`
+**Process**: See `UPDATE_CRISIS_RESOURCES.md`
 
 ### Reporting Errors
 

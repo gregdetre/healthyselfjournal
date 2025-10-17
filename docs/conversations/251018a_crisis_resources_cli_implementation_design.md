@@ -204,7 +204,7 @@ Multiple paths to find crisis resources needed:
 
 **Documents Created in This Session:**
 - `docs/reference/GLOBAL_CRISIS_RESOURCES.md` - Comprehensive verified crisis resources catalogue (42+ services, 19 countries)
-- `gjdutils/docs/instructions/UPDATE_CRISIS_RESOURCES.md` - Quarterly verification procedures
+- `docs/reference/UPDATE_CRISIS_RESOURCES.md` - Quarterly verification procedures
 - `docs/reference/SAFEGUARDING.md` - Updated to reference crisis catalogue
 
 **Related Documentation:**
