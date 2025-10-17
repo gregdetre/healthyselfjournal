@@ -1,3 +1,10 @@
+## 0.2.4 - 2025-10-17
+
+- Publish to PyPI; `uvx healthyselfjournal -- --help` validated
+- Package now includes `healthyselfjournal/prompts/insights.prompt.md.jinja`
+- Verified wheel assets: prompts and static files bundled; entrypoint present
+- Minor prompt and web UI script updates
+
 ## 0.2.1 - 2025-09-20
 
 - Publish to PyPI with bundled prompts and static assets verified
@@ -24,3 +31,4 @@ All notable changes to this project will be documented in this file.
 - TestPyPI validation and prompt asset load smoke test confirmed.
 
 [0.2.0]: https://pypi.org/project/healthyselfjournal/0.2.0/
+ [0.2.4]: https://pypi.org/project/healthyselfjournal/0.2.4/
