@@ -1,5 +1,7 @@
 # Safeguarding
 
+STILL IN PROGRESS
+
 ## Introduction
 
 Concise principles and practices to prevent harm in a voice‑first journaling app. Focus: anti‑sycophancy, autonomy support, rumination mitigation, usage pacing, and clear boundaries/referrals.
