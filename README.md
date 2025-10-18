@@ -106,10 +106,10 @@ Generate reflective insights based on your past summaries and recent transcripts
 
 ```bash
 # List existing insights
-healthyselfjournal insights list --sessions-dir ./sessions
+healthyselfjournal insight list --sessions-dir ./sessions
 
 # Generate multiple insights in a single file
-healthyselfjournal insights generate --sessions-dir ./sessions --count 3
+healthyselfjournal insight generate --sessions-dir ./sessions --count 3
 ```
 
 ### Controls

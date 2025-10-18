@@ -320,10 +320,10 @@ def merge(
 
     Examples:
       - Merge by stamps (keeps earlier):
-        healthyselfjournal session merge 250918_0119 250918_085316
+        healthyselfjournal sessions merge 250918_0119 250918_085316
 
       - Merge explicit files and skip regeneration (preview only):
-        healthyselfjournal session merge --no-regenerate --dry-run \
+        healthyselfjournal sessions merge --no-regenerate --dry-run \
           sessions/250917_041214.md sessions/250918_0119.md
     """
 

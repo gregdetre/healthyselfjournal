@@ -178,7 +178,7 @@ Clean Language research and Rogers' person-centered therapy emphasize using the 
 ### v1: Single Insight per Generation
 
 **Behavior:**
-- User runs `healthyselfjournal insights generate`
+- User runs `healthyselfjournal insight generate`
 - System generates exactly one insight
 - Outputs to `[SESSIONS-DIR]/insights/yyMMdd_HHmm_insights.md`
 - User reads and reflects at their own pace
@@ -193,7 +193,7 @@ Clean Language research and Rogers' person-centered therapy emphasize using the 
 ### v2 (Future): Interactive Dripfeed Loop
 
 **Envisioned Behavior:**
-- User runs `healthyselfjournal insights generate --interactive`
+- User runs `healthyselfjournal insight generate --interactive`
 - System generates first insight
 - Displays to user
 - Prompts: "Press Enter for another insight, or type your thoughts..."
@@ -510,17 +510,17 @@ guidelines_version: "1.0"
 
 **Generate Insights:**
 ```bash
-healthyselfjournal insights generate [--llm-model MODEL] [--sessions-dir DIR]
+healthyselfjournal insight generate [--llm-model MODEL] [--sessions-dir DIR]
 ```
 
 **List Existing Insights:**
 ```bash
-healthyselfjournal insights list [--sessions-dir DIR]
+healthyselfjournal insight list [--sessions-dir DIR]
 ```
 
 **Future: Interactive Mode:**
 ```bash
-healthyselfjournal insights generate --interactive
+healthyselfjournal insight generate --interactive
 ```
 
 ### Testing Considerations

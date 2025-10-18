@@ -5,33 +5,34 @@ Single source for command discovery. See linked pages for detailed flags.
 
 ## Primary commands
 
+- `version` – Print the installed package version.
 - `journal cli` – Terminal-based recording. See `CLI_RECORDING_INTERFACE.md`.
 - `journal web` – Launch local browser interface. See `WEB_RECORDING_INTERFACE.md`.
 - `journal desktop` – Launch PyWebView desktop shell. See `DESKTOP_APP_PYWEBVIEW.md`.
-- `session list` – Show sessions with summary snippets. See `SESSIONS.md`.
-- `session summaries` – Show which sessions are missing summaries (moved from summarise list).
+- `sessions list` – Show sessions with summary snippets. See `SESSIONS.md`.
+- `sessions summaries` – Show which sessions are missing summaries (moved from summarise list).
 - `fix stt` – Backfill missing STT for saved WAV/webm/ogg files, replace markdown placeholders, and remove error sentinels.
 - `fix backfill` – Generate summaries where missing.
 - `fix regenerate <file>` – Regenerate a summary for a specific session file.
-- `session merge` – Merge two sessions into the earlier one.
+- `sessions merge` – Merge two sessions into the earlier one.
 - `init` – Setup wizard for first-time configuration.
 - `diagnose` – Diagnostics for mic/STT, local/cloud LLM, and TTS.
   - `diagnose desktop` – Probe desktop web shell routes (`/setup`, `/`) to catch template/context errors.
 
-### Insights
+### Insight
 
-- `insights list` – List existing insights files (newest first).
-- `insights generate` – Generate one or more reflective insights using the two-range default.
+- `insight list` – List existing insights files (newest first).
+- `insight generate` – Generate one or more reflective insights using the two-range default.
 
 Examples:
 
 ```bash
-uv run --active healthyselfjournal insights list --sessions-dir ./sessions
-uv run --active healthyselfjournal insights generate --sessions-dir ./sessions --llm-model anthropic:claude-sonnet-4:20250514:thinking
+uv run --active healthyselfjournal insight list --sessions-dir ./sessions
+uv run --active healthyselfjournal insight generate --sessions-dir ./sessions --llm-model anthropic:claude-sonnet-4:20250514:thinking
 # Let the model decide the number (default)
-uv run --active healthyselfjournal insights generate --sessions-dir ./sessions
+uv run --active healthyselfjournal insight generate --sessions-dir ./sessions
 # Explicit count
-uv run --active healthyselfjournal insights generate --sessions-dir ./sessions --count 3
+uv run --active healthyselfjournal insight generate --sessions-dir ./sessions --count 3
 ```
 
 ### Local LLM bootstrap
@@ -78,6 +79,9 @@ Each command lives in its own `cli_*.py` module for clarity:
 ## Examples
 
 ```bash
+# Show version
+uvx healthyselfjournal -- version
+
 # Start CLI journaling
 uvx healthyselfjournal -- journal cli --voice-mode
 
@@ -85,10 +89,10 @@ uvx healthyselfjournal -- journal cli --voice-mode
 uvx healthyselfjournal -- journal web --port 8888 --resume
 
 # List sessions in a custom directory (first 200 chars)
-uvx healthyselfjournal -- session list --sessions-dir ./sessions --nchars 200
+uvx healthyselfjournal -- sessions list --sessions-dir ./sessions --nchars 200
 
 # Summaries
-uvx healthyselfjournal -- session summaries --missing-only
+uvx healthyselfjournal -- sessions summaries --missing-only
 uvx healthyselfjournal -- fix backfill --limit 10
 uvx healthyselfjournal -- fix regenerate 250918_0119.md
 

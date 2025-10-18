@@ -42,7 +42,7 @@ def build_app() -> typer.Typer:
 
         if not files:
             console.print(
-                "[yellow]No insights found.[/] Run: healthyselfjournal insights generate"
+                "[yellow]No insights found.[/] Run: healthyselfjournal insight generate"
             )
             return
 
@@ -115,30 +115,37 @@ def build_app() -> typer.Typer:
 
         guidelines = "Use tentative, descriptive language; ground observations in quotes; end with an open question."
 
-        insights: list[str] = []
-        loops = max(1, n) if n > 0 else 1
-        for _ in range(loops):
-            resp = generate_insight(
-                InsightsRequest(
-                    historical_summaries=inputs.historical_summaries,
-                    recent_transcripts=inputs.recent_transcripts,
-                    prior_insights_excerpt=inputs.prior_insights_excerpt,
-                    range_text=inputs.range_text,
-                    guidelines=guidelines,
-                    model=llm_model,
-                    count=(None if n == 0 else 1 if loops == 1 else loops),
-                )
+        # Request insights once; if a count was provided, ask the model for exactly that many
+        requested_count = None if n == 0 else n
+        resp = generate_insight(
+            InsightsRequest(
+                historical_summaries=inputs.historical_summaries,
+                recent_transcripts=inputs.recent_transcripts,
+                prior_insights_excerpt=inputs.prior_insights_excerpt,
+                range_text=inputs.range_text,
+                guidelines=guidelines,
+                model=llm_model,
+                count=requested_count,
             )
-            text = resp.insight_markdown.strip()
-            if text:
-                if n == 0:
-                    # Heuristic split on horizontal rule or double newline
-                    parts = [p.strip() for p in text.split("\n---\n") if p.strip()]
-                    if len(parts) == 1:
-                        parts = [p.strip() for p in text.split("\n\n") if p.strip()]
-                    insights.extend(parts)
+        )
+
+        # Split the model response into individual insights using robust separators
+        insights: list[str] = []
+        text = resp.insight_markdown.strip()
+        if text:
+            parts = [p.strip() for p in text.split("\n---\n") if p.strip()]
+            if len(parts) <= 1:
+                # Fallback to double-newline split if horizontal rule not used
+                parts = [p.strip() for p in text.split("\n\n") if p.strip()]
+
+            if requested_count is None:
+                insights = parts if parts else ([text] if text else [])
+            else:
+                if parts:
+                    insights = parts[:requested_count]
                 else:
-                    insights.append(text)
+                    # Model returned a single block; treat as one insight
+                    insights = [text]
 
         path = write_insight_output(
             sessions_dir,

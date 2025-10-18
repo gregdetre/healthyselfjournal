@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import typer
+from typer.core import TyperGroup
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -17,12 +18,32 @@ from .cli_session import build_app as build_session_app
 from .cli_insights import build_app as build_insights_app
 from .cli_diagnose import build_app as build_diagnose_app
 from . import __version__
+from .cli_reconcile import reconcile as reconcile_cmd
+
+
+class _OrderedTopLevelGroup(TyperGroup):
+    def list_commands(self, ctx):
+        desired = [
+            "version",
+            "init",
+            "diagnose",
+            "journal",
+            "fix",
+            "sessions",
+            "insight",
+        ]
+        names = list(self.commands.keys())
+        ordered = [name for name in desired if name in names]
+        remaining = [name for name in sorted(names) if name not in set(ordered)]
+        return ordered + remaining
+
 
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
     help=f"HealthySelfJournal {__version__}\n\nVoice-first journaling CLI.",
+    cls=_OrderedTopLevelGroup,
 )
 
 console = Console()
@@ -102,7 +123,7 @@ def version() -> None:
 
 
 # Session utilities group (moved out to cli_session.py)
-app.add_typer(build_session_app(), name="session")
+app.add_typer(build_session_app(), name="sessions")
 
 # New `fix` group consolidating reconciliation and summary maintenance
 fix_app = typer.Typer(
@@ -191,12 +212,8 @@ fix_app.add_typer(_summaries_app, name="summaries")
 
 app.add_typer(fix_app, name="fix")
 
-# Insights sub-app (v1): list and generate
-app.add_typer(build_insights_app(), name="insights")
+# Insight sub-app (v1): list and generate
+app.add_typer(build_insights_app(), name="insight")
 
 
 # mic-check is now part of the diagnose subcommands
-@app.command("version", help="Print the installed package version.")
-def version_command() -> None:
-    from . import __version__ as pkg_version
-    console.print(pkg_version)
