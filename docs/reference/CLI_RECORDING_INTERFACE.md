@@ -6,10 +6,24 @@ Voice-first recording from your terminal with visual feedback and keyboard contr
 
 ## Launching
 
-Run from the project root (or installed environment):
+Run from the project root (or installed environment). Choose a mode explicitly:
 
 ```bash
-uvx healthyselfjournal -- journal cli \
+uvx healthyselfjournal -- journal cli cloud \
+  [--sessions-dir PATH] \
+  [--llm-model SPEC] \
+  [--stt-backend BACKEND] [--stt-model MODEL] [--stt-compute COMPUTE] [--stt-formatting MODE] \
+  [--opening-question TEXT] [--language LANG] [--resume] \
+  [--delete-wav-when-safe/--keep-wav] \
+  [--stream-llm/--no-stream-llm] \
+  [--voice-mode/--no-voice-mode] [--tts-model SPEC] [--tts-voice NAME] [--tts-format FORMAT] \
+  [--llm-questions-debug/--no-llm-questions-debug] \
+  [--mic-check/--no-mic-check]
+```
+
+Privacy mode variant:
+```bash
+uvx healthyselfjournal -- journal cli private \
   [--sessions-dir PATH] \
   [--llm-model SPEC] \
   [--stt-backend BACKEND] [--stt-model MODEL] [--stt-compute COMPUTE] [--stt-formatting MODE] \

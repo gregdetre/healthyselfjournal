@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import os
+import platform
+import time
+import subprocess
 import sys
 from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 import typer
 from rich.console import Console
+from rich.live import Live
 from rich.panel import Panel
 from rich.text import Text
-from rich.live import Live
 import tempfile
 import shutil
+import httpx
 
 from . import __version__
 from .cli_init import needs_init, run_init_wizard
@@ -24,6 +29,11 @@ from .transcription import (
     BackendNotAvailableError,
     apply_transcript_formatting,
     resolve_backend_selection,
+    CLOUD_BACKEND,
+    LOCAL_MLX_BACKEND,
+    LOCAL_FASTER_BACKEND,
+    LOCAL_WHISPERCPP_BACKEND,
+    AUTO_PRIVATE_BACKEND,
 )
 from .mic_check import run_interactive_mic_check
 from .tts import TTSOptions, speak_text
@@ -38,109 +48,241 @@ from .utils.pending import (
 console = Console()
 
 
-def journal(
-    ctx: typer.Context,
-    sessions_dir: Path = typer.Option(
-        CONFIG.recordings_dir,
-        "--sessions-dir",
-        help="Directory where session markdown/audio files are stored.",
-    ),
-    llm_model: str = typer.Option(
-        CONFIG.model_llm,
-        "--llm-model",
-        help="LLM model string: provider:model:version[:thinking] (e.g., anthropic:claude-sonnet-4:20250514:thinking)",
-    ),
-    stt_backend: str = typer.Option(
-        CONFIG.stt_backend,
-        "--stt-backend",
-        help=(
-            "Transcription backend: cloud-openai, local-mlx, local-faster, "
-            "local-whispercpp, or auto-private."
-        ),
-    ),
-    stt_model: str = typer.Option(
-        CONFIG.model_stt,
-        "--stt-model",
-        help="Model preset or identifier for the selected backend.",
-    ),
-    stt_compute: str = typer.Option(
-        CONFIG.stt_compute or "auto",
-        "--stt-compute",
-        help="Optional compute precision override for local backends (e.g., int8_float16).",
-    ),
-    stt_formatting: str = typer.Option(
-        CONFIG.stt_formatting,
-        "--stt-formatting",
-        help="Transcript formatting mode: sentences (default) or raw.",
-    ),
-    opening_question: str = typer.Option(
-        CONFIG.opening_question,
-        "--opening-question",
-        help="Initial question used to start each session.",
-    ),
-    language: str = typer.Option(
-        "en",
-        "--language",
-        help="Primary language for transcription and LLM guidance.",
-    ),
-    resume: bool = typer.Option(
-        False,
-        "--resume",
-        help="Resume the most recent session in the sessions directory.",
-    ),
-    delete_wav_when_safe: bool = typer.Option(
-        True,
-        "--delete-wav-when-safe/--keep-wav",
-        help="Delete WAV after MP3+STT exist (saves disk).",
-    ),
-    stream_llm: bool = typer.Option(
-        True,
-        "--stream-llm/--no-stream-llm",
-        help="Stream the next question from the LLM for lower perceived latency.",
-    ),
-    voice_mode: bool = typer.Option(
-        False,
-        "--voice-mode/--no-voice-mode",
-        help=(
-            "Convenience switch: enable speech with default TTS settings (shimmer, gpt-4o-mini-tts, wav)."
-        ),
-    ),
-    tts_model: str = typer.Option(
-        CONFIG.tts_model,
-        "--tts-model",
-        help="TTS model identifier (default: gpt-4o-mini-tts).",
-    ),
-    tts_voice: str = typer.Option(
-        CONFIG.tts_voice,
-        "--tts-voice",
-        help="TTS voice name (e.g., alloy).",
-    ),
-    tts_format: str = typer.Option(
-        CONFIG.tts_format,
-        "--tts-format",
-        help="TTS audio format for playback (wav recommended).",
-    ),
-    llm_questions_debug: bool = typer.Option(
-        False,
-        "--llm-questions-debug/--no-llm-questions-debug",
-        help="Append a debug postscript to LLM questions about techniques used.",
-    ),
-    mic_check: bool = typer.Option(
-        False,
-        "--mic-check/--no-mic-check",
-        help="Run a 3s mic check on startup (ENTER continue, ESC retry, q quit).",
-    ),
+# Default Ollama model used by the private mode alias
+_OLLAMA_DEFAULT_MODEL = "ollama:qwen2.5:7b-instruct"
+
+
+class _EnvScope:
+    def __init__(self, updates: Dict[str, Optional[str]]) -> None:
+        self._updates = updates
+        self._original: Dict[str, Optional[str]] = {}
+
+    def __enter__(self) -> None:
+        for key, value in self._updates.items():
+            self._original[key] = os.environ.get(key)
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        for key, original in self._original.items():
+            if original is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = original
+
+
+def _is_interactive_tty() -> bool:
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _normalise_path_option(value: Optional[Path], default: Path) -> Path:
+    if value is None:
+        return default
+    return value
+
+
+def _normalise_bool_option(value: Optional[bool], default: bool) -> bool:
+    if value is None:
+        return default
+    return value
+
+
+def _normalise_str_option(value: Optional[str], default: str) -> str:
+    if value is None or value == "":
+        return default
+    return value
+
+
+def _extract_ollama_model_id(llm_model: str) -> str:
+    if ":" not in llm_model:
+        return llm_model
+    provider, rest = llm_model.split(":", 1)
+    if provider.lower() != "ollama":
+        return llm_model
+    return rest
+
+
+def _run_ollama_preflight_or_exit(llm_model: str) -> None:
+    """Validate local Ollama availability for the given model.
+
+    Checks:
+    1) Binary present on PATH
+    2) Daemon reachable at CONFIG.ollama_base_url (/api/tags)
+    3) Model tag present; if missing, propose `ollama pull <model>`
+
+    Offers interactive auto-fix in a TTY for safe operations:
+    - Start desktop app on macOS (open -a Ollama), then retry
+    - Pull missing model with `ollama pull <model>`
+    Exits with code 2 when an unrecoverable issue remains.
+    """
+    provider = get_model_provider(llm_model)
+    if provider != "ollama":
+        return
+
+    model_id = _extract_ollama_model_id(llm_model)
+    base_url = CONFIG.ollama_base_url.rstrip("/")
+
+    # 1) Binary present
+    if not shutil.which("ollama"):
+        lines = [
+            "Ollama CLI not found on PATH.",
+            "Next step:",
+            "  - Install Ollama, then rerun this command.",
+            "    macOS (Homebrew): brew install ollama",
+            "    Or download: https://ollama.com/download",
+        ]
+        console.print(
+            Panel.fit("\n".join(lines), title="Ollama Preflight", border_style="yellow")
+        )
+        raise typer.Exit(code=2)
+
+    # 2) Daemon reachable
+    tags_url = f"{base_url}/api/tags"
+    try:
+        resp = httpx.get(tags_url, timeout=CONFIG.ollama_timeout_seconds)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        # Try to start the daemon interactively on macOS
+        if _is_interactive_tty() and platform.system().lower() == "darwin":
+            console.print(
+                Panel.fit(
+                    "Could not reach the Ollama daemon. Start it now?",
+                    title="Ollama Preflight",
+                    border_style="yellow",
+                )
+            )
+            if typer.confirm("Start Ollama app now?", default=True):
+                try:
+                    subprocess.run(["open", "-a", "Ollama"], check=False)
+                except Exception:
+                    pass
+                # Give it a moment, then retry once
+                time.sleep(2.0)
+                try:
+                    resp = httpx.get(tags_url, timeout=CONFIG.ollama_timeout_seconds)
+                    resp.raise_for_status()
+                    data = resp.json()
+                except Exception as exc2:
+                    _show_ollama_connect_help(base_url, model_id, extra=str(exc2))
+                    raise typer.Exit(code=2)
+            else:
+                _show_ollama_connect_help(base_url, model_id, extra=str(exc))
+                raise typer.Exit(code=2)
+        else:
+            _show_ollama_connect_help(base_url, model_id, extra=str(exc))
+            raise typer.Exit(code=2)
+
+    # 3) Model available
+    if not _ollama_tags_contains_model(data, model_id):
+        suggestion = f"ollama pull {model_id}"
+        if _is_interactive_tty():
+            console.print(
+                Panel.fit(
+                    f"Required model not found: {model_id}\nPull now?",
+                    title="Ollama Model",
+                    border_style="yellow",
+                )
+            )
+            if typer.confirm(f"Run '{suggestion}' now?", default=True):
+                try:
+                    subprocess.run(["ollama", "pull", model_id], check=True)
+                except subprocess.CalledProcessError as exc:
+                    console.print(f"[red]ollama pull failed:[/] {exc}")
+                    raise typer.Exit(code=2)
+            else:
+                console.print(
+                    Panel.fit(
+                        f"Next: run\n  {suggestion}",
+                        title="Ollama Model",
+                        border_style="yellow",
+                    )
+                )
+                raise typer.Exit(code=2)
+        else:
+            console.print(
+                Panel.fit(
+                    f"Missing model: {model_id}\nNext: run\n  {suggestion}",
+                    title="Ollama Model",
+                    border_style="yellow",
+                )
+            )
+            raise typer.Exit(code=2)
+
+
+def _ollama_tags_contains_model(tags_json: Any, model_id: str) -> bool:
+    try:
+        models = tags_json.get("models") or []
+        for m in models:
+            # Common keys: "model" or "name"
+            val = (m.get("model") or m.get("name") or "").strip()
+            # Accept exact match or base name match
+            if (
+                val == model_id
+                or val.endswith(f":{model_id}")
+                or model_id.endswith(f":{val}")
+            ):
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def _show_ollama_connect_help(
+    base_url: str, model_id: str, *, extra: str | None = None
+) -> None:
+    lines: list[str] = []
+    if extra:
+        lines.append(str(extra))
+        lines.append("")
+    lines.append(f"Could not reach Ollama at {base_url}.")
+    lines.append("Next step:")
+    if platform.system().lower() == "darwin":
+        lines.append("  - Start the app: open -a Ollama")
+        lines.append("  - Or with Homebrew: brew services start ollama")
+    else:
+        lines.append("  - Start the daemon: ollama serve")
+    lines.append("  - If using a remote host/port, set OLLAMA_BASE_URL appropriately")
+    lines.append("")
+    lines.append("Then verify:")
+    lines.append(f"  curl -s {base_url}/api/version && echo")
+    lines.append("")
+    lines.append("If the model is missing, pull it:")
+    lines.append(f"  ollama pull {model_id}")
+    console.print(
+        Panel.fit("\n".join(lines), title="Ollama Preflight", border_style="yellow")
+    )
+
+
+def _run_cli_session(
+    *,
+    sessions_dir: Path,
+    llm_model: str,
+    stt_backend: str,
+    stt_model: str,
+    stt_compute: str,
+    stt_formatting: str,
+    opening_question: str,
+    language: str,
+    resume: bool,
+    delete_wav_when_safe: bool,
+    stream_llm: bool,
+    voice_mode: bool,
+    tts_model: str,
+    tts_voice: str,
+    tts_format: str,
+    llm_questions_debug: bool,
+    mic_check: bool,
+    mode_alias: str | None,
 ) -> None:
     """Run the interactive voice journaling session."""
-
-    # If a subcommand is invoked under the journal app, do nothing here
-    if getattr(ctx, "invoked_subcommand", None):
-        return
 
     # Auto-run init wizard if critical prerequisites are missing and we are in a TTY.
     # This respects any values loaded from .env/.env.local in __init__ at import time.
     if needs_init(stt_backend):
-        if sys.stdin.isatty():
+        if _is_interactive_tty():
             console.print(
                 Panel.fit(
                     "It looks like you haven't finished setup yet. Launching the setup wizard…",
@@ -163,6 +305,15 @@ def journal(
             )
             raise typer.Exit(code=2)
 
+    # Preflight for Ollama when using an Ollama model for question generation
+    try:
+        if get_model_provider(llm_model) == "ollama":
+            _run_ollama_preflight_or_exit(llm_model)
+    except typer.Exit:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive surface
+        console.print(f"[yellow]Ollama preflight warning:[/] {exc}")
+
     selection, stream_llm, tts_model, tts_voice, tts_format = (
         prepare_runtime_and_backends(
             llm_model=llm_model,
@@ -182,27 +333,27 @@ def journal(
 
     # Initialize append-only metadata event logger
     init_event_logger(sessions_dir)
-    log_event(
-        "cli.start",
-        {
-            "sessions_dir": sessions_dir,
-            "model_llm": llm_model,
-            "stt_backend": selection.backend_id,
-            "model_stt": selection.model,
-            "stt_compute": selection.compute,
-            "stt_requested_backend": stt_backend,
-            "stt_requested_model": stt_model,
-            "stt_requested_compute": stt_compute,
-            "stt_formatting": stt_formatting,
-            "language": language,
-            "events_log": str(get_event_log_path() or ""),
-            "app_version": __version__,
-            "resume": resume,
-            "stt_auto_reason": selection.reason,
-            "stt_warnings": selection.warnings,
-            "mic_check": mic_check,
-        },
-    )
+    metadata = {
+        "sessions_dir": sessions_dir,
+        "model_llm": llm_model,
+        "stt_backend": selection.backend_id,
+        "model_stt": selection.model,
+        "stt_compute": selection.compute,
+        "stt_requested_backend": stt_backend,
+        "stt_requested_model": stt_model,
+        "stt_requested_compute": stt_compute,
+        "stt_formatting": stt_formatting,
+        "language": language,
+        "events_log": str(get_event_log_path() or ""),
+        "app_version": __version__,
+        "resume": resume,
+        "stt_auto_reason": selection.reason,
+        "stt_warnings": selection.warnings,
+        "mic_check": mic_check,
+    }
+    if mode_alias:
+        metadata["cli.mode_alias"] = mode_alias
+    log_event("cli.start", metadata)
 
     # Show effective runtime models/config once at startup
     try:
@@ -740,6 +891,126 @@ def finalize_or_cleanup(*, manager: SessionManager, state, sessions_dir: Path) -
             )
 
 
+def journal(
+    sessions_dir: Path = typer.Option(
+        CONFIG.recordings_dir,
+        "--sessions-dir",
+        help="Directory where session markdown/audio files are stored.",
+    ),
+    llm_model: str = typer.Option(
+        CONFIG.model_llm,
+        "--llm-model",
+        help="LLM model spec (e.g., anthropic:claude-sonnet-4:20250514 or ollama:qwen2.5:7b-instruct)",
+    ),
+    stt_backend: str = typer.Option(
+        CONFIG.stt_backend,
+        "--stt-backend",
+        help=(
+            "Transcription backend: cloud-openai, local-mlx, local-faster, "
+            "local-whispercpp, or auto-private."
+        ),
+    ),
+    stt_model: str = typer.Option(
+        CONFIG.model_stt,
+        "--stt-model",
+        help="Model preset or identifier for the selected backend.",
+    ),
+    stt_compute: str = typer.Option(
+        CONFIG.stt_compute or "auto",
+        "--stt-compute",
+        help="Optional compute precision override for local backends (e.g., int8_float16).",
+    ),
+    stt_formatting: str = typer.Option(
+        CONFIG.stt_formatting,
+        "--stt-formatting",
+        help="Transcript formatting mode: sentences (default) or raw.",
+    ),
+    opening_question: str = typer.Option(
+        CONFIG.opening_question,
+        "--opening-question",
+        help="First question to show before recording begins.",
+    ),
+    language: str = typer.Option(
+        "en", "--language", help="Primary language for transcription."
+    ),
+    resume: bool = typer.Option(
+        False,
+        "--resume/--new",
+        help="Resume the most recent session in the sessions directory.",
+    ),
+    delete_wav_when_safe: bool = typer.Option(
+        True,
+        "--delete-wav-when-safe/--keep-wav",
+        help="Delete large WAV files once MP3 and STT JSON exist (default on).",
+    ),
+    stream_llm: bool = typer.Option(
+        True,
+        "--stream-llm/--no-stream-llm",
+        help="Stream the next question as it is generated (off automatically when voice mode).",
+    ),
+    voice_mode: bool = typer.Option(
+        False,
+        "--voice-mode/--no-voice-mode",
+        help="Speak the assistant's questions using TTS (cloud-only for now).",
+    ),
+    tts_model: str = typer.Option(
+        CONFIG.tts_model, "--tts-model", help="TTS model (OpenAI)."
+    ),
+    tts_voice: str = typer.Option(
+        CONFIG.tts_voice, "--tts-voice", help="TTS voice (OpenAI)."
+    ),
+    tts_format: str = typer.Option(
+        CONFIG.tts_format, "--tts-format", help="TTS audio format."
+    ),
+    llm_questions_debug: bool = typer.Option(
+        False,
+        "--llm-questions-debug/--no-llm-questions-debug",
+        help="Include hidden metadata in prompts to aid debugging.",
+    ),
+    mic_check: bool = typer.Option(
+        False,
+        "--mic-check/--no-mic-check",
+        help="Run a brief mic check before starting the session.",
+    ),
+    mode_alias: Optional[str] = typer.Option(
+        None,
+        "--_mode-alias",
+        hidden=True,
+        help="Internal: set when invoked via an alias (private|cloud).",
+    ),
+):
+    """Start the interactive CLI journaling session."""
+
+    base_dir = _normalise_path_option(sessions_dir, CONFIG.recordings_dir)
+    stt_backend_eff = _normalise_str_option(stt_backend, CONFIG.stt_backend)
+    stt_model_eff = _normalise_str_option(stt_model, CONFIG.model_stt)
+    stt_compute_eff = _normalise_str_option(stt_compute, CONFIG.stt_compute or "auto")
+    stt_formatting_eff = _normalise_str_option(stt_formatting, CONFIG.stt_formatting)
+    llm_model_eff = _normalise_str_option(llm_model, CONFIG.model_llm)
+    opening_q_eff = _normalise_str_option(opening_question, CONFIG.opening_question)
+
+    _run_cli_session(
+        sessions_dir=base_dir,
+        llm_model=llm_model_eff,
+        stt_backend=stt_backend_eff,
+        stt_model=stt_model_eff,
+        stt_compute=stt_compute_eff,
+        stt_formatting=stt_formatting_eff,
+        opening_question=opening_q_eff,
+        language=language,
+        resume=bool(resume),
+        delete_wav_when_safe=bool(delete_wav_when_safe),
+        stream_llm=bool(stream_llm),
+        voice_mode=bool(voice_mode),
+        tts_model=tts_model,
+        tts_voice=tts_voice,
+        tts_format=tts_format,
+        llm_questions_debug=bool(llm_questions_debug),
+        mic_check=bool(mic_check),
+        mode_alias=mode_alias,
+    )
+
+
 def build_app() -> typer.Typer:
     """Build the Typer sub-app for `journal` with explicit subcommands.
 
@@ -759,8 +1030,516 @@ def build_app() -> typer.Typer:
         ),
     )
 
-    # Explicit subcommand for the interactive CLI loop
-    app.command("cli")(journal)
+    # When invoked as `healthyselfjournal journal` with no subcommand, run the CLI
+    @app.callback()
+    def _default(
+        ctx: typer.Context,
+        sessions_dir: Path = typer.Option(
+            CONFIG.recordings_dir,
+            "--sessions-dir",
+            help="Directory where session markdown/audio files are stored.",
+        ),
+        llm_model: str = typer.Option(
+            CONFIG.model_llm,
+            "--llm-model",
+            help="LLM model spec (e.g., anthropic:claude-sonnet-4:20250514 or ollama:qwen2.5:7b-instruct)",
+        ),
+        stt_backend: str = typer.Option(
+            CONFIG.stt_backend,
+            "--stt-backend",
+            help=(
+                "Transcription backend: cloud-openai, local-mlx, local-faster, "
+                "local-whispercpp, or auto-private."
+            ),
+        ),
+        stt_model: str = typer.Option(
+            CONFIG.model_stt,
+            "--stt-model",
+            help="Model preset or identifier for the selected backend.",
+        ),
+        stt_compute: str = typer.Option(
+            CONFIG.stt_compute or "auto",
+            "--stt-compute",
+            help="Optional compute precision override for local backends (e.g., int8_float16).",
+        ),
+        stt_formatting: str = typer.Option(
+            CONFIG.stt_formatting,
+            "--stt-formatting",
+            help="Transcript formatting mode: sentences (default) or raw.",
+        ),
+        opening_question: str = typer.Option(
+            CONFIG.opening_question,
+            "--opening-question",
+            help="First question to show before recording begins.",
+        ),
+        language: str = typer.Option(
+            "en", "--language", help="Primary language for transcription."
+        ),
+        resume: bool = typer.Option(
+            False,
+            "--resume/--new",
+            help="Resume the most recent session in the sessions directory.",
+        ),
+        delete_wav_when_safe: bool = typer.Option(
+            True,
+            "--delete-wav-when-safe/--keep-wav",
+            help="Delete large WAV files once MP3 and STT JSON exist (default on).",
+        ),
+        stream_llm: bool = typer.Option(
+            True,
+            "--stream-llm/--no-stream-llm",
+            help="Stream the next question as it is generated (off automatically when voice mode).",
+        ),
+        voice_mode: bool = typer.Option(
+            False,
+            "--voice-mode/--no-voice-mode",
+            help="Speak the assistant's questions using TTS (cloud-only for now).",
+        ),
+        tts_model: str = typer.Option(
+            CONFIG.tts_model, "--tts-model", help="TTS model (OpenAI)."
+        ),
+        tts_voice: str = typer.Option(
+            CONFIG.tts_voice, "--tts-voice", help="TTS voice (OpenAI)."
+        ),
+        tts_format: str = typer.Option(
+            CONFIG.tts_format, "--tts-format", help="TTS audio format."
+        ),
+        llm_questions_debug: bool = typer.Option(
+            False,
+            "--llm-questions-debug/--no-llm-questions-debug",
+            help="Include hidden metadata in prompts to aid debugging.",
+        ),
+        mic_check: bool = typer.Option(
+            False,
+            "--mic-check/--no-mic-check",
+            help="Run a brief mic check before starting the session.",
+        ),
+    ) -> None:
+        # Only run the default journaling command when no subcommand is invoked
+        # and not in help parsing mode. This prevents 'journal cli --help' from
+        # starting a session.
+        if getattr(ctx, "invoked_subcommand", None):
+            return
+        if getattr(ctx, "resilient_parsing", False):
+            return
+        return journal(
+            sessions_dir=sessions_dir,
+            llm_model=llm_model,
+            stt_backend=stt_backend,
+            stt_model=stt_model,
+            stt_compute=stt_compute,
+            stt_formatting=stt_formatting,
+            opening_question=opening_question,
+            language=language,
+            resume=resume,
+            delete_wav_when_safe=delete_wav_when_safe,
+            stream_llm=stream_llm,
+            voice_mode=voice_mode,
+            tts_model=tts_model,
+            tts_voice=tts_voice,
+            tts_format=tts_format,
+            llm_questions_debug=llm_questions_debug,
+            mic_check=mic_check,
+        )
+
+    # Explicit subcommands group for the interactive CLI loop and its aliases
+    cli_app = typer.Typer(
+        add_completion=False,
+        no_args_is_help=False,
+        invoke_without_command=True,
+        context_settings={"help_option_names": ["-h", "--help"]},
+        help=(
+            "Interactive CLI journaling.\n\n"
+            "Run 'healthyselfjournal journal cli' to start immediately, or use:\n"
+            "  - 'healthyselfjournal journal cli private' for privacy-first defaults\n"
+            "  - 'healthyselfjournal journal cli cloud' for cloud-first defaults"
+        ),
+    )
+
+    @cli_app.callback()
+    def _cli_default(
+        ctx: typer.Context,
+        sessions_dir: Path = typer.Option(
+            CONFIG.recordings_dir,
+            "--sessions-dir",
+            help="Directory where session markdown/audio files are stored.",
+        ),
+        llm_model: str = typer.Option(
+            CONFIG.model_llm,
+            "--llm-model",
+            help="LLM model spec (e.g., anthropic:claude-sonnet-4:20250514 or ollama:qwen2.5:7b-instruct)",
+        ),
+        stt_backend: str = typer.Option(
+            CONFIG.stt_backend,
+            "--stt-backend",
+            help=(
+                "Transcription backend: cloud-openai, local-mlx, local-faster, "
+                "local-whispercpp, or auto-private."
+            ),
+        ),
+        stt_model: str = typer.Option(
+            CONFIG.model_stt,
+            "--stt-model",
+            help="Model preset or identifier for the selected backend.",
+        ),
+        stt_compute: str = typer.Option(
+            CONFIG.stt_compute or "auto",
+            "--stt-compute",
+            help="Optional compute precision override for local backends (e.g., int8_float16).",
+        ),
+        stt_formatting: str = typer.Option(
+            CONFIG.stt_formatting,
+            "--stt-formatting",
+            help="Transcript formatting mode: sentences (default) or raw.",
+        ),
+        opening_question: str = typer.Option(
+            CONFIG.opening_question,
+            "--opening-question",
+            help="First question to show before recording begins.",
+        ),
+        language: str = typer.Option(
+            "en", "--language", help="Primary language for transcription."
+        ),
+        resume: bool = typer.Option(
+            False,
+            "--resume/--new",
+            help="Resume the most recent session in the sessions directory.",
+        ),
+        delete_wav_when_safe: bool = typer.Option(
+            True,
+            "--delete-wav-when-safe/--keep-wav",
+            help="Delete large WAV files once MP3 and STT JSON exist (default on).",
+        ),
+        stream_llm: bool = typer.Option(
+            True,
+            "--stream-llm/--no-stream-llm",
+            help="Stream the next question as it is generated (off automatically when voice mode).",
+        ),
+        voice_mode: bool = typer.Option(
+            False,
+            "--voice-mode/--no-voice-mode",
+            help="Speak the assistant's questions using TTS (cloud-only for now).",
+        ),
+        tts_model: str = typer.Option(
+            CONFIG.tts_model, "--tts-model", help="TTS model (OpenAI)."
+        ),
+        tts_voice: str = typer.Option(
+            CONFIG.tts_voice, "--tts-voice", help="TTS voice (OpenAI)."
+        ),
+        tts_format: str = typer.Option(
+            CONFIG.tts_format, "--tts-format", help="TTS audio format."
+        ),
+        llm_questions_debug: bool = typer.Option(
+            False,
+            "--llm-questions-debug/--no-llm-questions-debug",
+            help="Include hidden metadata in prompts to aid debugging.",
+        ),
+        mic_check: bool = typer.Option(
+            False,
+            "--mic-check/--no-mic-check",
+            help="Run a brief mic check before starting the session.",
+        ),
+    ) -> None:
+        # Only run when no subcommand is invoked (so 'journal cli --help' works)
+        if getattr(ctx, "invoked_subcommand", None):
+            return
+        if getattr(ctx, "resilient_parsing", False):
+            return
+        return journal(
+            sessions_dir=sessions_dir,
+            llm_model=llm_model,
+            stt_backend=stt_backend,
+            stt_model=stt_model,
+            stt_compute=stt_compute,
+            stt_formatting=stt_formatting,
+            opening_question=opening_question,
+            language=language,
+            resume=resume,
+            delete_wav_when_safe=delete_wav_when_safe,
+            stream_llm=stream_llm,
+            voice_mode=voice_mode,
+            tts_model=tts_model,
+            tts_voice=tts_voice,
+            tts_format=tts_format,
+            llm_questions_debug=llm_questions_debug,
+            mic_check=mic_check,
+        )
+
+    def _alias_effective_values(
+        *,
+        stt_backend: Optional[str],
+        llm_model: Optional[str],
+        private_mode: bool,
+    ) -> tuple[Optional[str], Optional[str]]:
+        """Return (stt_backend_eff, llm_model_eff) applying alias defaults with precedence.
+
+        Precedence: explicit flags > env > alias defaults.
+        """
+        # STT backend defaulting with private-mode hardening: never fall back to cloud
+        stt_backend_eff: Optional[str] = stt_backend
+        env_stt = (os.environ.get("STT_BACKEND") or "").strip().lower()
+        if private_mode:
+            if stt_backend_eff in {None, ""}:
+                if env_stt in {
+                    LOCAL_MLX_BACKEND,
+                    LOCAL_FASTER_BACKEND,
+                    LOCAL_WHISPERCPP_BACKEND,
+                    AUTO_PRIVATE_BACKEND,
+                }:
+                    stt_backend_eff = env_stt
+                else:
+                    # Ignore cloud env values; prefer auto-private
+                    stt_backend_eff = AUTO_PRIVATE_BACKEND
+        else:
+            if stt_backend_eff in {None, ""} and env_stt in {None, ""}:
+                stt_backend_eff = CLOUD_BACKEND
+
+        # LLM model defaulting (only override when neither flag nor env set)
+        llm_model_eff: Optional[str] = llm_model
+        env_llm = os.environ.get("LLM_MODEL")
+        if private_mode and (llm_model_eff in {None, ""}) and (env_llm in {None, ""}):
+            llm_model_eff = _OLLAMA_DEFAULT_MODEL
+
+        return stt_backend_eff, llm_model_eff
+
+    @cli_app.command("private")
+    def cli_private(
+        sessions_dir: Optional[Path] = typer.Option(
+            None,
+            "--sessions-dir",
+            help="Directory where session markdown/audio files are stored.",
+        ),
+        llm_model: Optional[str] = typer.Option(
+            None,
+            "--llm-model",
+            help="LLM model spec (defaults to ollama:qwen2.5:7b-instruct in private mode)",
+        ),
+        stt_backend: Optional[str] = typer.Option(
+            None,
+            "--stt-backend",
+            help=(
+                "Transcription backend: cloud-openai, local-mlx, local-faster, "
+                "local-whispercpp, or auto-private (default in private mode)."
+            ),
+        ),
+        stt_model: Optional[str] = typer.Option(
+            None,
+            "--stt-model",
+            help="Model preset or identifier for the selected backend.",
+        ),
+        stt_compute: Optional[str] = typer.Option(
+            None,
+            "--stt-compute",
+            help="Optional compute precision override for local backends (e.g., int8_float16).",
+        ),
+        stt_formatting: Optional[str] = typer.Option(
+            None,
+            "--stt-formatting",
+            help="Transcript formatting mode: sentences or raw.",
+        ),
+        opening_question: Optional[str] = typer.Option(
+            None, "--opening-question", help="First question before recording begins."
+        ),
+        language: Optional[str] = typer.Option(
+            None, "--language", help="Primary language for transcription."
+        ),
+        resume: Optional[bool] = typer.Option(
+            None,
+            "--resume/--new",
+            help="Resume the most recent session in the directory.",
+        ),
+        delete_wav_when_safe: Optional[bool] = typer.Option(
+            None,
+            "--delete-wav-when-safe/--keep-wav",
+            help="Delete large WAV files once MP3 and STT JSON exist.",
+        ),
+        stream_llm: Optional[bool] = typer.Option(
+            None,
+            "--stream-llm/--no-stream-llm",
+            help="Stream next question as it is generated (auto-off when voice mode).",
+        ),
+        voice_mode: Optional[bool] = typer.Option(
+            None,
+            "--voice-mode/--no-voice-mode",
+            help="Speak the assistant's questions using TTS (cloud-only for now).",
+        ),
+        tts_model: Optional[str] = typer.Option(
+            None, "--tts-model", help="TTS model (OpenAI)."
+        ),
+        tts_voice: Optional[str] = typer.Option(
+            None, "--tts-voice", help="TTS voice (OpenAI)."
+        ),
+        tts_format: Optional[str] = typer.Option(
+            None, "--tts-format", help="TTS audio format."
+        ),
+        llm_questions_debug: Optional[bool] = typer.Option(
+            None,
+            "--llm-questions-debug/--no-llm-questions-debug",
+            help="Include hidden metadata in prompts to aid debugging.",
+        ),
+        mic_check: Optional[bool] = typer.Option(
+            None, "--mic-check/--no-mic-check", help="Run a brief mic check first."
+        ),
+    ) -> None:
+        # Apply alias defaults with precedence and enforce cloud_off within process
+        stt_backend_eff, llm_model_eff = _alias_effective_values(
+            stt_backend=stt_backend, llm_model=llm_model, private_mode=True
+        )
+
+        prev_cloud_off = CONFIG.llm_cloud_off
+        with _EnvScope({"LLM_CLOUD_OFF": "1"}):
+            CONFIG.llm_cloud_off = True
+            try:
+                return journal(
+                    sessions_dir=sessions_dir or CONFIG.recordings_dir,
+                    llm_model=llm_model_eff or CONFIG.model_llm,
+                    stt_backend=stt_backend_eff or CONFIG.stt_backend,
+                    stt_model=stt_model or CONFIG.model_stt,
+                    stt_compute=stt_compute or (CONFIG.stt_compute or "auto"),
+                    stt_formatting=stt_formatting or CONFIG.stt_formatting,
+                    opening_question=opening_question or CONFIG.opening_question,
+                    language=language or "en",
+                    resume=bool(resume) if resume is not None else False,
+                    delete_wav_when_safe=(
+                        bool(delete_wav_when_safe)
+                        if delete_wav_when_safe is not None
+                        else True
+                    ),
+                    stream_llm=bool(stream_llm) if stream_llm is not None else True,
+                    voice_mode=bool(voice_mode) if voice_mode is not None else False,
+                    tts_model=tts_model or CONFIG.tts_model,
+                    tts_voice=tts_voice or CONFIG.tts_voice,
+                    tts_format=tts_format or CONFIG.tts_format,
+                    llm_questions_debug=(
+                        bool(llm_questions_debug)
+                        if llm_questions_debug is not None
+                        else False
+                    ),
+                    mic_check=bool(mic_check) if mic_check is not None else False,
+                    mode_alias="private",
+                )
+            finally:
+                CONFIG.llm_cloud_off = prev_cloud_off
+
+    @cli_app.command("cloud")
+    def cli_cloud(
+        sessions_dir: Optional[Path] = typer.Option(
+            None,
+            "--sessions-dir",
+            help="Directory where session markdown/audio files are stored.",
+        ),
+        llm_model: Optional[str] = typer.Option(
+            None,
+            "--llm-model",
+            help="LLM model spec (defaults to cloud model in config/env).",
+        ),
+        stt_backend: Optional[str] = typer.Option(
+            None,
+            "--stt-backend",
+            help=(
+                "Transcription backend: cloud-openai, local-mlx, local-faster, "
+                "local-whispercpp, or auto-private."
+            ),
+        ),
+        stt_model: Optional[str] = typer.Option(
+            None,
+            "--stt-model",
+            help="Model preset or identifier for the selected backend.",
+        ),
+        stt_compute: Optional[str] = typer.Option(
+            None,
+            "--stt-compute",
+            help="Optional compute precision override for local backends (e.g., int8_float16).",
+        ),
+        stt_formatting: Optional[str] = typer.Option(
+            None,
+            "--stt-formatting",
+            help="Transcript formatting mode: sentences or raw.",
+        ),
+        opening_question: Optional[str] = typer.Option(
+            None, "--opening-question", help="First question before recording begins."
+        ),
+        language: Optional[str] = typer.Option(
+            None, "--language", help="Primary language for transcription."
+        ),
+        resume: Optional[bool] = typer.Option(
+            None,
+            "--resume/--new",
+            help="Resume the most recent session in the directory.",
+        ),
+        delete_wav_when_safe: Optional[bool] = typer.Option(
+            None,
+            "--delete-wav-when-safe/--keep-wav",
+            help="Delete large WAV files once MP3 and STT JSON exist.",
+        ),
+        stream_llm: Optional[bool] = typer.Option(
+            None,
+            "--stream-llm/--no-stream-llm",
+            help="Stream next question as it is generated (auto-off when voice mode).",
+        ),
+        voice_mode: Optional[bool] = typer.Option(
+            None,
+            "--voice-mode/--no-voice-mode",
+            help="Speak the assistant's questions using TTS (cloud-only for now).",
+        ),
+        tts_model: Optional[str] = typer.Option(
+            None, "--tts-model", help="TTS model (OpenAI)."
+        ),
+        tts_voice: Optional[str] = typer.Option(
+            None, "--tts-voice", help="TTS voice (OpenAI)."
+        ),
+        tts_format: Optional[str] = typer.Option(
+            None, "--tts-format", help="TTS audio format."
+        ),
+        llm_questions_debug: Optional[bool] = typer.Option(
+            None,
+            "--llm-questions-debug/--no-llm-questions-debug",
+            help="Include hidden metadata in prompts to aid debugging.",
+        ),
+        mic_check: Optional[bool] = typer.Option(
+            None, "--mic-check/--no-mic-check", help="Run a brief mic check first."
+        ),
+    ) -> None:
+        stt_backend_eff, llm_model_eff = _alias_effective_values(
+            stt_backend=stt_backend, llm_model=llm_model, private_mode=False
+        )
+
+        prev_cloud_off = CONFIG.llm_cloud_off
+        with _EnvScope({"LLM_CLOUD_OFF": "0"}):
+            CONFIG.llm_cloud_off = False
+            try:
+                return journal(
+                    sessions_dir=sessions_dir or CONFIG.recordings_dir,
+                    llm_model=llm_model_eff or CONFIG.model_llm,
+                    stt_backend=stt_backend_eff or CONFIG.stt_backend,
+                    stt_model=stt_model or CONFIG.model_stt,
+                    stt_compute=stt_compute or (CONFIG.stt_compute or "auto"),
+                    stt_formatting=stt_formatting or CONFIG.stt_formatting,
+                    opening_question=opening_question or CONFIG.opening_question,
+                    language=language or "en",
+                    resume=bool(resume) if resume is not None else False,
+                    delete_wav_when_safe=(
+                        bool(delete_wav_when_safe)
+                        if delete_wav_when_safe is not None
+                        else True
+                    ),
+                    stream_llm=bool(stream_llm) if stream_llm is not None else True,
+                    voice_mode=bool(voice_mode) if voice_mode is not None else False,
+                    tts_model=tts_model or CONFIG.tts_model,
+                    tts_voice=tts_voice or CONFIG.tts_voice,
+                    tts_format=tts_format or CONFIG.tts_format,
+                    llm_questions_debug=(
+                        bool(llm_questions_debug)
+                        if llm_questions_debug is not None
+                        else False
+                    ),
+                    mic_check=bool(mic_check) if mic_check is not None else False,
+                    mode_alias="cloud",
+                )
+            finally:
+                CONFIG.llm_cloud_off = prev_cloud_off
+
+    app.add_typer(cli_app, name="cli")
 
     # Subcommand to launch the web interface
     import os as _os

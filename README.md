@@ -36,7 +36,12 @@ Note: this beta version runs in the command-line and relies on OpenAI & Anthropi
 ```bash
 # Recommended: run without installing (uvx)
 uvx healthyselfjournal@latest -- init
-uvx healthyselfjournal@latest -- journal cli
+
+# Choose a mode explicitly:
+# Cloud mode (requires ANTHROPIC_API_KEY and OPENAI_API_KEY)
+uvx healthyselfjournal@latest -- journal cli cloud
+# Privacy mode (local STT + local LLM via Ollama)
+uvx healthyselfjournal@latest -- journal cli private
 ```
 
 That's it. Recording starts immediately. Press ENTER to stop and get your next question.
@@ -114,11 +119,15 @@ uvx healthyselfjournal@latest -- init
 ## Daily use
 
 ```bash
-# Start a new session
-uvx healthyselfjournal@latest -- journal cli
+# Start a new session (explicit mode)
+uvx healthyselfjournal@latest -- journal cli cloud
+# or
+uvx healthyselfjournal@latest -- journal cli private
 
 # Continue your last session
-uvx healthyselfjournal@latest -- journal cli --resume
+uvx healthyselfjournal@latest -- journal cli cloud --resume
+# or
+uvx healthyselfjournal@latest -- journal cli private --resume
 ```
 
 Use `--sessions-dir` to decide where to store them - otherwise it defaults to `./sessions/`.
@@ -156,7 +165,7 @@ Local speech-to-text (STT) options (install only what you need):
 ```bash
 # Apple Silicon (no native builds): MLX Whisper CLI
 pipx install mlx-whisper
-uvx -p 3.12 healthyselfjournal@latest -- journal cli --stt-backend local-mlx --stt-model large-v2
+uvx -p 3.12 healthyselfjournal@latest -- journal cli private --stt-backend local-mlx --stt-model large-v2
 
 # Cross‑platform, no FFmpeg build: whisper.cpp
 pipx install whispercpp

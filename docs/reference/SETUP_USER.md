@@ -56,9 +56,13 @@ On desktop, a built‑in Setup wizard appears on first launch and saves keys und
   - Choose local STT via `--stt-backend` (see below) and an `ollama:*` `--llm-model`
 
 ## Daily usage
-Start a journaling session:
+Start a journaling session (choose a mode explicitly):
 ```bash
-uvx healthyselfjournal -- journal cli
+# Cloud mode (requires ANTHROPIC_API_KEY and OPENAI_API_KEY)
+uvx healthyselfjournal -- journal cli cloud
+
+# Privacy mode (local STT + local LLM via Ollama)
+uvx healthyselfjournal -- journal cli private
 ```
 
 Handy flags:
@@ -72,7 +76,7 @@ Recording behavior:
 - `Q` saves the take, transcribes it, then ends the session
 
 ## Staying offline
-To avoid cloud calls entirely:
+To avoid cloud calls entirely (privacy mode):
 1) Use a local STT backend
 ```bash
 healthyselfjournal journal cli --stt-backend local-mlx        # Apple Silicon
@@ -83,11 +87,11 @@ On Apple Silicon (M1–M4), a good default is MLX Whisper large‑v2:
 
 ```bash
 pipx install mlx-whisper
-uvx -p 3.12 healthyselfjournal@latest -- journal cli --stt-backend local-mlx --stt-model large-v2
+uvx -p 3.12 healthyselfjournal@latest -- journal cli private --stt-backend local-mlx --stt-model large-v2
 ```
 2) Use a local LLM via Ollama (daemon must be running)
 ```bash
-healthyselfjournal journal cli --llm-model ollama:gemma3:27b-instruct-q4_K_M
+healthyselfjournal journal cli private --llm-model ollama:gemma3:27b-instruct-q4_K_M
 ```
 3) Ensure no cloud keys are set in your environment
 
