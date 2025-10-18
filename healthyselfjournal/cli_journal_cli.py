@@ -204,6 +204,36 @@ def journal(
         },
     )
 
+    # Show effective runtime models/config once at startup
+    try:
+        _provider = get_model_provider(llm_model)
+    except Exception:
+        _provider = "unknown"
+    _lines: list[str] = []
+    _lines.append(
+        f"LLM: {llm_model} (provider: {_provider}; mode={CONFIG.llm_mode}; cloud_off={CONFIG.llm_cloud_off})"
+    )
+    _lines.append(
+        f"STT: {selection.backend_id} model={selection.model} compute={selection.compute or '-'}"
+    )
+    if selection.reason:
+        _lines.append(f"STT auto-private: {selection.reason}")
+    if selection.warnings:
+        _lines.append("STT warnings: " + ", ".join(selection.warnings))
+    if CONFIG.speak_llm and CONFIG.tts_enabled:
+        _lines.append(
+            f"TTS: openai:{CONFIG.tts_model} voice={CONFIG.tts_voice} format={CONFIG.tts_format}"
+        )
+    else:
+        _lines.append("TTS: disabled")
+    console.print(
+        Panel.fit(
+            Text("\n".join(_lines)),
+            title="Runtime Models",
+            border_style="cyan",
+        )
+    )
+
     # Propagate config flag
     CONFIG.delete_wav_when_safe = bool(delete_wav_when_safe)
 
