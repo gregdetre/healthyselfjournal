@@ -15,6 +15,7 @@ import time
 import tempfile
 from pathlib import Path
 from typing import Optional
+from contextlib import contextmanager
 
 import typer
 from rich.console import Console
@@ -83,6 +84,32 @@ def _print_config_snapshot() -> None:
     table.add_row("stt_model (default)", str(CONFIG.model_stt))
     table.add_row("stt_compute (default)", str(CONFIG.stt_compute))
     console.print(table)
+
+
+@contextmanager
+def _temporary_local_model(model_filename: Optional[str]):
+    """Temporarily override CONFIG.llm_local_model and clear llama cache."""
+    if not model_filename:
+        # No override requested
+        yield
+        return
+    try:
+        from .llm_local import reset_local_cache  # lazy import
+    except Exception:
+        reset_local_cache = None  # type: ignore
+    prev = CONFIG.llm_local_model
+    try:
+        CONFIG.llm_local_model = model_filename
+        if reset_local_cache:
+            reset_local_cache()
+        yield
+    finally:
+        CONFIG.llm_local_model = prev
+        if reset_local_cache:
+            try:
+                reset_local_cache()
+            except Exception:
+                pass
 
 
 def build_app() -> typer.Typer:
@@ -278,7 +305,17 @@ def build_app() -> typer.Typer:
         prompt: str = typer.Option(
             "Say 'Local LLM OK' and ask one reflective follow-up.",
             "--prompt",
-            help="Small fixed prompt to probe local LLM.",
+            help="Prompt text when --mode=smoke. Ignored in realistic mode.",
+        ),
+        mode: str = typer.Option(
+            "smoke",
+            "--mode",
+            help="Prompt mode: smoke (quick) or realistic (journaling template)",
+        ),
+        model: Optional[str] = typer.Option(
+            None,
+            "--model",
+            help="Override local gguf filename for this probe (e.g. mistral-7b-instruct-q4_k_m.gguf)",
         ),
         max_tokens: int = typer.Option(64, "--max-tokens"),
         sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir"),
@@ -294,9 +331,10 @@ def build_app() -> typer.Typer:
         _print_config_snapshot()
         console.print(Text(f"events.log: {base / 'events.log'}", style="dim"))
 
-        # Check for local model file presence first to avoid surprise downloads
+        # Resolve the effective model path considering an override
+        effective_model = model or CONFIG.llm_local_model
         manager = get_model_manager()
-        model_path = manager.llama_model_path(CONFIG.llm_local_model)
+        model_path = manager.llama_model_path(effective_model)
         if not model_path.exists():
             msg = (
                 f"Local model not found: {model_path}\n"
@@ -315,21 +353,40 @@ def build_app() -> typer.Typer:
             )
             return
 
-        spec = f"local:{CONFIG.llm_local_model}"
+        # Build prompt depending on mode
+        if mode.strip().lower() == "realistic":
+            transcript = (
+                "I keep putting off recording my thoughts after work. By the time I sit down,\n"
+                "my brain feels foggy and I tell myself it won't matter. Then I feel guilty the next day.\n"
+                "I want this journaling to help me get unstuck, not be another thing I fail at."
+            )
+            recent = [
+                "Struggling with evening energy; mornings feel calmer.",
+                "Tension between expectations and sustainable habits.",
+            ]
+            duration = "07:40"
+        else:
+            transcript = prompt
+            recent = []
+            duration = "0s"
+
+        spec = f"local:{effective_model}"
         req = QuestionRequest(
             model=spec,
-            current_transcript=prompt,
-            recent_summaries=[],
+            current_transcript=transcript,
+            recent_summaries=recent,
             opening_question="",
             question_bank=[],
             language="en",
-            conversation_duration="0s",
+            conversation_duration=duration,
             max_tokens=max_tokens,
+            llm_questions_debug=(mode.strip().lower() == "realistic"),
         )
 
         started = time.time()
         try:
-            resp = generate_followup_question(req)
+            with _temporary_local_model(model):
+                resp = generate_followup_question(req)
         except Exception as exc:
             console.print(f"[red]Local LLM error:[/] {exc}")
             raise typer.Exit(code=2)
@@ -342,6 +399,133 @@ def build_app() -> typer.Typer:
                     style="green",
                 ),
                 title="Local LLM Response",
+                border_style="green",
+            )
+        )
+
+    @local_app.command("compare")
+    def local_compare(
+        model_a: str = typer.Argument(
+            ..., help="First local gguf filename (e.g. gemma-2-9b-it-q4_k_m.gguf)"
+        ),
+        model_b: str = typer.Argument(
+            ...,
+            help="Second local gguf filename (e.g. mistral-7b-instruct-v0.3-q4_k_m.gguf)",
+        ),
+        max_tokens: int = typer.Option(96, "--max-tokens"),
+        sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir"),
+        sandbox: bool = typer.Option(True, "--sandbox/--no-sandbox"),
+    ) -> None:
+        base = _maybe_init_events(sessions_dir, sandbox)
+        _print_header("Local LLM – Compare Models")
+        _print_config_snapshot()
+        console.print(Text(f"events.log: {base / 'events.log'}", style="dim"))
+
+        manager = get_model_manager()
+        missing: list[str] = []
+        for m in (model_a, model_b):
+            if not manager.llama_model_path(m).exists():
+                missing.append(m)
+        if missing:
+            console.print(
+                Panel.fit(
+                    Text(
+                        "Missing model files:\n- "
+                        + "\n- ".join(missing)
+                        + "\n\nUse: healthyselfjournal init local-llm --hf-repo <repo> --hf-file <file>",
+                        style="yellow",
+                    ),
+                    title="Models Missing",
+                    border_style="yellow",
+                )
+            )
+            raise typer.Exit(code=2)
+
+        transcript = (
+            "I keep putting off recording my thoughts after work. By the time I sit down,\n"
+            "my brain feels foggy and I tell myself it won't matter. Then I feel guilty the next day.\n"
+            "I want this journaling to help me get unstuck, not be another thing I fail at."
+        )
+        recent = [
+            "Struggling with evening energy; mornings feel calmer.",
+            "Tension between expectations and sustainable habits.",
+        ]
+        duration = "07:40"
+
+        def _run_one(model_name: str) -> tuple[str, float]:
+            spec = f"local:{model_name}"
+            req = QuestionRequest(
+                model=spec,
+                current_transcript=transcript,
+                recent_summaries=recent,
+                opening_question="",
+                question_bank=[],
+                language="en",
+                conversation_duration=duration,
+                max_tokens=max_tokens,
+                llm_questions_debug=True,
+            )
+            t0 = time.time()
+            with _temporary_local_model(model_name):
+                resp = generate_followup_question(req)
+            ms = (time.time() - t0) * 1000
+            return resp.question, ms
+
+        out_a, ms_a = _run_one(model_a)
+        out_b, ms_b = _run_one(model_b)
+
+        def _score(q: str) -> int:
+            text = q.strip()
+            score = 0
+            if text.endswith("?"):
+                score += 1
+            words = len(text.split())
+            if 5 <= words <= 40:
+                score += 1
+            if "!" not in text:
+                score += 1
+            lowered = text.lower()
+            disallowed = ["proud of you", "amazing", "you got this", "great job"]
+            if not any(x in lowered for x in disallowed):
+                score += 1
+            if any(
+                w in lowered
+                for w in ["what", "how", "where", "when", "which", "could", "might"]
+            ):
+                score += 1
+            return score
+
+        score_a = _score(out_a)
+        score_b = _score(out_b)
+        recommended = model_a if (score_a, -ms_a) > (score_b, -ms_b) else model_b
+
+        console.print(
+            Panel.fit(
+                Text(
+                    f"Model A: {model_a}\nLatency: {ms_a:.0f} ms\nScore: {score_a}\nOutput: {out_a}",
+                    style="cyan",
+                ),
+                title="A",
+                border_style="cyan",
+            )
+        )
+        console.print(
+            Panel.fit(
+                Text(
+                    f"Model B: {model_b}\nLatency: {ms_b:.0f} ms\nScore: {score_b}\nOutput: {out_b}",
+                    style="magenta",
+                ),
+                title="B",
+                border_style="magenta",
+            )
+        )
+        console.print(
+            Panel.fit(
+                Text(
+                    f"Recommended: {recommended} (higher score; tie broken by faster latency)",
+                    style="green",
+                ),
+                title="Recommendation",
                 border_style="green",
             )
         )

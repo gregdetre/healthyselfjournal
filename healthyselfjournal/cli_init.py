@@ -86,12 +86,12 @@ def run_init_wizard(*, xdg: bool = False) -> None:
     if mode is None:
         raise typer.Abort()
 
-    anthropic_key = _prompt_anthropic_key()
-
+    anthropic_key: str | None = None
     openai_key: str | None = None
     stt_backend_choice = "cloud-openai" if mode == "cloud" else "auto-private"
 
     if mode == "cloud":
+        anthropic_key = _prompt_anthropic_key()
         openai_key = _prompt_openai_key()
 
     default_sessions = str((Path.cwd() / "sessions").resolve())
@@ -117,7 +117,6 @@ def run_init_wizard(*, xdg: bool = False) -> None:
         raise typer.Abort()
 
     updates: dict[str, str] = {
-        "ANTHROPIC_API_KEY": anthropic_key,
         "STT_BACKEND": stt_backend_choice,
         "STT_MODEL": os.environ.get("STT_MODEL", "default"),
         "STT_COMPUTE": os.environ.get("STT_COMPUTE", "auto"),
@@ -125,6 +124,8 @@ def run_init_wizard(*, xdg: bool = False) -> None:
         "SPEAK_LLM": os.environ.get("SPEAK_LLM", "0"),
         "SESSIONS_DIR": str(sessions_dir),
     }
+    if anthropic_key:
+        updates["ANTHROPIC_API_KEY"] = anthropic_key
     if openai_key:
         updates["OPENAI_API_KEY"] = openai_key
 

@@ -107,8 +107,17 @@ def build_app() -> typer.Typer:
             repo_id: str, filename: str, revision: str = "main"
         ) -> Tuple[str, str]:
             api_url = f"https://huggingface.co/api/models/{repo_id}/revision/{revision}"
+            # Allow private/gated repos when a token is provided
+            headers = {}
+            token = (
+                os.environ.get("HUGGING_FACE_HUB_TOKEN")
+                or os.environ.get("HF_TOKEN")
+                or os.environ.get("HUGGING_FACE_TOKEN")
+            )
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
             try:
-                with httpx.Client(timeout=30.0) as client:
+                with httpx.Client(timeout=30.0, headers=headers) as client:
                     resp = client.get(api_url, follow_redirects=True)
                     resp.raise_for_status()
                     data = resp.json()
@@ -356,5 +365,59 @@ def build_app() -> typer.Typer:
                 border_style="green",
             )
         )
+
+    @app.command("remove-local-llm")
+    def remove_local_llm(
+        model: str = typer.Argument(
+            ..., help="Model filename under the managed llama dir to delete"
+        ),
+        yes: bool = typer.Option(
+            False, "--yes", help="Do not prompt for confirmation."
+        ),
+    ) -> None:
+        """Delete a managed local LLM gguf file and its metadata entry.
+
+        Example:
+          healthyselfjournal init remove-local-llm phi-3-mini-4k-instruct-q4_k_m.gguf
+        """
+        manager = get_model_manager()
+        path = manager.llama_model_path(model)
+        if not path.exists():
+            console.print(
+                Panel.fit(
+                    Text(f"Not found: {path}", style="yellow"),
+                    title="Local LLM",
+                    border_style="yellow",
+                )
+            )
+            # Still attempt metadata cleanup
+            removed = manager.delete_llama_model(model)
+            raise typer.Exit(code=0 if removed else 2)
+
+        if not yes:
+            try:
+                confirmed = typer.confirm(f"Delete {path}?", default=False)
+            except Exception:
+                confirmed = False
+            if not confirmed:
+                raise typer.Exit(code=1)
+
+        removed = manager.delete_llama_model(model)
+        if removed:
+            console.print(
+                Panel.fit(
+                    Text(f"Removed: {path}", style="green"),
+                    title="Local LLM",
+                    border_style="green",
+                )
+            )
+        else:
+            console.print(
+                Panel.fit(
+                    Text("Nothing removed (file/metadata not present)", style="yellow"),
+                    title="Local LLM",
+                    border_style="yellow",
+                )
+            )
 
     return app
