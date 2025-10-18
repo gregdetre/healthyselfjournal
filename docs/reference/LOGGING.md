@@ -1,7 +1,7 @@
 # Logging
 
 ## Introduction
-This document describes logging in Healthy Self Journal. It covers the structured, append‑only event log used for telemetry and troubleshooting, and the lightweight use of Python’s standard logging for developer diagnostics.
+This document describes logging in Healthyself Journal. It covers the structured, append‑only event log used for telemetry and troubleshooting, and the lightweight use of Python’s standard logging for developer diagnostics.
 
 ## See also
 - `../reference/FILE_FORMATS_ORGANISATION.md` – Where `events.log` lives and the overall session artefacts layout.

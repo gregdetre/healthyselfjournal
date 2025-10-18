@@ -1,8 +1,8 @@
-# Healthy Self Journal
+# Healthyself Journal
 
-**Speak your thoughts. Get better questions. Build healthier patterns.**
+**Speak your thoughts. Get good questions. Build healthier patterns.**
 
-A voice-based journaling tool that makes self-reflection as easy as thinking out loud. No typing, no blank page anxiety – just speak naturally and receive thoughtful, evidence-based questions that guide you toward clarity without getting stuck in unhelpful thought loops.
+A voice-based journaling tool that makes self-reflection as easy as thinking out loud. Just ramble for a while about what's on your mind, and receive thoughtful, evidence-based questions that help you think things through without getting stuck in unhelpful thought loops.
 
 ## What makes this different
 
@@ -21,6 +21,15 @@ uvx healthyselfjournal -- journal cli
 ```
 
 That's it. Recording starts immediately. Press any key to stop and get your next question.
+
+Tip for first‑time users: if `uvx` isn’t found, install `uv` (which provides `uvx`) and try again:
+
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
 
 ## Who this is for
 

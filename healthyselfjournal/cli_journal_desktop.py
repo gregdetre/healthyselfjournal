@@ -55,7 +55,7 @@ def desktop(
         help="TTS audio format returned to the embedded web app (e.g., wav, mp3).",
     ),
     window_title: str = typer.Option(
-        "Healthy Self Journal",
+        "Healthyself Journal",
         "--title",
         help="Window title for the desktop shell.",
     ),
@@ -95,7 +95,7 @@ def desktop(
         help="Ask for confirmation before closing the window.",
     ),
 ) -> None:
-    """Launch the Healthy Self Journal desktop experience."""
+    """Launch the Healthyself Journal desktop experience."""
 
     from .desktop import DesktopConfig, run_desktop_app
     from .web.app import WebAppConfig
@@ -144,7 +144,7 @@ def desktop(
         confirm_close=confirm_close,
     )
 
-    console.print("[green]Launching Healthy Self Journal desktop shell…[/]")
+    console.print("[green]Launching Healthyself Journal desktop shell…[/]")
     console.print(f"Sessions directory: [cyan]{sessions_dir.expanduser()}[/]")
     console.print(f"Embedded server: [cyan]{web_cfg.host}:{web_cfg.port or 'auto'}[/]")
 

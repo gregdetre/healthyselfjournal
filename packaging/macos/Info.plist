@@ -3,13 +3,13 @@
 <plist version="1.0">
   <dict>
     <key>CFBundleDisplayName</key>
-    <string>Healthy Self Journal</string>
+    <string>Healthyself Journal</string>
     <key>CFBundleIdentifier</key>
     <string>com.experim.healthyselfjournal</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Healthy Self Journal uses the microphone to capture your spoken journal entries.</string>
+    <string>Healthyself Journal uses the microphone to capture your spoken journal entries.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>Speech recognition runs locally to transcribe your reflections.</string>
     <key>NSHumanReadableCopyright</key>

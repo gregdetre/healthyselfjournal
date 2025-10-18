@@ -64,7 +64,7 @@ uv run --active healthyselfjournal journal desktop \
   --tts-model "${TTS_MODEL}" \
   --tts-voice "${TTS_VOICE}" \
   --tts-format wav \
-  --title "Healthy Self Journal" \
+  --title "Healthyself Journal" \
   --width 1280 --height 860 \
   --fullscreen \
   --debug \
@@ -219,7 +219,7 @@ CI packaging (GitHub Actions):
 - A macOS workflow is included: `.github/workflows/desktop-macos.yml`.
   - Triggers on tags `v*` and manual dispatch.
   - Steps: checkout, setup Python 3.12, setup `uv`, build web static assets, run PyInstaller with `packaging/HealthySelfJournal.spec`.
-  - Uploads unsigned app bundle artifact: `Healthy Self Journal.app`.
+  - Uploads unsigned app bundle artifact: `Healthyself Journal.app`.
   - Notarization/signing is not performed in CI yet; see macOS distribution notes below.
 
 References:

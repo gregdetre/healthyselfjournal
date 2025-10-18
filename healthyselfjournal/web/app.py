@@ -521,11 +521,11 @@ def build_app(config: WebAppConfig) -> Any:
                 <html lang=\"en\">
                   <head>
                     <meta charset=\"utf-8\" />
-                    <title>Healthy Self Journal (Web)</title>
+                    <title>Healthyself Journal (Web)</title>
                   </head>
                   <body>
                     <main style=\"max-width:600px;margin:3rem auto;font-family:system-ui\">
-                      <h1>Healthy Self Journal</h1>
+                      <h1>Healthyself Journal</h1>
                       <p>Sorry, the web interface could not start: check your STT/LLM configuration.</p>
                     </main>
                   </body>

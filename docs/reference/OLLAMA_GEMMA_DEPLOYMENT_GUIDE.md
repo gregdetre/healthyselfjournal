@@ -324,7 +324,7 @@ response = client.chat(
   ```
 - Omit `--llm-model` (or use `anthropic:*`) to switch back to the Claude default.
 
-#### App Quickstart (Healthy Self Journal)
+#### App Quickstart (Healthyself Journal)
 
 ```bash
 # 1) Install and start Ollama, pull a model

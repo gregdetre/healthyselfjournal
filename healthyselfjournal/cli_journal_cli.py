@@ -380,7 +380,7 @@ def start_or_resume_session(
             console.print(
                 Panel.fit(
                     "No prior sessions found. Starting a new session.",
-                    title="Healthy Self Journal",
+                    title="Healthyself Journal",
                     border_style="magenta",
                 )
             )
@@ -411,7 +411,7 @@ def start_or_resume_session(
                     f"Resuming session {state.session_id}. Recording starts immediately.\n"
                     "Press any key to stop. Q saves then ends after this entry.\n\n"
                     "Tip: Say 'give me a question' to get a quick prompt from the built-in examples.",
-                    title="Healthy Self Journal",
+                    title="Healthyself Journal",
                     border_style="magenta",
                 )
             )
@@ -439,7 +439,7 @@ def start_or_resume_session(
                 "Voice journaling session starting. Recording starts immediately.\n"
                 "Press any key to stop. Q saves then ends after this entry.\n\n"
                 "Tip: Say 'give me a question' to get a quick prompt from the built-in examples.",
-                title="Healthy Self Journal",
+                title="Healthyself Journal",
                 border_style="magenta",
             )
         )

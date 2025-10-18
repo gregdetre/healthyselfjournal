@@ -1,7 +1,7 @@
 # User Setup & Quickstart
 
 ## Introduction
-This guide helps end users install and run Healthy Self Journal with minimal effort. It focuses on PyPI installation via `uvx` or `pip`, required keys for cloud features, optional local/offline setup, and the most useful commands.
+This guide helps end users install and run Healthyself Journal with minimal effort. It focuses on PyPI installation via `uvx` or `pip`, required keys for cloud features, optional local/offline setup, and the most useful commands.
 
 ## See also
 - `CLI_COMMANDS.md` – CLI reference and flags
@@ -24,6 +24,15 @@ This guide helps end users install and run Healthy Self Journal with minimal eff
 Option A: run without installing, using uvx (recommended)
 ```bash
 uvx healthyselfjournal -- --help
+```
+
+If `uvx` isn’t available yet, install `uv` (which provides `uvx`) and retry:
+
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
 Option B: install with pip

@@ -48,7 +48,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: HealthySelfJournal-macos-unsigned
-          path: dist/Healthy Self Journal.app
+          path: dist/Healthyself Journal.app
           if-no-files-found: error
 
 

@@ -4,7 +4,7 @@ Use pytest for tests. Write a small number of high-level, high-coverage tests th
 
 ### Introduction
 
-This document describes how we run and structure tests for Healthy Self Journal: how to run them reliably, what they cover, and common pitfalls.
+This document describes how we run and structure tests for Healthyself Journal: how to run them reliably, what they cover, and common pitfalls.
 
 ### See also
 

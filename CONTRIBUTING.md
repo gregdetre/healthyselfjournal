@@ -1,4 +1,4 @@
-# Contributing to Healthy Self Journal
+# Contributing to Healthyself Journal
 
 Thanks for your interest in contributing! This project aims to make reflective journaling more accessible through voice input and evidence-based questions.
 

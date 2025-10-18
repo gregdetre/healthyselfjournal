@@ -70,7 +70,7 @@ def run_init_wizard(*, xdg: bool = False) -> None:
             "Welcome! This wizard will configure your API keys and recording options.\n\n"
             "- Cloud mode (recommended): best accuracy/latency; requires OpenAI + Anthropic keys.\n"
             "- Privacy mode: on-device STT if available (experimental).",
-            title="Healthy Self Journal – Setup",
+            title="Healthyself Journal – Setup",
             border_style="magenta",
         )
     )

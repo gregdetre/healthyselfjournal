@@ -54,7 +54,7 @@ def main() -> None:
     )
     desktop_cfg = DesktopConfig(
         web=web_cfg,
-        window_title="Healthy Self Journal",
+        window_title="Healthyself Journal",
         window_width=1280,
         window_height=860,
         fullscreen=False,

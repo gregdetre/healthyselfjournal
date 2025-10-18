@@ -23,7 +23,7 @@ class DesktopConfig:
     """Configuration container for the PyWebView desktop runtime."""
 
     web: WebAppConfig
-    window_title: str = "Healthy Self Journal"
+    window_title: str = "Healthyself Journal"
     window_width: int = 1280
     window_height: int = 860
     fullscreen: bool = False

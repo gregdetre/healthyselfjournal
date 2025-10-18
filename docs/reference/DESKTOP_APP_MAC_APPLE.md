@@ -1,6 +1,6 @@
 ## Desktop App (macOS) — Signing, Hardened Runtime, Notarization
 
-This evergreen guide explains how to sign, notarize, and verify the macOS desktop app bundle produced by PyInstaller for Healthy Self Journal. It also lists the required entitlements (including network client for the localhost loopback) and provides step‑by‑step commands.
+This evergreen guide explains how to sign, notarize, and verify the macOS desktop app bundle produced by PyInstaller for Healthyself Journal. It also lists the required entitlements (including network client for the localhost loopback) and provides step‑by‑step commands.
 
 ### See also
 
@@ -66,12 +66,12 @@ uv sync --active
 uv run --active pyinstaller packaging/HealthySelfJournal.spec
 ```
 
-Outputs under `dist/`, e.g. `dist/Healthy Self Journal.app`.
+Outputs under `dist/`, e.g. `dist/Healthyself Journal.app`.
 
 ### Codesign (hardened runtime)
 
 ```bash
-APP="/Users/greg/Dropbox/dev/experim/healthyselfjournal/dist/Healthy Self Journal.app"
+APP="/Users/greg/Dropbox/dev/experim/healthyselfjournal/dist/Healthyself Journal.app"
 ENT="/Users/greg/Dropbox/dev/experim/healthyselfjournal/packaging/macos/entitlements.plist"
 CERT="Developer ID Application: Your Name (TEAMID)"   # replace with your identity
 
@@ -105,7 +105,7 @@ Optional DMG flow:
 
 ```bash
 DMG="/Users/greg/Dropbox/dev/experim/healthyselfjournal/dist/HealthySelfJournal.dmg"
-hdiutil create -volname "Healthy Self Journal" -srcfolder "$APP" -ov -format UDZO "$DMG"
+hdiutil create -volname "Healthyself Journal" -srcfolder "$APP" -ov -format UDZO "$DMG"
 codesign --force --timestamp --sign "$CERT" "$DMG"
 xcrun notarytool submit "$DMG" --keychain-profile HSJNotary --wait
 xcrun stapler staple -v "$DMG"

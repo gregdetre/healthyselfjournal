@@ -1,7 +1,7 @@
 # Web Recording Interface
 
 ## Introduction
-The web interface brings the Healthy Self Journal experience into the browser while reusing the CLI pipeline for transcription, dialogue, and storage.
+The web interface brings the Healthyself Journal experience into the browser while reusing the CLI pipeline for transcription, dialogue, and storage.
 
 ## Running
 

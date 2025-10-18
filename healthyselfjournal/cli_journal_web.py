@@ -86,9 +86,7 @@ def web(
         tts_voice=tts_voice,
         tts_format=tts_format,
     )
-    console.print(
-        f"[green]Starting Healthy Self Journal web server on {host}:{port}[/]"
-    )
+    console.print(f"[green]Starting Healthyself Journal web server on {host}:{port}[/]")
     console.print(f"Sessions directory: [cyan]{config.sessions_dir.expanduser()}[/]")
 
     # Optionally free the port before starting

@@ -1,6 +1,6 @@
 "use strict";
 /*
- * Minimal browser recorder for the Healthy Self Journal web interface.
+ * Minimal browser recorder for the Healthyself Journal web interface.
  * Handles MediaRecorder capture, simple level metering, and uploads to the FastHTML server.
  */
 class RecorderController {

@@ -1,7 +1,7 @@
 # Developer Setup
 
 ## Introduction
-This guide explains how to set up a development environment for Healthy Self Journal using uv and the shared external virtual environment, with an editable local clone of `gjdutils` for smooth editing in Cursor. It also covers building TypeScript assets and common troubleshooting.
+This guide explains how to set up a development environment for Healthyself Journal using uv and the shared external virtual environment, with an editable local clone of `gjdutils` for smooth editing in Cursor. It also covers building TypeScript assets and common troubleshooting.
 
 ## See also
 - `ARCHITECTURE.md` – System dependencies and configuration management overview

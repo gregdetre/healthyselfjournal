@@ -62,7 +62,7 @@ sd -ps "healthyselfjournal" "NEW_PACKAGE_NAME" .
 # Apply
 sd -s "healthyselfjournal" "NEW_PACKAGE_NAME" .
 ```
-- [ ] Update user-facing brand strings (panels, help text) from "Healthy Self Journal" to the new brand using `sd` preview then apply.
+- [ ] Update user-facing brand strings (panels, help text) from "Healthyself Journal" to the new brand using `sd` preview then apply.
 
 Acceptance: `rg NEW_PACKAGE_NAME` shows imports updated; no lingering `healthyselfjournal` imports.
 
@@ -70,10 +70,10 @@ Acceptance: `rg NEW_PACKAGE_NAME` shows imports updated; no lingering `healthyse
 #### Stage: Update docs and examples
 - [ ] Replace CLI command and name in `docs/reference/*.md` and `README.md`:
   - `healthyselfjournal` → NEW_CLI_NAME
-  - "Healthy Self Journal" → New brand
+  - "Healthyself Journal" → New brand
 - [ ] Update any code blocks and example commands.
 
-Acceptance: `rg -n "healthyselfjournal|Healthy Self Journal" docs README.md` returns no results.
+Acceptance: `rg -n "healthyselfjournal|Healthyself Journal" docs README.md` returns no results.
 
 
 #### Stage: Clean environment and verify locally
@@ -129,7 +129,7 @@ Acceptance: `pip install NEW_DIST_NAME` installs the new CLI name.
 #### Stage: Post-rename hygiene
 - [ ] Final sweep for stragglers:
 ```bash
-rg -n "healthyselfjournal|Healthy Self Journal" .
+rg -n "healthyselfjournal|Healthyself Journal" .
 ```
 - [ ] Update any external scripts or dotfiles that reference the old CLI.
 - [ ] Announce change in CHANGELOG / release notes (optional).
