@@ -59,13 +59,13 @@ Notes:
 ## Current state vs target state
 
 **Current State**
-- STT default favors OpenAI cloud for accuracy and simplicity.
-- Dialogue and summaries default to a cloud LLM (Anthropic Claude).
-- TTS (if enabled) uses OpenAI.
+- STT default favors OpenAI cloud for accuracy and simplicity when using `journal cli cloud`.
+- Dialogue and summaries default to a cloud LLM (Anthropic Claude) in cloud mode.
+- TTS (if enabled) uses OpenAI in cloud mode.
 
 **Target State**
 - First‑class local options across STT, LLM, and TTS to enable fully offline operation.
-- Simple CLI switches to opt into local backends everywhere.
+- Simple CLI switches to opt into local backends everywhere (`journal cli private`).
 
 **Migration Status**
 - STT supports multiple local backends today; see `CLI_COMMANDS.md` for flags.
@@ -77,7 +77,7 @@ Notes:
 - STT: choose a local backend with `--stt-backend local-mlx` (Apple Silicon), `local-faster`, or `local-whispercpp`. You can also specify `--stt-model` and `--language`.
 - LLM: follow `OLLAMA_GEMMA_DEPLOYMENT_GUIDE.md` to use a local model; otherwise set your cloud model via environment and config.
 - TTS: disable voice output by omitting `--voice-mode`, or select a local TTS once available.
-- Offline mode: use only local backends; the app will not attempt cloud calls without the corresponding API keys set.
+- Offline mode: use `journal cli private` and only local backends; the app will not attempt cloud calls without the corresponding API keys set.
 
 ### Verifying privacy with diagnostics
 

@@ -48,7 +48,9 @@ app = typer.Typer(
     help=(
         f"HealthySelfJournal {__version__}\n\n"
         "Voice-first journaling CLI.\n\n"
-        "Quickstart: run 'healthyselfjournal init' then 'healthyselfjournal journal' (defaults to CLI)."
+        "Quickstart: run 'healthyselfjournal init' then choose a mode explicitly:\n"
+        "  - 'healthyselfjournal journal cli cloud' (requires keys)\n"
+        "  - 'healthyselfjournal journal cli private' (local STT + local LLM)"
     ),
     cls=_OrderedTopLevelGroup,
 )
