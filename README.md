@@ -6,11 +6,14 @@ A voice-based journaling tool that makes self-reflection as easy as thinking out
 
 ## What makes this different
 
-🎙️ **Voice-first**: Start journaling instantly by speaking – no typing, no friction
+🎙️ **Voice-first**: Start journaling instantly by speaking – no typing, no friction.
 🧠 **Wise, helpful questions**: Evidence-based prompts adapted from cognitive behavioral therapy, psychology research, mindfulness practice, and famous coaches.
-🔄 **Keeps you moving**: Gentle redirection when you're spiraling; deeper exploration when you're onto something
-📊 **Builds on your history**: Each session connects to previous ones for continuity and growth
-🔒 **Privacy choice**: Use private/local LLM+transcription, or Anthropic + OpenAI, as you prefer.
+🔄 **Keeps you moving**: Gentle redirection when you're spiraling; deeper exploration when you're onto something.
+📊 **Builds on your history**: Each session connects to previous ones for continuity and growth.
+🔒 **Privacy choice**: Use Anthropic + OpenAI OR private/local LLM+transcription (in beta), as you prefer. Healthyself doesn't have any backend, storage, or analytics of its own outside your machine at all).
+🛡️ **Aims to be safe**: Anti-sycophancy, rumination pivots, and clear boundaries; see `docs/reference/SAFEGUARDING.md`.
+- **Open source**. So you can see & modify the prompts and research for yourself.
+- This is assisted reflection. It's not trying to be or replace human conversation or therapy.
 
 ## Quick start
 
@@ -33,7 +36,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 ## Who this is for
 
-If you've tried journaling but found it hard to maintain, or if you want to process your thoughts without getting stuck in rumination, this tool is designed for you. It combines the ease of voice recording with the structure of guided reflection, using techniques validated by research to help you develop healthier thinking patterns.
+If you've tried journaling but found it hard to maintain, or if you appreciate good questions to help you reflect more deeply, this tool is designed for you. It combines the ease of voice recording with the structure of guided reflection, using techniques validated by research to help you develop healthier thinking patterns.
 
 ## How it works
 
@@ -42,34 +45,36 @@ If you've tried journaling but found it hard to maintain, or if you want to proc
 3. **Get a thoughtful question** – Based on what you shared and your patterns
 4. **Keep going or wrap up** – Continue as long as helpful, or press Q to end with a summary
 
+
+
 ### Example session
 
-```
-You: "I'm torn between applying for the new role and doubling down on my current
-     project. I'm worried I'll disappoint people either way."
+> 🧑 You: "I'm torn between applying for the new role and doubling down on my current project. I'm worried I'll disappoint people either way."
+>
+> 🤖 AI: "I hear the pull between gratitude for people who believed in you and the desire for the growth you've been wanting. When you say these are 'real relationships, not just work' — what would honoring those relationships look like as you make this decision?"
+>
+> [conversation continues...]
 
-AI: "I can hear the weight of wanting to honor both paths and the people involved.
-    When you imagine disappointing people - what's the hardest part about that for you?"
+You can see the [full questioning prompt](https://github.com/gregdetre/healthyselfjournal/blob/main/healthyselfjournal/prompts/question.prompt.md.jinja), and the research on which it's based below.
 
-You: "I guess I hate feeling like I've let someone down who believed in me.
-     Especially my current team. They took a chance on me when I didn't have much
-     experience in this area. And we've built something together, you know? But then
-     this other opportunity... it's exactly the kind of challenge I've been wanting.
-     More leadership, bigger scope. I keep thinking about five years from now - will
-     I regret not trying? But also these are real relationships, not just work..."
+For example, the question above draws on the following approaches: *[Values exploration, Clean Language (preserving "real relationships"), Socratic questioning, autonomy-supportive framing]*.
 
-AI: "There's something powerful in how you describe building something together with
-    your team. What does it mean to you that they 'took a chance' on you?"
-
-[conversation continues...]
-```
 
 ## Installation & Setup
 
 ### Requirements
-- Python 3.10 or newer
-- Optional: an API key from OpenAI (for voice transcription) and Anthropic (for questions)
-- Optional: ffmpeg for audio compression
+- Python 3.10+
+- Microphone access (grant permission to your terminal/app)
+- Optional cloud keys:
+  - `OPENAI_API_KEY` (speech-to-text when using `--stt-backend cloud-openai`)
+  - `ANTHROPIC_API_KEY` (LLM questions/summaries; default cloud provider)
+- Optional local/offline (in beta):
+  - Ollama running (for local LLM via `--llm-model ollama:<model>`)
+  - One STT backend installed: `mlx-whisper` (Apple Silicon), `faster-whisper`, or `whispercpp` + `.gguf` model
+- Optional: `ffmpeg` on PATH for background MP3 conversion
+- Linux only: install audio libs (e.g., `sudo apt install portaudio19-dev libsndfile1`)
+
+See `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md` and `docs/reference/PRIVACY.md` for details.
 
 ### Install
 
@@ -104,9 +109,6 @@ healthyselfjournal journal cli
 
 # Continue your last session
 healthyselfjournal journal cli --resume
-
-# Use the web interface instead
-healthyselfjournal journal web
 ```
 
 ### Insights (v1)
@@ -196,7 +198,7 @@ For an overview of all 30+ research areas and methodologies, see `docs/research/
 
 ## Advanced options
 
-### Desktop app
+### Desktop app (in alpha)
 ```bash
 healthyselfjournal journal desktop --voice-mode
 ```
@@ -214,14 +216,15 @@ healthyselfjournal journal cli --sessions-dir ~/Documents/journal
 
 ## Support & Documentation
 
-- **Issues or questions**: [GitHub Issues](https://github.com/anthropics/healthyselfjournal/issues)
+- **Issues or questions**: [GitHub Issues](https://github.com/gregdetre/healthyselfjournal/issues)
 - **Full documentation**: See the `docs/` folder
 - **Contributing**: Contributions welcome! See `CONTRIBUTING.md`
 
 ## Technical details
 
 For developers and technical users:
-- Built with Python, using FastHTML for the web interface and PyWebView for desktop
+- Built with Python, using Typer for the CLI.
+- OPTIONAL/ALPHA FastHTML for the web interface and PyWebView for desktop
 - Transcription via OpenAI Whisper API (or local alternatives)
 - Questions generated by Anthropic Claude (or local Ollama models)
 - Either everything runs locally (your data never leaves your device), or choose cloud services
