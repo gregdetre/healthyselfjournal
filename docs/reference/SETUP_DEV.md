@@ -36,6 +36,31 @@ source /path/to/venv/bin/activate
 python -V
 ```
 
+Greg's local machine note:
+```bash
+source /Users/greg/.venvs/experim__healthyselfjournal/bin/activate
+uv sync --active
+```
+
+### Hugging Face token for model downloads
+Place your token in `.env.local` using one of the supported names:
+
+```bash
+# .env.local
+HUGGING_FACE_HUB_TOKEN=xxxx
+# or
+HF_TOKEN=xxxx
+# or
+HUGGING_FACE_TOKEN=xxxx
+```
+
+Load it into the environment before running download commands so private/gated or
+rate‑limited downloads work:
+
+```bash
+set -a; [ -f .env.local ] && source .env.local; set +a
+```
+
 2) Clone the local editable dependency into the project root
 ```bash
 git clone https://github.com/gregdetre/gjdutils.git gjdutils

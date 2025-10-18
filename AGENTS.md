@@ -29,6 +29,12 @@ See: `docs/reference/PRODUCT_VISION_FEATURES.md`
   - Or venv-less: `uvx healthyselfjournal -- --help`
 - `gjdutils` is a local editable dep via `[tool.uv.sources]`
 - `ffmpeg` on PATH enables background MP3 conversion (optional)
+ - Note (local dev on Greg's Mac): external venv is `/Users/greg/.venvs/experim__healthyselfjournal` (activate it, then use `uv sync --active` / `uv run --active ...`).
+- Hugging Face token (for GGUF/model downloads): put it in `.env.local` as
+  `HUGGING_FACE_HUB_TOKEN`, `HF_TOKEN`, or `HUGGING_FACE_TOKEN`. Load it before
+  running:
+  - `set -a; [ -f .env.local ] && source .env.local; set +a`
+  The downloader will automatically pick up any of these env vars.
 
 ## Run
 
