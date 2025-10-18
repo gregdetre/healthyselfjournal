@@ -2,14 +2,14 @@
 
 ### Introduction
 
-This document describes the initialization flow for non‑technical users. The `init` wizard collects API keys, lets users choose between Cloud and Privacy modes, configures the sessions directory, optionally runs a smoke test, and persists configuration so `healthyselfjournal journal cli` works out of the box.
+This document describes the initialization flow for non‑technical users. The `init` wizard collects API keys, lets users choose between Cloud and Privacy modes, configures the sessions directory, optionally runs a smoke test, and persists configuration so `healthyselfjournal journal` (defaults to CLI) works out of the box.
 
 ### See also
 
 - `../reference/CLI_COMMANDS.md` – how to run commands (`journal cli`, `journal web`, `reconcile`, `summarise/*`).
 - `../reference/SETUP_DEV.md` – development/venv setup; context for env variables and uv workflow.
 - `../reference/libraries/QUESTIONARY.md` – prompt library usage patterns and tips.
-- `../../healthyselfjournal/cli.py` – Typer CLI including `init` (supports `--xdg`) and auto‑init in `journal cli`.
+- `../../healthyselfjournal/cli.py` – Typer CLI including `init` (supports `--xdg`), `readme`, and Quickstart hints.
 - `../../healthyselfjournal/__init__.py` – `.env`/`.env.local` autoloading at import time.
 - `../../healthyselfjournal/config.py` – defaults and env‑driven configuration (e.g., `SESSIONS_DIR`, `STT_*`).
 - `../../healthyselfjournal/transcription.py` – STT backends and selection logic.
@@ -30,7 +30,7 @@ This document describes the initialization flow for non‑technical users. The `
 ### Current state
 
 - `healthyselfjournal init` launches an interactive Questionary wizard.
-- `healthyselfjournal journal cli` auto‑runs the wizard if critical prerequisites are missing.
+- `healthyselfjournal journal` (CLI) auto‑runs the wizard if critical prerequisites are missing.
 - Configuration is written to `.env.local` in the current working directory and applied to the current process immediately.
 - Optional smoke test records a 1‑second WAV and, in Cloud mode, attempts a tiny transcription call.
 
@@ -100,7 +100,7 @@ Notes:
 
 ### Common flows
 
-- First run via `uvx healthyselfjournal` → auto‑init launches → user selects Cloud → keys entered → sessions at `./sessions` → optional smoke test → run `journal cli`.
+- First run via `uvx healthyselfjournal` shows help with Quickstart. Run `init` → select Cloud → enter keys → sessions at `./sessions` → optional mic check → run `journal`.
 - Switching to Privacy mode later: edit `.env.local` (`STT_BACKEND=auto-private`) or re‑run `healthyselfjournal init` and choose Privacy.
 - No keys yet: run `init`, skip Cloud, select Privacy; if no local backends present, users can still record audio with `journal cli`, then backfill later after enabling Cloud or installing local STT.
 
@@ -116,7 +116,7 @@ Notes:
 
 ### Troubleshooting
 
-- “Environment variable X is required”: run `healthyselfjournal init` or export the variable before running `journal cli`.
+- “Environment variable X is required”: run `healthyselfjournal init` or export the variable before running `journal`.
 - macOS microphone permissions: grant access in System Settings → Privacy & Security → Microphone.
 - `.env.local` not picked up: ensure you’re running commands from the directory containing `.env.local`, or export variables in your shell profile.
 - Local STT unavailable in Privacy mode: install `mlx-whisper` (Apple Silicon), or `faster-whisper`, or switch to Cloud.

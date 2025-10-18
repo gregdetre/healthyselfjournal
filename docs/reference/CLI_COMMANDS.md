@@ -3,11 +3,18 @@
 ## Overview
 Single source for command discovery. See linked pages for detailed flags.
 
+Quickstart:
+
+```bash
+uvx healthyselfjournal -- init
+uvx healthyselfjournal -- journal
+```
+
 ## Primary commands
 
 - `version` – Print the installed package version.
-- `journal cli` – Terminal-based recording. See `CLI_RECORDING_INTERFACE.md`.
-- `journal web` – Launch local browser interface. See `WEB_RECORDING_INTERFACE.md`.
+- `journal` – Defaults to the terminal-based recorder (same as `journal cli`). See `CLI_RECORDING_INTERFACE.md`.
+- `journal web` – Launch local browser interface (hidden by default; set `HSJ_ENABLE_WEB=1`). See `WEB_RECORDING_INTERFACE.md`.
 - `journal desktop` – Launch PyWebView desktop shell. See `DESKTOP_APP_PYWEBVIEW.md`.
 - `sessions list` – Show sessions with summary snippets. See `SESSIONS.md`.
 - `sessions summaries` – Show which sessions are missing summaries (moved from summarise list).
@@ -16,6 +23,7 @@ Single source for command discovery. See linked pages for detailed flags.
 - `fix regenerate <file>` – Regenerate a summary for a specific session file.
 - `sessions merge` – Merge two sessions into the earlier one.
 - `init` – Setup wizard for first-time configuration.
+- `readme` – Show the README in the terminal (add `--open` to open in browser).
 - `diagnose` – Diagnostics for mic/STT, local/cloud LLM, and TTS.
   - `diagnose desktop` – Probe desktop web shell routes (`/setup`, `/`) to catch template/context errors.
 
@@ -82,11 +90,11 @@ Each command lives in its own `cli_*.py` module for clarity:
 # Show version
 uvx healthyselfjournal -- version
 
-# Start CLI journaling
-uvx healthyselfjournal -- journal cli --voice-mode
+# Start CLI journaling (the `cli` subcommand is optional)
+uvx healthyselfjournal -- journal --voice-mode
 
-# Start web interface on a different port, resume latest session
-uvx healthyselfjournal -- journal web --port 8888 --resume
+# Start web interface on a different port, resume latest session (requires HSJ_ENABLE_WEB=1)
+HSJ_ENABLE_WEB=1 uvx healthyselfjournal -- journal web --port 8888 --resume
 
 # List sessions in a custom directory (first 200 chars)
 uvx healthyselfjournal -- sessions list --sessions-dir ./sessions --nchars 200
@@ -98,6 +106,10 @@ uvx healthyselfjournal -- fix regenerate 250918_0119.md
 
 # Desktop diagnostics
 uvx healthyselfjournal -- diagnose desktop
+
+# Readme
+uvx healthyselfjournal -- readme
+uvx healthyselfjournal -- readme --open
 ```
 
 ## See also

@@ -7,6 +7,8 @@ from pathlib import Path
 import typer
 from typer.core import TyperGroup
 from rich.console import Console
+from rich.markdown import Markdown
+import webbrowser
 from rich.panel import Panel
 from rich.text import Text
 
@@ -43,7 +45,11 @@ app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
-    help=f"HealthySelfJournal {__version__}\n\nVoice-first journaling CLI.",
+    help=(
+        f"HealthySelfJournal {__version__}\n\n"
+        "Voice-first journaling CLI.\n\n"
+        "Quickstart: run 'healthyselfjournal init' then 'healthyselfjournal journal' (defaults to CLI)."
+    ),
     cls=_OrderedTopLevelGroup,
 )
 
@@ -133,3 +139,51 @@ app.add_typer(build_insights_app(), name="insight")
 
 
 # mic-check is now part of the diagnose subcommands
+
+
+@app.command("readme")
+def readme(
+    open_browser: bool = typer.Option(
+        False,
+        "--open/--no-open",
+        help="Open README in your default browser instead of printing to the terminal.",
+    )
+) -> None:
+    """Show the project README or open it in a browser."""
+
+    # Try to locate a local README first (package root, then CWD)
+    package_root = Path(__file__).resolve().parents[1]
+    candidates = [package_root / "README.md", Path.cwd() / "README.md"]
+    readme_path = next((p for p in candidates if p.exists()), None)
+
+    # Fallback URL if no local README is present (wheel/sdist environments)
+    fallback_url = "https://pypi.org/project/healthyselfjournal/"
+    url: str
+
+    if readme_path is not None:
+        url = readme_path.resolve().as_uri()
+    else:
+        url = fallback_url
+
+    if open_browser:
+        try:
+            webbrowser.open(url, new=2)
+            console.print(f"[green]Opened:[/] {url}")
+        except Exception:
+            console.print(f"[yellow]Please open in your browser:[/] {url}")
+        return
+
+    console.print(f"[cyan]Open in browser:[/] {url}\n")
+    if readme_path is not None:
+        try:
+            content = readme_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception as exc:
+            console.print(f"[red]Failed to read README:[/] {exc}")
+            console.print(f"[yellow]You can view it here:[/] {url}")
+            return
+        console.print(Markdown(content))
+    else:
+        console.print(
+            "README.md not found locally. Use --open to view the online documentation."
+        )
+    console.print(f"\n[cyan]Open in browser:[/] {url}")

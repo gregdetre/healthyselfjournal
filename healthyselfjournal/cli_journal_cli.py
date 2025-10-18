@@ -720,24 +720,31 @@ def build_app() -> typer.Typer:
 
     app = typer.Typer(
         add_completion=False,
-        no_args_is_help=True,
+        no_args_is_help=False,
+        invoke_without_command=True,
         context_settings={"help_option_names": ["-h", "--help"]},
-        help="Journaling interfaces (CLI and web).",
+        help=(
+            "Journaling interfaces.\n\n"
+            "Tip: run 'healthyselfjournal journal' to start the CLI interface."
+        ),
     )
 
     # Explicit subcommand for the interactive CLI loop
     app.command("cli")(journal)
 
     # Subcommand to launch the web interface
-    try:
-        from .cli_journal_web import (
-            web as web_command,
-        )  # Lazy-heavy imports are inside the function
+    import os as _os
 
-        app.command("web")(web_command)
-    except Exception:
-        # If import fails at build time (e.g., optional deps), we still allow CLI usage.
-        pass
+    if _os.environ.get("HSJ_ENABLE_WEB", "0") in {"1", "true", "yes"}:
+        try:
+            from .cli_journal_web import (
+                web as web_command,
+            )  # Lazy-heavy imports are inside the function
+
+            app.command("web")(web_command)
+        except Exception:
+            # If import fails at build time (e.g., optional deps), we still allow CLI usage.
+            pass
 
     # Subcommand to launch the desktop app (PyWebView shell)
     try:
