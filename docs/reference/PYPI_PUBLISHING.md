@@ -89,7 +89,7 @@ password = pypi-***
 Upload:
 
 ```bash
-uvx twine upload -r testpypi dist/*
+uvx twine upload -r testpypi dist/*.whl dist/*.tar.gz
 ```
 
 ### 5) Validate TestPyPI install
@@ -111,7 +111,7 @@ Optional: verify prompt asset load in that venv as above.
 - Ensure the git tree matches the release.
 
 ```bash
-uvx twine upload dist/*
+uvx twine upload dist/*.whl dist/*.tar.gz
 ```
 
 Validate from a clean machine:
@@ -177,7 +177,7 @@ uvx --python 3.12 healthyselfjournal -- --help
 - [x] `uvx --from dist/*.whl healthyselfjournal -- --help` works
 - [x] Prompt asset load smoke test passes
 - [x] Push commit to main: `git push origin main`
-- [x] `uvx twine upload dist/*` publishes to PyPI
+- [x] `uvx twine upload dist/*.whl dist/*.tar.gz` publishes to PyPI
 - [ ] `uvx healthyselfjournal -- --help` works on a clean machine
 - [ ] Pin-run check: `uvx healthyselfjournal==<version> -- --help`
 - [ ] Tag and push (triggers desktop CI build): `git tag v<version> && git push origin v<version>`
@@ -199,10 +199,29 @@ Short, practical steps for routine releases (example bumps 0.2.0 → 0.2.1):
    - `uvx --from dist/*.whl healthyselfjournal -- --help`
    - `uvx --from dist/*.whl python -c "import healthyselfjournal.llm as m; print(m._load_prompt('question.prompt.md.jinja')[:40])"`
 7. Upload:
-   - TestPyPI (optional): `uvx twine upload -r testpypi dist/*`
-   - PyPI: `uvx twine upload dist/*`
+   - TestPyPI (optional): `uvx twine upload -r testpypi dist/*.whl dist/*.tar.gz`
+   - PyPI: `uvx twine upload dist/*.whl dist/*.tar.gz`
 8. Validate from PyPI:
    - `uvx healthyselfjournal==0.2.1 -- --help`
    - Optional: `uvx --python 3.12 healthyselfjournal==0.2.1 -- --help`
 9. Push/tag (triggers desktop build): `git push origin main && git tag v0.2.1 && git push origin v0.2.1`
 10. If shipping the desktop app, follow the Desktop app release checklist in `docs/reference/DESKTOP_APP_PYWEBVIEW.md`
+
+### Helper script
+
+For routine releases, you can use the helper script which wraps the steps above. It assumes you've already edited and committed the version and changelog.
+
+```bash
+# TestPyPI example (no git tag/push):
+scripts/release.sh -v <version> -r testpypi --validate --no-git
+
+# PyPI example (with tag/push):
+scripts/release.sh -v <version> --validate
+```
+
+Flags:
+- `-v, --version`: the version (must match `pyproject.toml` and exist in `CHANGELOG.md`)
+- `-r, --repo`: `pypi` (default) or `testpypi`
+- `--validate`: runs a simple `uvx healthyselfjournal==<version> -- --help`
+- `--no-git`: skips tagging/pushing
+- `--skip-clean-check`: allow a dirty working tree (not recommended)
