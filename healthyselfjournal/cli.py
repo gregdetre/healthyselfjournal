@@ -157,7 +157,7 @@ def readme(
     readme_path = next((p for p in candidates if p.exists()), None)
 
     # Fallback URL if no local README is present (wheel/sdist environments)
-    fallback_url = "https://pypi.org/project/healthyselfjournal/"
+    fallback_url = "https://github.com/gregdetre/healthyselfjournal/blob/main/README.md"
     url: str
 
     if readme_path is not None:
@@ -184,6 +184,6 @@ def readme(
         console.print(Markdown(content))
     else:
         console.print(
-            "README.md not found locally. Use --open to view the online documentation."
+            "README.md not found locally. Use --open to view the GitHub README."
         )
     console.print(f"\n[cyan]Open in browser:[/] {url}")
