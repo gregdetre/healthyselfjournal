@@ -113,6 +113,9 @@ def record_response(
 
     voiced_seconds = 0.0
     frame_duration_sec = 0.0
+    used_sample_rate = sample_rate
+    stop_requested_at: float | None = None
+    stop_grace_seconds = 0.25
 
     def _audio_callback(
         indata, frames, time_info, status
@@ -125,12 +128,17 @@ def record_response(
             level_queue.put_nowait(rms)
         except queue.Full:
             pass
-        # Do not enqueue frames after a stop/cancel has been requested,
-        # and only enqueue when not paused
-        if not stop_event.is_set() and not paused_event.is_set():
+        # Allow a brief grace window after stop to capture the tail
+        allow_after_stop = False
+        if stop_event.is_set() and stop_requested_at is not None:
+            allow_after_stop = (
+                time.monotonic() - stop_requested_at
+            ) <= stop_grace_seconds
+        if not paused_event.is_set() and (not stop_event.is_set() or allow_after_stop):
             frames_queue.put_nowait(indata.copy())
 
     def _wait_for_stop():  # pragma: no cover - blocking on user input
+        nonlocal stop_requested_at
         # Use shared key normalization; fall back handled inside the util
         try:
             from .utils.keys import read_one_key_normalized
@@ -143,10 +151,12 @@ def record_response(
                 )
                 if key_name == "ESC":
                     cancel_flag.set()
+                    stop_requested_at = time.monotonic()
                     stop_event.set()
                     return
                 if key_name == "Q":
                     quit_flag.set()
+                    stop_requested_at = time.monotonic()
                     stop_event.set()
                     return
                 if key_name == "SPACE":
@@ -156,9 +166,11 @@ def record_response(
                         paused_event.set()
                     continue
                 if key_name == "ENTER" or key_name == "OTHER":
+                    stop_requested_at = time.monotonic()
                     stop_event.set()
                     return
         except KeyboardInterrupt:
+            stop_requested_at = time.monotonic()
             stop_event.set()
             interrupt_flag.set()
             return
@@ -176,6 +188,7 @@ def record_response(
             effective_sr = int(
                 getattr(stream, "samplerate", sample_rate) or sample_rate
             )
+            used_sample_rate = effective_sr
 
             if effective_sr != sample_rate:
                 try:
@@ -209,7 +222,7 @@ def record_response(
                         max_seconds=max_seconds,
                     )
 
-            duration_sec = max(frames_written / effective_sr, 0.0)
+            duration_sec = max(frames_written / used_sample_rate, 0.0)
 
     except Exception as exc:  # pragma: no cover - defensive logging
         _LOGGER.exception("Error during audio capture: %s", exc)
@@ -235,7 +248,7 @@ def record_response(
     if interrupt_flag.is_set():
         raise KeyboardInterrupt
 
-    duration_sec = frames_written / sample_rate
+    duration_sec = frames_written / used_sample_rate
 
     if cancel_flag.is_set():
         wav_path.unlink(missing_ok=True)
@@ -303,19 +316,10 @@ def record_response(
             discarded_short_answer=True,
         )
 
-    # Lightweight post-processing: trim leading/trailing silence and attenuate peaks
-    try:
-        new_duration = _postprocess_wav_simple(wav_path, sample_rate)
-        if new_duration is not None:
-            duration_sec = new_duration
-    except Exception:
-        # Fail-safe: never block the flow due to post-processing issues
-        _LOGGER.debug("Post-processing skipped due to error", exc_info=True)
-
     mp3_path = None
     duration_sec, mp3_path = postprocess_and_convert(
         wav_path,
-        sample_rate=sample_rate,
+        sample_rate=used_sample_rate,
         ffmpeg_path=ffmpeg_path,
         convert_to_mp3=convert_to_mp3,
         current_duration=duration_sec,
@@ -513,6 +517,7 @@ def run_meter_loop(
     stop_event: threading.Event,
     meter_refresh_hz: float,
     max_seconds: float | None,
+    stop_grace_seconds: float = 0.25,
 ) -> tuple[int, float]:
     """Run the capture + meter loop until stop.
 
@@ -524,7 +529,8 @@ def run_meter_loop(
     start_time = time.monotonic()
     last_render = 0.0
 
-    while not (stop_event.is_set() and frames_queue.empty()):
+    grace_deadline: float | None = None
+    while True:
         try:
             chunk = frames_queue.get(timeout=0.05)
         except queue.Empty:
@@ -553,8 +559,12 @@ def run_meter_loop(
         if max_seconds is not None and (time.monotonic() - start_time) >= max_seconds:
             stop_event.set()
 
-        if stop_event.is_set() and frames_queue.empty():
-            break
+        if stop_event.is_set():
+            if grace_deadline is None:
+                grace_deadline = time.monotonic() + max(0.0, float(stop_grace_seconds))
+            # Break only after the queue is empty AND grace window has elapsed
+            if frames_queue.empty() and time.monotonic() >= grace_deadline:
+                break
 
     return frames_written, voiced_seconds
 
@@ -591,6 +601,7 @@ def postprocess_and_convert(
     Returns (possibly_updated_duration, mp3_path_or_none).
     """
     duration_sec = current_duration
+    # Single post-processing pass only (trim + attenuate); avoid duplicate runs
     try:
         new_duration = _postprocess_wav_simple(wav_path, sample_rate)
         if new_duration is not None:
@@ -727,7 +738,8 @@ def _postprocess_wav_simple(wav_path: Path, input_sample_rate: int) -> Optional[
     trimmed = audio
     trimmed_any = False
     if above.size > 0:
-        pad_samples = int(0.05 * sr)
+        # Slightly more generous padding to avoid cutting soft tails
+        pad_samples = int(0.10 * sr)
         start = max(int(above[0]) - pad_samples, 0)
         end = min(int(above[-1]) + pad_samples + 1, audio.shape[0])
         if end - start > 0 and (start > 0 or end < audio.shape[0]):
