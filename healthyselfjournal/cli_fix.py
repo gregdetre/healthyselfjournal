@@ -86,5 +86,3 @@ def build_app() -> typer.Typer:
     app.add_typer(_summaries_app, name="summaries")
 
     return app
-
-

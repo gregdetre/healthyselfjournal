@@ -175,7 +175,7 @@ def run_init_wizard(*, xdg: bool = False) -> None:
             )
 
     # Friendly next-step hint
-    console.print("[bold]Next:[/] run [cyan]healthyselfjournal journal[/]")
+    console.print("[bold]Next:[/] run [cyan]uvx healthyselfjournal -- journal cli[/]")
 
 
 def _smoke_test_setup(sessions_dir: Path, stt_backend_value: str) -> None:

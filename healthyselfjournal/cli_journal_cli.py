@@ -695,7 +695,7 @@ def finalize_or_cleanup(*, manager: SessionManager, state, sessions_dir: Path) -
         )
         console.print(
             Panel.fit(
-                f"Session saved to {state.markdown_path.name}",
+                f"Session saved to {state.markdown_path.resolve()}",
                 title="Session Complete",
                 border_style="magenta",
             )
