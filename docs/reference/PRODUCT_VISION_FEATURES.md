@@ -8,6 +8,7 @@ We prioritize evidence-based design and the long-term wellbeing of users and soc
 
 ## See also
 
+- `README.md`
 - `ARCHITECTURE.md` - System architecture, components, and data flow
 - `CLI_COMMANDS.md` - Recording controls and visual feedback
 - `DIALOGUE_FLOW.md` - Question sequencing and session management
@@ -42,33 +43,12 @@ We prioritize evidence-based design and the long-term wellbeing of users and soc
 - Short accidental takes auto-discarded based on duration and voiced-time thresholds
 - Detect-and-suggest transcription resilience with markdown placeholders, error sentinels, and CLI/web reconcile hints (see `RESILIENCE.md`)
 
+
 ## Next Steps
 
-- Time‑based break nudge (research‑aligned)
-  - Gentle reminder around 20 minutes (configurable; defaults to 20)
-  - Non-blocking notice in UI; never auto‑terminate
+Make it easier to setup and run the first time. Especially improve the local-first functionality, make it more robust, rely on defaults.
 
-- Question quality and style
-  - Tighter, single‑focus follow‑ups; slightly lower temperature for clarity
-  - Small prompt refinements for validation/rumination redirection
-  - Keep “give me a question” via embedded examples for variety
+Consider how to monitor and respond to potentially dangerous/crisis situations, e.g. suicidal thoughts.
 
-- Summary brevity and usefulness
-  - Stricter brevity guidance in the prompt; reduce max tokens
-  - Heuristic: very short sessions → very short summaries
+In a separate repo, we have a working mobile app in alpha, but we're struggling to get the Dropbox/iCloud sync working...
 
-- Multi‑backend speech recognition (cloud + local)
-  - Abstract STT backend with pluggable providers
-  - Default: OpenAI (cloud). Optional: local MLX (macOS/Apple Silicon), faster‑whisper (CPU)
-  - CLI flags: `--stt-backend`, `--stt-model`, `--language`; graceful fallback
-  - OS/machine specific guidance; offline mode when local backends selected
-  - Align/reference docs to reflect cloud default and optional local paths
-
-- Audio device selection and diagnostics
-  - `--list-devices` to enumerate; `--input-device` to select
-  - Log selected device name/rate; basic troubleshooting tips
-
-- Resilience and maintenance
-  - Backfill utility to generate missing summaries for older sessions
-  - E2E and CLI integration tests; device enumeration tests; short‑take discard tests
-  - Optional streaming display of LLM responses (fallback to all‑at‑once)

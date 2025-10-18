@@ -12,15 +12,12 @@ Thanks for your interest in contributing! This project aims to make reflective j
 
 - Fork the repo and create a feature branch
 - Follow existing code patterns (check neighboring files for conventions)
-- Run tests: `pytest tests/test_*.py` (see [TESTING.md](TESTING.md))
+- Run tests: `pytest tests/test_*.py` (see [TESTING.md](TESTING.md)) (may be out of date)
 - Submit a pull request with a clear description of changes
 
 ## Philosophy
 
-This project prioritizes:
-- **Voice-first** interaction to reduce friction
-- **Privacy by default** with local processing options
-- **Simple, maintainable** solutions over complex abstractions
+see README.md and docs/reference/PRODUCT_VISION_FEATURES.md for more info.
 
 ## Questions?
 

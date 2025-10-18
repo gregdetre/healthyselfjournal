@@ -79,6 +79,12 @@ healthyselfjournal journal cli --stt-backend local-mlx        # Apple Silicon
 healthyselfjournal journal cli --stt-backend local-faster     # Portable CPU/GPU
 healthyselfjournal journal cli --stt-backend local-whispercpp --stt-model /path/to/model.gguf
 ```
+On Apple Silicon (M1–M4), a good default is MLX Whisper large‑v2:
+
+```bash
+pipx install mlx-whisper
+uvx -p 3.12 healthyselfjournal@latest -- journal cli --stt-backend local-mlx --stt-model large-v2
+```
 2) Use a local LLM via Ollama (daemon must be running)
 ```bash
 healthyselfjournal journal cli --llm-model ollama:gemma3:27b-instruct-q4_K_M
