@@ -74,7 +74,7 @@ Each command lives in its own `cli_*.py` module for clarity:
 - `cli_session.py` – session utilities (also includes `session merge` and `session summaries`)
 - `cli_summarise.py` – legacy summaries utilities (re-exported under `fix`)
 - `cli_diagnose.py` – diagnostics sub-app (mic/local/cloud)
-- `cli_reconcile.py`, `cli_init.py` – other commands (merge lives under `cli_session.py`)
+- `cli_fix.py`, `cli_reconcile.py`, `cli_init.py` – other commands (merge lives under `cli_session.py`)
 
 ## Examples
 
