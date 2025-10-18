@@ -2,16 +2,19 @@
 
 **Speak your thoughts. Get good questions. Build healthier patterns.**
 
-A voice-based journaling tool that makes self-reflection as easy as thinking out loud. Just ramble for a while about what's on your mind, and receive thoughtful, evidence-based questions that help you think things through without getting stuck in unhelpful thought loops.
+A voice-based journaling and self-reflection tool. Just ramble for a while out loud about what's on your mind, and receive a warm, thoughtful, evidence-based question each time in response to help you think things through.
+
+Note: this beta version runs in the command-line and relies on OpenAI & Anthropic models.
+
 
 ## What makes this different
 
-🎙️ **Voice-first**: Start journaling instantly by speaking – no typing, no friction.
-🧠 **Wise, helpful questions**: Evidence-based prompts adapted from cognitive behavioral therapy, psychology research, mindfulness practice, and famous coaches.
-🔄 **Keeps you moving**: Gentle redirection when you're spiraling; deeper exploration when you're onto something.
-📊 **Builds on your history**: Each session connects to previous ones for continuity and growth.
-🔒 **Privacy choice**: Use Anthropic + OpenAI OR private/local LLM+transcription (in beta), as you prefer. Healthyself doesn't have any backend, storage, or analytics of its own outside your machine at all).
-🛡️ **Aims to be safe**: Anti-sycophancy, rumination pivots, and clear boundaries; see `docs/reference/SAFEGUARDING.md`.
+- 🎙️ **Voice-first**: Start journaling instantly by speaking – no typing, no friction.
+- 🧠 **Wise, helpful questions**: Evidence-based prompts adapted from cognitive behavioral therapy, psychology research, mindfulness practice, and famous coaches.
+- 🔄 **Keeps you moving**: Gentle redirection when you're spiraling; deeper exploration when you're onto something.
+- 📊 **Builds on your history**: Each session connects to previous ones for continuity and growth.
+- 🔒 **Privacy choice**: Use Anthropic + OpenAI OR private/local LLM+transcription (in beta), as you prefer. Healthyself doesn't have any backend, storage, or analytics of its own outside your machine at all).
+- 🛡️ **Aims to be safe**: Anti-sycophancy, rumination pivots, and clear boundaries; see [`docs/reference/SAFEGUARDING.md`](docs/reference/SAFEGUARDING.md).
 - **Open source**. So you can see & modify the prompts and research for yourself.
 - This is assisted reflection. It's not trying to be or replace human conversation or therapy.
 
@@ -23,7 +26,7 @@ uvx healthyselfjournal -- init
 uvx healthyselfjournal -- journal cli
 ```
 
-That's it. Recording starts immediately. Press any key to stop and get your next question.
+That's it. Recording starts immediately. Press ENTER to stop and get your next question.
 
 Tip for first‑time users: if `uvx` isn’t found, install `uv` (which provides `uvx`) and try again:
 
@@ -34,15 +37,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-## Who this is for
-
-If you've tried journaling but found it hard to maintain, or if you appreciate good questions to help you reflect more deeply, this tool is designed for you. It combines the ease of voice recording with the structure of guided reflection, using techniques validated by research to help you develop healthier thinking patterns.
 
 ## How it works
 
 1. **Start speaking** – Recording begins immediately when you launch
 2. **Press any key to stop** – Your audio is transcribed automatically
-3. **Get a thoughtful question** – Based on what you shared and your patterns
+3. **Get a thoughtful question** (out loud if you want) – Based on what you shared and your patterns
 4. **Keep going or wrap up** – Continue as long as helpful, or press Q to end with a summary
 
 
@@ -74,7 +74,7 @@ For example, the question above draws on the following approaches: *[Values expl
 - Optional: `ffmpeg` on PATH for background MP3 conversion
 - Linux only: install audio libs (e.g., `sudo apt install portaudio19-dev libsndfile1`)
 
-See `docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md` and `docs/reference/PRIVACY.md` for details.
+See [`docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md`](docs/reference/AUDIO_VOICE_RECOGNITION_WHISPER.md) and [`docs/reference/PRIVACY.md`](docs/reference/PRIVACY.md) for details.
 
 ### Install
 
@@ -90,37 +90,37 @@ pip install healthyselfjournal
 
 The setup wizard will help you:
 - Add your API keys securely
-- Choose between Cloud mode (recommended) or Privacy mode (fully offline)
+- Choose between Cloud mode (recommended) or Privacy mode (fully offline, but still in beta)
 - Pick where to save your journal sessions
 
 ```bash
 # Recommended
 uvx healthyselfjournal -- init
-
-# Or if installed via pip
-healthyselfjournal init
 ```
+
 
 ## Daily use
 
 ```bash
 # Start a new session
-healthyselfjournal journal cli
+uvx healthyselfjournal -- journal cli
 
 # Continue your last session
-healthyselfjournal journal cli --resume
+uvx healthyselfjournal -- journal cli --resume
 ```
 
-### Insights (v1)
+Use `--sessions-dir` to decide where to store them - otherwise it defaults to `sessions/`.
 
-Generate reflective insights based on your past summaries and recent transcripts, saved under `sessions/insights/`:
+### Insights (beta)
+
+Generate high-level reflective insights every so often spanning recent conversations, saved under `sessions/insights/`:
 
 ```bash
 # List existing insights
-healthyselfjournal insight list --sessions-dir ./sessions
+uvx healthyselfjournal -- insight list --sessions-dir ./sessions
 
 # Generate multiple insights in a single file
-healthyselfjournal insight generate --sessions-dir ./sessions --count 3
+uvx healthyselfjournal -- insight generate --sessions-dir ./sessions --count 3
 ```
 
 ### Controls
@@ -132,7 +132,8 @@ healthyselfjournal insight generate --sessions-dir ./sessions --count 3
 
 **Cloud mode** (default): Uses OpenAI for transcription and Anthropic Claude for questions. Best accuracy and response quality.
 
-**Privacy mode**: Everything stays on your device. Requires [Ollama](https://ollama.ai) for local AI and choosing a local transcription option. See `docs/reference/PRIVACY.md` for details.
+**Privacy mode**: Everything stays on your device. Requires [Ollama](https://ollama.ai) for local AI and choosing a local transcription option. See [`docs/reference/PRIVACY.md`](docs/reference/PRIVACY.md) for details.
+
 
 ## Where your journal lives
 
@@ -150,7 +151,7 @@ You own all your data. Export it, back it up, or delete it anytime.
 
 ## The research behind it
 
-This tool is built on decades of evidence-based psychological research, integrating over 30 documented therapeutic and coaching frameworks:
+Healthyself journal is built primarily on evidence-based psychological research (and a few other things that we have found helpful), integrating over 30 documented therapeutic and coaching frameworks:
 
 ### Core Therapeutic Foundations
 - **Cognitive Behavioral Therapy (CBT)**: Socratic questioning to identify and reframe thought patterns (meta-analyses show d=0.73 effect size)
@@ -194,9 +195,11 @@ Questions inspired by renowned coaches and researchers:
 
 The system continuously analyzes your responses for emotional intensity, thought patterns, topic persistence, exhaustion signals, and readiness for change, adapting its questioning strategy based on session phase and your current needs.
 
-For an overview of all 30+ research areas and methodologies, see `docs/research/RESEARCH_TOPICS.md` and `docs/reference/SCIENTIFIC_RESEARCH_EVIDENCE_PRINCIPLES.md`.
+For an overview of all 30+ research areas and methodologies, see [`docs/research/RESEARCH_TOPICS.md`](docs/research/RESEARCH_TOPICS.md) and [`docs/reference/SCIENTIFIC_RESEARCH_EVIDENCE_PRINCIPLES.md`](docs/reference/SCIENTIFIC_RESEARCH_EVIDENCE_PRINCIPLES.md).
 
 ## Advanced options
+
+(These are in development, and probably won't work yet)
 
 ### Desktop app (in alpha)
 ```bash
@@ -218,7 +221,7 @@ healthyselfjournal journal cli --sessions-dir ~/Documents/journal
 
 - **Issues or questions**: [GitHub Issues](https://github.com/gregdetre/healthyselfjournal/issues)
 - **Full documentation**: See the `docs/` folder
-- **Contributing**: Contributions welcome! See `CONTRIBUTING.md`
+- **Contributing**: Contributions welcome! See [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ## Technical details
 
@@ -228,5 +231,5 @@ For developers and technical users:
 - Transcription via OpenAI Whisper API (or local alternatives)
 - Questions generated by Anthropic Claude (or local Ollama models)
 - Either everything runs locally (your data never leaves your device), or choose cloud services
-- See `docs/reference/ARCHITECTURE.md` for system design
-- See `AGENTS.md` for development setup
+- See [`docs/reference/ARCHITECTURE.md`](docs/reference/ARCHITECTURE.md) for system design
+- See [`AGENTS.md`](AGENTS.md) for development setup
