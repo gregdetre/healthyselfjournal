@@ -20,8 +20,9 @@ This document describes the end‑to‑end process for packaging and publishing 
 - Wheel packaging: includes Python modules plus required runtime assets:
   - Jinja prompts: `healthyselfjournal/prompts/*.jinja`
   - Static assets for the web UI: `healthyselfjournal/static/{css,js}/*`
+  - Web templates for the web UI: `healthyselfjournal/web/templates/*.jinja`
 - CLI entry point: `healthyselfjournal` → `healthyselfjournal.__main__:app` (Typer app defined in `healthyselfjournal/cli.py`).
-- Dependencies: pinned lower bounds; notable constraints include `python-fasthtml>=0.3,<0.4` and `fastcore` (kept compatible with `python-fasthtml`).
+- Dependencies: pinned lower bounds; notable constraints include `python-fasthtml>=0.12,<0.13` and `fastcore>=1.6.7,<2.0` (kept compatible with `python-fasthtml`).
 - Python requirement: `>=3.10` (with `tomli` fallback for TOML parsing on <3.11).
 - Dev convenience: `[tool.uv.sources] gjdutils = { path = "./gjdutils", editable = true }` for local work; published wheels depend on the public `gjdutils` (`>=0.6.1`).
 - Verified: build + smoke tests pass; published to TestPyPI and validated via a fresh venv.
@@ -54,7 +55,7 @@ uv build
 
 ```bash
 # Inspect wheel contents for assets
-unzip -l dist/*.whl | rg -n "prompts/|static/|RECORD|healthyselfjournal/__main__|healthyselfjournal/cli.py"
+unzip -l dist/*.whl | rg -n "prompts/|static/|web/templates/|RECORD|healthyselfjournal/__main__|healthyselfjournal/cli.py"
 
 # Smoke test console script directly from the wheel (no install)
 uvx --from dist/*.whl healthyselfjournal -- --help
@@ -141,7 +142,7 @@ uvx --python 3.12 healthyselfjournal -- --help
   - Validate with `python -m build` or `uv build` and inspect the generated `METADATA`/`RECORD`.
 
 - Python version mismatches on user systems:
-  - Project requires Python `>=3.12`. Document `uvx --python 3.12 healthyselfjournal` for easy runs on older default interpreters.
+  - Project requires Python `>=3.10`. Document `uvx --python 3.12 healthyselfjournal` (or your preferred version) for easy runs on older default interpreters.
 
 - Platform/system deps:
   - `ffmpeg` is optional (for background MP3 conversion) and is not bundled. Document as an external prerequisite.
@@ -168,36 +169,40 @@ uvx --python 3.12 healthyselfjournal -- --help
 
 ## Release checklist (copy/paste)
 
-- [x] Bump version in `pyproject.toml` and commit
+- [x] Bump version in `pyproject.toml`
+- [x] Update `CHANGELOG.md` with highlights for this release
+- [x] Commit version and changelog (clean working tree)
 - [x] `uv build` completes; wheel and sdist produced
-- [x] Wheel contains `prompts/` and `static/` assets
+- [x] Wheel contains `prompts/`, `static/`, and `web/templates/` assets
 - [x] `uvx --from dist/*.whl healthyselfjournal -- --help` works
 - [x] Prompt asset load smoke test passes
+- [x] Push commit to main: `git push origin main`
 - [x] `uvx twine upload dist/*` publishes to PyPI
 - [ ] `uvx healthyselfjournal -- --help` works on a clean machine
+- [ ] Pin-run check: `uvx healthyselfjournal==<version> -- --help`
+- [ ] Tag and push (triggers desktop CI build): `git tag v<version> && git push origin v<version>`
+- [ ] (Optional) Create a GitHub release from the tag
 - [ ] Docs updated (`README.md`, `CLI_COMMANDS.md`) if flags/flows changed
- - [ ] Pin-run check: `uvx healthyselfjournal==<version> -- --help`
- - [ ] Tag and push (triggers desktop CI build): `git tag v<version> && git push origin v<version>`
- - [ ] Update `CHANGELOG.md` with highlights for this release
- - [ ] (If enabled) CI Trusted Publishing workflow runs and succeeds
- - [ ] If distributing the desktop app, follow the Desktop app release checklist in `docs/reference/DESKTOP_APP_PYWEBVIEW.md`
+- [ ] (If enabled) CI Trusted Publishing workflow runs and succeeds
+- [ ] If distributing the desktop app, follow the Desktop app release checklist in `docs/reference/DESKTOP_APP_PYWEBVIEW.md`
 
 ## Quick checklist for a new version
 
 Short, practical steps for routine releases (example bumps 0.2.0 → 0.2.1):
 
 1. Edit `pyproject.toml` → `[project] version = "0.2.1"`
-2. Build: `uv build`
-3. Inspect wheel: `unzip -l dist/*.whl | rg -n "prompts/|static/"`
-4. Local smoke test:
+2. Update `CHANGELOG.md` with a `0.2.1` section
+3. Commit both: `git add pyproject.toml CHANGELOG.md && git commit -m "chore: bump to 0.2.1; docs: changelog"`
+4. Build: `uv build`
+5. Inspect wheel: `unzip -l dist/*.whl | rg -n "prompts/|static/|web/templates/"`
+6. Local smoke test:
    - `uvx --from dist/*.whl healthyselfjournal -- --help`
    - `uvx --from dist/*.whl python -c "import healthyselfjournal.llm as m; print(m._load_prompt('question.prompt.md.jinja')[:40])"`
-5. Upload:
+7. Upload:
    - TestPyPI (optional): `uvx twine upload -r testpypi dist/*`
    - PyPI: `uvx twine upload dist/*`
-6. Validate from PyPI:
+8. Validate from PyPI:
    - `uvx healthyselfjournal==0.2.1 -- --help`
    - Optional: `uvx --python 3.12 healthyselfjournal==0.2.1 -- --help`
-7. Commit/tag (triggers desktop build): `git tag v0.2.1 && git push origin v0.2.1`
-8. Update `CHANGELOG.md` and docs if user‑facing changes were made
-9. If shipping the desktop app, follow the Desktop app release checklist in `docs/reference/DESKTOP_APP_PYWEBVIEW.md`
+9. Push/tag (triggers desktop build): `git push origin main && git tag v0.2.1 && git push origin v0.2.1`
+10. If shipping the desktop app, follow the Desktop app release checklist in `docs/reference/DESKTOP_APP_PYWEBVIEW.md`

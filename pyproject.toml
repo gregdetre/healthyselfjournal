@@ -1,6 +1,6 @@
 [project]
 name = "healthyselfjournal"
-version = "0.2.8"
+version = "0.2.9"
 description = "Voice journaling CLI with Whisper transcription and Claude follow-ups"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,11 +22,22 @@ dependencies = [
     "soundfile>=0.12.1",
     "pywebview>=5.1",
     "platformdirs>=4.3.0",
-    "faster-whisper>=1.0.1",
     "typer>=0.9.0",
     "tqdm>=4.66.0",
     # Provide TOML parsing for Python < 3.11
     "tomli>=2.0; python_version < \"3.11\"",
+]
+
+[project.optional-dependencies]
+# Local STT backends are optional; install only when requested.
+local-faster = [
+    "faster-whisper>=1.0.1",
+]
+local-mlx = [
+    "mlx-whisper",
+]
+local-whispercpp = [
+    "whispercpp",
 ]
 
 [project.scripts]

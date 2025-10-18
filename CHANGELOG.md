@@ -1,3 +1,9 @@
+## 0.2.9 - 2025-10-18
+
+- Publishing docs: clarified release order and added web template asset check
+- Packaging: ensure web templates verified in wheel inspection
+- Minor: dependency constraints documented to match `pyproject.toml`
+
 ## 0.2.8 - 2025-10-18
 
 - Local LLM: realistic prompt mode and per-run model override in diagnose
