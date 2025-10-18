@@ -1,3 +1,11 @@
+## 0.2.8 - 2025-10-18
+
+- Local LLM: realistic prompt mode and per-run model override in diagnose
+- CLI: add `diagnose local compare` subcommand; refine init/init_app UX
+- Model manager: more robust model path resolution and cache safety
+- Packaging: wheel verified (prompts/static bundled); `uvx` smoke tests pass
+- Published to PyPI and tagged `v0.2.8`
+
 ## 0.2.5 - 2025-10-17
 
 - Add `version` command to CLI (`healthyselfjournal -- version`)
@@ -38,3 +46,4 @@ All notable changes to this project will be documented in this file.
 
 [0.2.0]: https://pypi.org/project/healthyselfjournal/0.2.0/
  [0.2.4]: https://pypi.org/project/healthyselfjournal/0.2.4/
+ [0.2.8]: https://pypi.org/project/healthyselfjournal/0.2.8/
