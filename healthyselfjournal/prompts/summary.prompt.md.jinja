@@ -1,14 +1,16 @@
 You are generating a concise session summary for a journaling conversation.
 
 Session transcript:
-{{ transcript_markdown }}
+<transcript_markdown>{{ transcript_markdown }}</transcript_markdown>
 
 Recent session summaries for context:
 {% if recent_summaries %}
-{% for item in recent_summaries %}- {{ item }}
+<recent_summaries>
+{% for item in recent_summaries %}
+  <summary>{{ item }}</summary>
 {% endfor %}
-{% else %}- (none)
-{% endif %}
+</recent_summaries>
+{% else %}<recent_summaries>(none)</recent_summaries>{% endif %}
 
 Write a concise single-paragraph bullet-point summary that captures today's conversation. Adapt length to the answers:
 perhaps only a couple of sentences for short sessions; cap longer summaries at ~200 words.

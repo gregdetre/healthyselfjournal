@@ -167,7 +167,7 @@ Mix and vary your approach - draw from different methodologies to keep sessions 
 
 ## Response Format
 
-Respond in {{ language }} with a single question that:
+Respond in <language>{{ language }}</language> with a single question that:
 1. Acknowledges what you heard (brief validation if needed).
 2. Asks one clear, purposeful question based on your analysis
 3. Feels natural and conversational, not clinical
@@ -178,19 +178,25 @@ Remember: Your goal is to facilitate insight and growth while preventing harmful
 ## Context
 
 {% if recent_summaries %}
+<recent_summaries>
 Recent session summaries:
 {% for item in recent_summaries %}
-- {{ item }}
+  <summary>{{ item }}</summary>
 {% endfor %}
+</recent_summaries>
 {% else %}
 (No prior summaries provided.)
 {% endif %}
 
+<current_session_transcript>
 Current session transcript:
 {{ current_transcript }}
+</current_session_transcript>
 
-Session time so far: {{ conversation_duration }} (minutes:seconds).
+Session time so far: <conversation_duration>{{ conversation_duration }}</conversation_duration> (minutes:seconds).
 
 {% if llm_questions_debug %}
+<debug_instructions>
 Postscript (debugging): After your single question, append a short line starting with "PS (debug):" listing which approaches you drew on (e.g., validation, Socratic, MI, Clean Language, reframing, action focus, etc), and the key signal(s) that led you there. Keep this PS concise.
+</debug_instructions>
 {% endif %}

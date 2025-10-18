@@ -12,28 +12,36 @@ Boundaries:
 - No prescriptive advice (avoid "you should...")
 - No facilitator-originated metaphors
 
-Context range: {{ range_text }}
+Context range: <range_text>{{ range_text }}</range_text>
 
 Prior insights excerpt (to avoid repetition and highlight changes):
+<prior_insights_excerpt>
 {{ prior_insights_excerpt }}
+</prior_insights_excerpt>
 
 Historical session summaries (oldest → newest):
 {% if historical_summaries %}
-{% for item in historical_summaries %}- {{ item }}
+<historical_summaries>
+{% for item in historical_summaries %}
+  <summary>{{ item }}</summary>
 {% endfor %}
-{% else %}- (none)
-{% endif %}
+</historical_summaries>
+{% else %}(none){% endif %}
 
 Recent full transcripts (newest window since last insights):
 {% if recent_transcripts %}
+<recent_transcripts>
 {% for t in recent_transcripts %}
 ---
+<transcript>
 {{ t }}
+</transcript>
 {% endfor %}
+</recent_transcripts>
 {% else %}(no recent full transcripts available){% endif %}
 
 Guidelines (concise reminders):
-{{ guidelines }}
+<guidelines>{{ guidelines }}</guidelines>
 
 {% if insight_count %}
 Write {{ insight_count }} concise insight{{ '' if (insight_count == 1) else 's' }}:
