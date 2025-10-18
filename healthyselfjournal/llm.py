@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import logging
 import random
 import time
+import platform
 from functools import lru_cache
 from pathlib import Path
 from typing import Iterable, Sequence, Callable, Any
@@ -581,6 +582,51 @@ def _load_prompt(filename: str) -> str:
 _ANTHROPIC_CLIENT: Anthropic | None = None
 
 
+def _format_ollama_connect_help(*, base_url: str, model: str) -> str:
+    """Return contextual, platform-specific guidance for an Ollama connection failure.
+
+    Designed to be appended to exception messages for semi-technical users.
+    """
+    system = platform.system().lower()
+    common = [
+        f"Could not reach Ollama at {base_url} (for model '{model}').",
+        "Try the following:\n1) Start the Ollama server\n   - Foreground: ollama serve\n   - Verify: curl -s http://127.0.0.1:11434/api/version && echo",
+        "2) If Ollama runs on another host/port, set OLLAMA_BASE_URL, e.g.\n   export OLLAMA_BASE_URL=http://192.168.1.10:11434",
+    ]
+
+    if system == "darwin":
+        os_specific = [
+            "macOS tips:",
+            "- Launch as a background service (Homebrew): brew services start ollama",
+            "- If using Docker for your app, use host.docker.internal: http://host.docker.internal:11434",
+        ]
+    elif system == "linux":
+        os_specific = [
+            "Linux tips:",
+            "- If installed as a systemd service: sudo systemctl start ollama && sudo systemctl status ollama",
+            "- Firewall: sudo ufw allow 11434/tcp (if UFW is enabled)",
+            "- In Docker: use host.docker.internal (on macOS/Windows) or bind Ollama with OLLAMA_HOST=0.0.0.0:11434",
+        ]
+    elif system == "windows":
+        os_specific = [
+            "Windows tips:",
+            "- Start via 'ollama serve' or the Ollama Desktop app",
+            "- Verify with: curl http://127.0.0.1:11434/api/version",
+            "- If your app runs in Docker, use http://host.docker.internal:11434",
+        ]
+    else:
+        os_specific = []
+
+    tail = [
+        "If the model is missing, pull it first:",
+        f"  ollama pull {model}",
+        "Then test:",
+        f"  ollama run {model} -p 'Hello'",
+    ]
+
+    return "\n".join(common + os_specific + tail)
+
+
 def _call_ollama(
     model: str,
     prompt: str,
@@ -628,7 +674,61 @@ def _call_ollama(
             if not content:
                 raise ValueError("Ollama response missing assistant content")
             return str(content).strip()
-        except (httpx.RequestError, httpx.HTTPStatusError, ValueError) as exc:
+        except httpx.HTTPStatusError as exc:
+            # Compatibility fallback: older Ollama versions only support /api/generate
+            if exc.response is not None and exc.response.status_code == 404:
+                try:
+                    _LOGGER.info(
+                        "/api/chat not available (404); trying /api/generate compatibility path"
+                    )
+                    gen_url = f"{base_url}/api/generate"
+                    gen_payload = {
+                        "model": model,
+                        "prompt": prompt,
+                        "system": SYSTEM_PROMPT,
+                        "stream": False,
+                        "options": options,
+                    }
+                    gen_resp = httpx.post(gen_url, json=gen_payload, timeout=timeout)
+                    gen_resp.raise_for_status()
+                    gen_data = gen_resp.json()
+                    # /api/generate returns { "response": "..." }
+                    gen_text = gen_data.get("response")
+                    if not gen_text:
+                        # Some variants may still nest content under message
+                        gen_text = (gen_data.get("message") or {}).get("content")
+                    if not gen_text:
+                        raise ValueError(
+                            "Ollama generate response missing text content"
+                        )
+                    return str(gen_text).strip()
+                except Exception as gen_exc:
+                    last_error = gen_exc
+                    _LOGGER.warning("Ollama generate fallback failed: %s", gen_exc)
+                    log_event(
+                        "llm.retry",
+                        {
+                            "provider": "ollama",
+                            "model": model,
+                            "attempt": attempt,
+                            "error_type": gen_exc.__class__.__name__,
+                        },
+                    )
+            else:
+                last_error = exc
+                _LOGGER.warning(
+                    "Ollama call failed (attempt %s/%s): %s", attempt, max_retries, exc
+                )
+                log_event(
+                    "llm.retry",
+                    {
+                        "provider": "ollama",
+                        "model": model,
+                        "attempt": attempt,
+                        "error_type": exc.__class__.__name__,
+                    },
+                )
+        except (httpx.RequestError, ValueError) as exc:
             last_error = exc
             _LOGGER.warning(
                 "Ollama call failed (attempt %s/%s): %s", attempt, max_retries, exc
@@ -672,6 +772,22 @@ def _call_ollama(
             "error": str(last_error),
         },
     )
+    try:
+        import httpx as _httpx
+    except Exception:  # pragma: no cover - defensive import
+        _httpx = None  # type: ignore
+
+    # When connection is refused, append actionable guidance
+    if _httpx is not None and isinstance(last_error, _httpx.RequestError):
+        message = str(last_error)
+        lowered = message.lower()
+        if ("connection refused" in lowered) or (
+            getattr(last_error, "__class__", None)
+            and "connecterror" in last_error.__class__.__name__.lower()
+        ):
+            help_text = _format_ollama_connect_help(base_url=base_url, model=model)
+            raise RuntimeError(f"{message}\n\n{help_text}") from last_error
+
     raise last_error
 
 

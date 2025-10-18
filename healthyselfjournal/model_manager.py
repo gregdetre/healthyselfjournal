@@ -3,6 +3,7 @@ from __future__ import annotations
 """Persistent model management utilities for local AI backends."""
 
 from dataclasses import dataclass, field
+import os
 import hashlib
 import json
 import platform
@@ -43,11 +44,7 @@ class ModelManager:
         root.mkdir(parents=True, exist_ok=True)
         model_dir = root / model_name
 
-        metadata = (
-            self._metadata
-            .setdefault("faster-whisper", {})
-            .get(model_name)
-        )
+        metadata = self._metadata.setdefault("faster-whisper", {}).get(model_name)
 
         if model_dir.exists():
             if metadata:
@@ -91,11 +88,7 @@ class ModelManager:
 
         root = self._models_dir / "faster-whisper"
         model_dir = root / model_name
-        metadata = (
-            self._metadata
-            .get("faster-whisper", {})
-            .get(model_name)
-        )
+        metadata = self._metadata.get("faster-whisper", {}).get(model_name)
         if not model_dir.exists() or not metadata:
             return False
         return self._verify_directory(model_dir, metadata)
@@ -110,7 +103,7 @@ class ModelManager:
         return "cpu"
 
     def faster_whisper_model_dir(self, model_name: str) -> Path:
-        return (self._models_dir / "faster-whisper" / model_name)
+        return self._models_dir / "faster-whisper" / model_name
 
     def ensure_llama_model(
         self, model_name: str, *, url: str | None = None, sha256: str | None = None
@@ -146,7 +139,9 @@ class ModelManager:
             self.record_llama_model(model_name, target)
         else:
             if sha256 and not self._verify_file_hash(target, sha256):
-                raise RuntimeError("Local LLM model checksum mismatch after verification.")
+                raise RuntimeError(
+                    "Local LLM model checksum mismatch after verification."
+                )
             if not metadata:
                 self.record_llama_model(model_name, target)
 
@@ -173,6 +168,31 @@ class ModelManager:
 
     def llama_model_path(self, model_name: str) -> Path:
         return self._models_dir / "llama" / model_name
+
+    def delete_llama_model(self, model_name: str) -> bool:
+        """Delete a managed llama gguf file and remove metadata.
+
+        Returns True if a file or metadata entry was removed; False otherwise.
+        """
+
+        models_root = self._models_dir / "llama"
+        target = models_root / model_name
+        removed_any = False
+
+        try:
+            if target.exists():
+                target.unlink(missing_ok=True)
+                removed_any = True
+        except Exception:
+            # Continue to metadata cleanup even if file removal fails
+            pass
+
+        meta_root = self._metadata.setdefault("llama", {})
+        if meta_root.pop(model_name, None) is not None:
+            removed_any = True
+            self._write_metadata()
+
+        return removed_any
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -225,19 +245,35 @@ class ModelManager:
                 digest.update(chunk)
         return digest.hexdigest()
 
-    def _download_file(self, url: str, destination: Path, *, sha256: str | None = None) -> None:
+    def _download_file(
+        self, url: str, destination: Path, *, sha256: str | None = None
+    ) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        with httpx.stream("GET", url, follow_redirects=True, timeout=120.0) as response:
+        headers: Dict[str, str] = {}
+        # Support private/gated Hugging Face downloads when a token is provided
+        token = (
+            os.environ.get("HUGGING_FACE_HUB_TOKEN")
+            or os.environ.get("HF_TOKEN")
+            or os.environ.get("HUGGING_FACE_TOKEN")
+        )
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        with httpx.stream(
+            "GET", url, headers=headers, follow_redirects=True, timeout=120.0
+        ) as response:
             response.raise_for_status()
             total = int(response.headers.get("content-length") or 0)
-            with destination.open("wb") as fh, tqdm(
-                total=total if total > 0 else None,
-                unit="B",
-                unit_scale=True,
-                unit_divisor=1024,
-                desc=destination.name,
-                leave=True,
-            ) as bar:
+            with (
+                destination.open("wb") as fh,
+                tqdm(
+                    total=total if total > 0 else None,
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    desc=destination.name,
+                    leave=True,
+                ) as bar,
+            ):
                 for chunk in response.iter_bytes(1024 * 128):
                     if not chunk:
                         continue
